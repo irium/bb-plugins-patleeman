@@ -77,6 +77,7 @@ import {
 import { ChannelPermissionPicker } from "./channel-permissions";
 import {
   channelLinkDestination,
+  channelMessageIdFromSubPath,
   channelMessageReference,
 } from "./channel-links";
 import { ChannelAutomationsView } from "./channel-automations-view";
@@ -1653,11 +1654,7 @@ export function ChannelsPage({ subPath }: PluginNavPanelProps) {
       );
     };
   }, [id, dmBotId]);
-  let messageId: string | undefined;
-  try {
-    if (subPath.split("/")[1] === "message")
-      messageId = decodeURIComponent(subPath.split("/").slice(2, subPath.endsWith("/reply") ? -1 : undefined).join("/"));
-  } catch {}
+  const messageId = channelMessageIdFromSubPath(subPath);
   return dmBotId ? (
     <BotDirectMessagePage key={dmBotId} botId={dmBotId}
       selectedThreadId={subPath.split("/")[2]} />

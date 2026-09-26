@@ -9,6 +9,7 @@ import type {
 import { Button } from "./components/ui/button";
 import { EmptyState, ErrorMessage, message, StatusBadge } from "./bot-ui";
 import { Modal } from "./channel-controls";
+import { channelMessageSubPath } from "./channel-links";
 
 export function ChannelAutomationsView({
   id,
@@ -318,7 +319,7 @@ export function ChannelAutomationsView({
                         size="sm"
                         onClick={() => {
                           navigate.toPluginPanel("channels", {
-                            subPath: `${id}/message/${encodeURIComponent(run.responseMessageId!)}`,
+                            subPath: channelMessageSubPath(id, run.responseMessageId!),
                           });
                           window.dispatchEvent(
                             new CustomEvent("bb:bots:jump", {

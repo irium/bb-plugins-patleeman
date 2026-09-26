@@ -13,6 +13,30 @@ export function channelMessageReference(
   return `[${label}](/plugins/bot-teams/channels/${encodeURIComponent(roomId)}/message/${encodeURIComponent(messageId)})`;
 }
 
+/**
+ * The channels panel subpath for a message. toPluginPanel encodes subpath
+ * segments itself, so the message ID must stay raw. Pre-encoding it turns ':'
+ * into '%253A', and the split-view route never decodes that back.
+ */
+export function channelMessageSubPath(roomId: string, messageId: string) {
+  return `${roomId}/message/${messageId}`;
+}
+
+/**
+ * Reads the message ID back from a channels panel subpath. Routed panels get
+ * the subpath decoded once and split views get it still encoded, so decode
+ * exactly once here; raw IDs never contain '%'.
+ */
+export function channelMessageIdFromSubPath(subPath: string) {
+  const parts = subPath.split("/");
+  if (parts[1] !== "message") return undefined;
+  try {
+    return decodeURIComponent(parts.slice(2, subPath.endsWith("/reply") ? -1 : undefined).join("/"));
+  } catch {
+    return undefined;
+  }
+}
+
 export function channelLinkDestination(
   href: string,
   currentOrigin: string,
@@ -41,9 +65,7 @@ export function channelLinkDestination(
     if (!match[2]) return id;
     const messageId = decodeURIComponent(match[2]);
     if (!messageId || /[\u0000-\u001f\u007f]/u.test(messageId)) return null;
-    // toPluginPanel encodes subpath segments itself. Passing an encoded ID
-    // here would turn ':' into '%253A' and lose the message on navigation.
-    return `${id}/message/${messageId}`;
+    return channelMessageSubPath(id, messageId);
   } catch {
     return null;
   }

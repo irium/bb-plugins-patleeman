@@ -9,6 +9,7 @@ import {
 import type { Attention, AttentionView, rpcContract } from "./contract";
 import { Button } from "./components/ui/button";
 import { ErrorMessage, message } from "./bot-ui";
+import { channelMessageSubPath } from "./channel-links";
 
 export function useAttention(
   status: Attention["status"] = "open",
@@ -169,7 +170,7 @@ export function ChannelAttentionBanner({
         size="sm"
         variant="ghost"
         onClick={() => navigate.toPluginPanel("channels", {
-          subPath: `${roomId}/message/${encodeURIComponent(data.items[0]!.message.id)}`,
+          subPath: channelMessageSubPath(roomId, data.items[0]!.message.id),
         })}
       >
         Go to request

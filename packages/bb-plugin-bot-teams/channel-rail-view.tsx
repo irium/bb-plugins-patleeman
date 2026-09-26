@@ -28,6 +28,7 @@ import type { PluginFixedTabRegistration } from "@get-bb/plugin-sdk/app";
 import type { ChannelAutomation } from "./automation-contract";
 import { Button } from "./components/ui/button";
 import { message } from "./bot-ui";
+import { channelMessageSubPath } from "./channel-links";
 import { attachmentUrl } from "./channel-attachments";
 import { revealApproval } from "./channel-approvals";
 import { ChannelAutomationsView } from "./channel-automations-view";
@@ -563,7 +564,7 @@ export function ChannelRail({
                 className="channel-rail-row channel-rail-attention"
                 onClick={() =>
                   navigate.toPluginPanel("channels", {
-                    subPath: `${room.id}/message/${encodeURIComponent(item.message.id)}`,
+                    subPath: channelMessageSubPath(room.id, item.message.id),
                   })
                 }
               >

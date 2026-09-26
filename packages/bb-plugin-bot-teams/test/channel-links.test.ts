@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import {
   channelLinkDestination,
+  channelMessageIdFromSubPath,
   channelMessageReference,
+  channelMessageSubPath,
 } from "../channel-links";
 
 const id = "1a5943b7-4148-436b-94b0-aab0a5401064";
@@ -111,4 +113,17 @@ test("unrelated servers, schemes, downloads and malformed routes are not treated
       channelLinkDestination(href, "https://bb.example.com", known),
       null,
     );
+});
+
+test("message subpaths survive both host routes", () => {
+  // BB encodes each subpath segment into the URL. Routed panels read the
+  // splat decoded once; split views read it with matchPath, still encoded.
+  const url = channelMessageSubPath(id, messageId)
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/");
+  const routed = url.split("/").map(decodeURIComponent).join("/");
+  for (const subPath of [routed, url, `${routed}/reply`, `${url}/reply`])
+    assert.equal(channelMessageIdFromSubPath(subPath), messageId);
+  assert.equal(channelMessageIdFromSubPath(id), undefined);
 });
