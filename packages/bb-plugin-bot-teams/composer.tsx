@@ -40,6 +40,7 @@ import {
   clearSentDraft,
   type Draft,
 } from "./draft";
+import { notifyChannelDraftChanged } from "./channel-draft-state";
 import { SendModeMenu, SendModeOverride } from "./send-mode-picker";
 import {
   parseSendMode,
@@ -161,6 +162,7 @@ export function GroupComposer({
     try {
       localStorage.setItem(key, JSON.stringify(next));
     } catch {}
+    notifyChannelDraftChanged(roomId);
     setDraftState(next);
   };
   const [voiceEnabled, setVoiceEnabled] = useState(false);

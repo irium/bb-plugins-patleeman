@@ -51,6 +51,7 @@ async function setup() {
       },
       threads: {
         get: async () => makeThreadResponse({ environmentId: "env_remote" }),
+        list: async () => [],
         update: async () => makeThreadResponse(),
         stop: async () => ({ ok: true }),
         queuedMessages: {

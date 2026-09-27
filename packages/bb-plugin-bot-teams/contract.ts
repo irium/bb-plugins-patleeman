@@ -66,6 +66,25 @@ export const botListItemSchema = botSchema.extend({
   lastActivityAt: z.number().nullable(),
 });
 export type BotListItem = z.infer<typeof botListItemSchema>;
+export const directThreadIndicatorSchema = z.enum([
+  "background-agent", "background-command", "draft", "goal", "none",
+  "plan-mode", "queued-failed", "queued-waiting", "runtime",
+  "unread-error", "unread-success", "waiting-for-input", "workflow",
+  "working-draft",
+]);
+export const threadStatusViewSchema = z.object({
+  threadId: z.string(),
+  indicator: directThreadIndicatorSchema,
+  status: z.enum(["pending", "starting", "active", "stopping", "idle", "error"]),
+});
+export const directThreadViewSchema = threadStatusViewSchema;
+export type ThreadStatusView = z.infer<typeof threadStatusViewSchema>;
+export type DirectThreadView = ThreadStatusView;
+export const roomWorkSchema = z.object({
+  queued: z.number().int().nonnegative(),
+  running: z.number().int().nonnegative(),
+});
+export type RoomWork = z.infer<typeof roomWorkSchema>;
 export type ProfileInput = z.infer<typeof profileInput>;
 export const botCreateInput = profileInput.extend({
   mission: z.string().min(1).max(64000),
@@ -513,6 +532,9 @@ export const rpcContract = defineRpcContract({
       bots: z.array(botListItemSchema),
       rooms: z.array(roomSchema),
       activeRoomIds: z.array(z.string()),
+      directThreads: z.record(idSchema, directThreadViewSchema),
+      roomThreads: z.record(z.string(), z.array(threadStatusViewSchema)),
+      roomWork: z.record(z.string(), roomWorkSchema),
       attentionCounts: z.record(z.string(), z.number().int().nonnegative()),
       approvalCounts: z.record(z.string(), z.number().int().nonnegative()),
       botCreateRequests: z.array(botCreateRequestViewSchema),

@@ -204,8 +204,31 @@
 }
 .bot-direct-header-title > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }
 .bot-direct-header-title small { flex-shrink: 0; color: var(--muted-foreground); font-size: var(--text-xs); font-weight: 400; }
+.bot-direct-header-state { flex-shrink: 0; max-width: min(40vw, 180px); overflow: hidden; text-overflow: ellipsis; }
+.bot-direct-header-title .bot-status-badge { flex-shrink: 0; }
 .bot-direct-model-picker { max-width: 220px; }
 .bot-direct-header-error { color: var(--destructive); font-size: var(--text-xs); }
+.bot-thread-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  color: var(--muted-foreground);
+}
+.bot-thread-status-error { color: var(--destructive); }
+.bot-thread-status-icon[data-motion="spin"] [data-icon-root] {
+  animation: channel-working-spin 1s linear infinite;
+}
+.bot-thread-status-icon[data-motion="shine"] [data-icon-root] {
+  animation: bot-direct-status-shine 1.6s ease-in-out infinite;
+}
+@keyframes bot-direct-status-shine {
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bot-thread-status-icon[data-motion] [data-icon-root] { animation: none; }
+}
 .direct-messages-sidebar { margin-top: 0; }
 .direct-message-nav-row + .direct-message-nav-row { margin-top: 2px; }
 .direct-message-avatar {

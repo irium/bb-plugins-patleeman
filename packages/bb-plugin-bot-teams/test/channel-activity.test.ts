@@ -94,6 +94,24 @@ test("channel activity spans queue, dispatch, and execution and waits for every 
   }
 });
 
+test("channel work summary separates queued and running jobs and runs", () => {
+  const { db, store, room, job } = setup();
+  try {
+    job("queued");
+    job("dispatching");
+    const run = runSchema.parse({
+      id: "route", roomId: room.id, status: "queued", round: 0,
+      remaining: [], next: [], jobId: null, createdAt: 1, error: null,
+    });
+    store.putRun(run);
+    assert.deepEqual(store.roomWorkSummary()[room.id], { queued: 2, running: 1 });
+    store.putRun({ ...run, status: "running" });
+    assert.deepEqual(store.roomWorkSummary()[room.id], { queued: 1, running: 2 });
+  } finally {
+    db.close();
+  }
+});
+
 test("pending host cancellation remains active until confirmed even when the run has stopped", () => {
   const { db, store, room, job } = setup();
   try {

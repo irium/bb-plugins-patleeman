@@ -1009,12 +1009,85 @@ test("unrelated threads cannot claim a bot identity using metadata", async () =>
       bots: [],
       rooms: [],
       activeRoomIds: [],
+      directThreads: {},
+      roomThreads: {},
+      roomWork: {},
       attentionCounts: {},
       approvalCounts: {},
       botCreateRequests: [],
     });
   } finally {
     await host.harness.lifecycle.dispose();
+  }
+});
+
+test("roster identifies current direct threads independently of bot jobs", async () => {
+  const x = setup();
+  await plugin(x.bb);
+  try {
+    x.store.putConversation({
+      id: "archived-direct", botId: x.a.id, key: "history:old",
+      threadId: "thr_old", title: "Old", kind: "admin", createdAt: 1,
+      archivedAt: 2,
+    });
+    x.store.putConversation({
+      id: "current-direct", botId: x.a.id, key: "admin",
+      threadId: "thr_current", title: "Current", kind: "admin", createdAt: 3,
+    });
+    x.store.putConversation({
+      id: "group-primary", botId: x.a.id, key: `group:${x.room.id}`,
+      threadId: "thr_group", title: "Group", kind: "group", createdAt: 3,
+    });
+    x.store.putConversation({
+      id: "group-fork", botId: x.b.id, key: `group:${x.room.id}:fork:message`,
+      threadId: "thr_fork", title: "Group fork", kind: "group", createdAt: 3,
+    });
+    const currentThread = makeThreadResponse({ id: "thr_current", status: "active" });
+    const directEntry = {
+      ...currentThread,
+      runtime: { ...currentThread.runtime, displayStatus: "active" as const },
+      activity: {
+        activeBackgroundAgentCount: 0,
+        activeBackgroundCommandCount: 0,
+        activeGoalCount: 0,
+        activePlanModeCount: 0,
+        activeWorkflowCount: 0,
+      },
+      hasPendingInteraction: false,
+      queuedWork: "none" as const,
+      pinSortKey: null,
+      environmentBranchName: null,
+      environmentHostId: null,
+      environmentIsWorktree: null,
+      environmentName: null,
+      environmentPath: null,
+      environmentProviderId: null,
+      environmentWorkspaceDisplayKind: "other" as const,
+    };
+    x.harness.inspection.sdk.stub("threads.list", async () => [
+      directEntry,
+      { ...directEntry, id: "thr_group", status: "idle" as const,
+        runtime: { ...directEntry.runtime, displayStatus: "idle" as const },
+        activity: { ...directEntry.activity, activeBackgroundAgentCount: 1 } },
+      { ...directEntry, id: "thr_fork", status: "idle" as const,
+        runtime: { ...directEntry.runtime, displayStatus: "idle" as const },
+        queuedWork: "waiting" as const },
+    ]);
+    const listed = await x.harness.behavior.callRpc("list", null) as {
+      directThreads: Record<string, { threadId: string; indicator: string; status: string }>;
+      roomThreads: Record<string, { threadId: string; indicator: string; status: string }[]>;
+      bots: { id: string; working: boolean }[];
+    };
+    assert.deepEqual(listed.directThreads, {
+      [x.a.id]: { threadId: "thr_current", status: "active", indicator: "runtime" },
+    });
+    assert.deepEqual(listed.roomThreads[x.room.id], [
+      { threadId: "thr_group", status: "idle", indicator: "background-agent" },
+      { threadId: "thr_fork", status: "idle", indicator: "queued-waiting" },
+    ]);
+    assert.equal(listed.bots.find((entry) => entry.id === x.a.id)?.working, false);
+  } finally {
+    await x.close();
   }
 });
 

@@ -8,9 +8,11 @@ import {
   useBbNavigate,
   useRealtime,
   useRpc,
+  useSidebarThreadDraft,
+  useSidebarThreadRowStatus,
   type PluginFixedTabRegistration,
 } from "@get-bb/plugin-sdk/app";
-import type { Bot, Conversation, rpcContract } from "./contract";
+import type { Bot, Conversation, DirectThreadView, rpcContract } from "./contract";
 import { Button } from "./components/ui/button";
 import {
   DropdownMenu,
@@ -18,7 +20,39 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./components/ui/dropdown-menu";
-import { ErrorMessage, message } from "./bot-ui";
+import { ErrorMessage, message, StatusBadge } from "./bot-ui";
+import { directStatusPresentation } from "./direct-status";
+import { setDirectDraft, useDirectDraft } from "./direct-draft";
+
+export function DirectMessageStatus({ thread }: { thread: DirectThreadView }) {
+  const draft = useSidebarThreadDraft(thread.threadId);
+  const localDraft = useDirectDraft(thread.threadId);
+  const rowStatus = useSidebarThreadRowStatus(thread.threadId);
+  const status = directStatusPresentation(thread,
+    draft.hasUnsubmittedDraft || localDraft, rowStatus);
+  if (status.shortLabel === "Ready") return null;
+  return (
+    <span className="channel-nav-status">
+      <span className={`bot-thread-status-icon bot-thread-status-${status.tone}`}
+        data-motion={status.motion ?? undefined}
+        role="img" aria-label={status.label} title={status.label}>
+        {status.icon ? <Icon name={status.icon} /> :
+          <span className="channel-unread-dot" aria-hidden="true" />}
+      </span>
+    </span>
+  );
+}
+
+function DirectMessageHeaderStatus({ thread }: { thread: DirectThreadView }) {
+  const draft = useSidebarThreadDraft(thread.threadId);
+  const localDraft = useDirectDraft(thread.threadId);
+  const rowStatus = useSidebarThreadRowStatus(thread.threadId);
+  const status = directStatusPresentation(thread,
+    draft.hasUnsubmittedDraft || localDraft, rowStatus);
+  return <span className="bot-direct-header-state" title={status.label}>
+    <StatusBadge status={status.tone} label={status.shortLabel} />
+  </span>;
+}
 
 const dateLabel = (timestamp: number) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" })
@@ -57,10 +91,11 @@ const directThreads = (conversations: Conversation[]) => conversations
   .filter((conversation) => conversation.kind === "admin")
   .sort((a, b) => b.createdAt - a.createdAt);
 
-export function BotDirectMessageHeader({ botId, selectedThreadId, threadsTab }: {
+export function BotDirectMessageHeader({ botId, selectedThreadId, threadsTab, thread }: {
   botId: string;
   selectedThreadId?: string;
   threadsTab: PluginFixedTabRegistration;
+  thread?: DirectThreadView;
 }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
@@ -93,6 +128,8 @@ export function BotDirectMessageHeader({ botId, selectedThreadId, threadsTab }: 
       <span aria-hidden>{bot.avatar}</span>
       <span>{bot.name}</span>
       {selectedThreadId && <small>Past thread</small>}
+      {bot.retired ? <StatusBadge status="paused" label="Archived" /> :
+        thread && <DirectMessageHeaderStatus thread={thread} />}
     </span>
   );
   return (
@@ -213,6 +250,29 @@ export function BotDirectChat({
   const selected = selectedThreadId
     ? direct.find((conversation) => conversation.threadId === selectedThreadId)
     : current;
+
+  useEffect(() => {
+    if (!selected || selected.archivedAt) return;
+    const syncDraft = () => {
+      const root = chatRoot.current;
+      if (!root) return;
+      const composer = root.querySelector(".bot-direct-thread [data-promptbox]");
+      const editor = composer?.querySelector<HTMLTextAreaElement | HTMLElement>(
+        'textarea, [contenteditable="true"][role="textbox"]',
+      );
+      const hasText = editor &&
+        (editor instanceof HTMLTextAreaElement ? editor.value : editor.textContent ?? "")
+          .trim().length > 0;
+      const hasAttachment = !!composer?.querySelector(
+        '[data-promptbox-attachments], button[aria-label^="Remove "], ' +
+        '[role="status"][aria-label^="Uploading "]',
+      );
+      if (editor || hasAttachment) setDirectDraft(selected.threadId, !!hasText || hasAttachment);
+    };
+    syncDraft();
+    const timer = window.setInterval(syncDraft, 500);
+    return () => window.clearInterval(timer);
+  }, [selected?.threadId, selected?.archivedAt]);
 
   useEffect(() => {
     const root = chatRoot.current;

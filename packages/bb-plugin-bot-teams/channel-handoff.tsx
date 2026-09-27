@@ -3,6 +3,7 @@ import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import type { rpcContract } from "./contract";
 import { emptyDraft } from "./draft";
+import { notifyChannelDraftChanged } from "./channel-draft-state";
 
 const eventName = "bb:bots:handoff-to-channel";
 
@@ -32,6 +33,7 @@ export function ChannelHandoffController() {
               handoffSource: source,
             }),
           );
+          notifyChannelDraftChanged(room.id);
         } catch {
           await rpc.call("deleteRoom", { id: room.id }).catch(() => {});
           throw new Error("Could not save the channel handoff draft.");

@@ -41,6 +41,9 @@ import type {
   RoomRun,
   rpcContract,
   ChannelApproval,
+  DirectThreadView,
+  RoomWork,
+  ThreadStatusView,
 } from "./contract";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -69,10 +72,12 @@ import { ChannelApprovalDeck } from "./channel-approvals";
 import { ChannelSearch } from "./channel-search";
 import { ChannelAttentionBanner, MessageAttention } from "./attention-view";
 import { ChannelSidebarRow } from "./channel-sidebar-row";
+import { ChannelHeaderStatus } from "./channel-status-view";
 import {
   BotDirectMessageHeader,
   BotDirectMessagePage,
   BotDirectThreadsPanel,
+  DirectMessageStatus,
 } from "./bot-direct-chat";
 import { ChannelPermissionPicker } from "./channel-permissions";
 import {
@@ -132,12 +137,18 @@ function useRoster(reconcile = false) {
     bots: Bot[];
     rooms: Room[];
     activeRoomIds: string[];
+    directThreads: Record<string, DirectThreadView>;
+    roomThreads: Record<string, ThreadStatusView[]>;
+    roomWork: Record<string, RoomWork>;
     attentionCounts: Record<string, number>;
     approvalCounts: Record<string, number>;
   }>({
     bots: [],
     rooms: [],
     activeRoomIds: [],
+    directThreads: {},
+    roomThreads: {},
+    roomWork: {},
     attentionCounts: {},
     approvalCounts: {},
   });
@@ -176,7 +187,14 @@ function useRoster(reconcile = false) {
   useEffect(() => {
     if (reconcile && connectionState === "connected") load();
   }, [reconcile, connectionState, load]);
-  const hasActiveWork = data.activeRoomIds.length > 0;
+  const hasActiveWork = data.activeRoomIds.length > 0 ||
+    Object.values(data.directThreads).some((thread) =>
+      ["starting", "active", "stopping"].includes(thread.status) ||
+      ["runtime", "workflow", "background-agent", "background-command", "plan-mode", "goal"]
+        .includes(thread.indicator)) ||
+    Object.values(data.roomThreads).flat().some((thread) =>
+      ["runtime", "workflow", "background-agent", "background-command", "plan-mode", "goal"]
+        .includes(thread.indicator));
   useEffect(() => {
     if (!reconcile) return;
     const refresh = () => {
@@ -684,7 +702,8 @@ export function ChannelsSidebar({
   onNavigate,
   activeThreadId,
 }: Pick<PluginThreadListProps, "activeThreadId" | "onNavigate">) {
-  const { bots, rooms, activeRoomIds, attentionCounts, approvalCounts, error } =
+  const { bots, rooms, activeRoomIds, directThreads, roomThreads, roomWork,
+    attentionCounts, approvalCounts, error } =
       useRoster(true),
     rpc = useRpc<typeof rpcContract>(),
     navigate = useBbNavigate();
@@ -795,21 +814,25 @@ export function ChannelsSidebar({
   const visibleDirectBots = showArchivedBots
     ? [...activeDirectBots, ...archivedDirectBots]
     : activeDirectBots;
-  const directBotRow = (bot: Bot) => (
-    <a key={bot.id}
-      href={`/plugins/bot-teams/channels/dm/${bot.id}`}
-      className="channel-nav-row direct-message-nav-row"
-      aria-current={selected === `dm:${bot.id}` ? "page" : undefined}
-      onClick={(event) => {
-        if (event.metaKey || event.ctrlKey) return;
-        event.preventDefault();
-        openDirectMessage(bot.id);
-      }}>
-      <span className="direct-message-avatar" aria-hidden>{bot.avatar}</span>
-      <span className="channel-nav-name">{bot.name}</span>
-      {bot.retired && <span className="channel-nav-archived">Archived</span>}
-    </a>
-  );
+  const directBotRow = (bot: Bot) => {
+    const thread = directThreads[bot.id];
+    return (
+      <a key={bot.id}
+        href={`/plugins/bot-teams/channels/dm/${bot.id}`}
+        className="channel-nav-row direct-message-nav-row"
+        aria-current={selected === `dm:${bot.id}` ? "page" : undefined}
+        onClick={(event) => {
+          if (event.metaKey || event.ctrlKey) return;
+          event.preventDefault();
+          openDirectMessage(bot.id);
+        }}>
+        <span className="direct-message-avatar" aria-hidden>{bot.avatar}</span>
+        <span className="channel-nav-name">{bot.name}</span>
+        {bot.retired && <span className="channel-nav-archived">Archived</span>}
+        {!bot.retired && thread && <DirectMessageStatus thread={thread} />}
+      </a>
+    );
+  };
   const list = rooms
     .filter(
       (r) =>
@@ -821,17 +844,23 @@ export function ChannelsSidebar({
         ? Number(!!b.pinned) - Number(!!a.pinned)
         : 0) || compareChannels(a, b, display),
     );
+  const needsInput = (id: string) =>
+    (attentionCounts[id] ?? 0) + (approvalCounts[id] ?? 0) > 0 ||
+    (roomThreads[id] ?? []).some((thread) =>
+      ["waiting-for-input", "unread-error", "queued-failed"].includes(thread.indicator));
+  const working = (id: string) => activeRoomIds.includes(id) ||
+    (roomThreads[id] ?? []).some((thread) =>
+      ["runtime", "workflow", "background-agent", "background-command", "plan-mode", "goal"]
+        .includes(thread.indicator));
   const groups: { label: string | null; rooms: Room[] }[] =
     display.organization === "activity"
       ? [
           { label: "Needs you", rooms: list.filter((r) =>
-            (attentionCounts[r.id] ?? 0) + (approvalCounts[r.id] ?? 0) > 0) },
+            needsInput(r.id)) },
           { label: "Working", rooms: list.filter((r) =>
-            (attentionCounts[r.id] ?? 0) + (approvalCounts[r.id] ?? 0) === 0 &&
-            activeRoomIds.includes(r.id)) },
+            !needsInput(r.id) && working(r.id)) },
           { label: "Other channels", rooms: list.filter((r) =>
-            (attentionCounts[r.id] ?? 0) + (approvalCounts[r.id] ?? 0) === 0 &&
-            !activeRoomIds.includes(r.id)) },
+            !needsInput(r.id) && !working(r.id)) },
         ].filter((group) => group.rooms.length > 0)
       : [{ label: null, rooms: list }];
   return (
@@ -982,7 +1011,9 @@ export function ChannelsSidebar({
                 key={r.id}
                 room={r}
                 selected={selected === r.id}
-                working={activeRoomIds.includes(r.id)}
+                active={activeRoomIds.includes(r.id)}
+                threads={roomThreads[r.id] ?? []}
+                work={roomWork[r.id]}
                 attentionCount={attentionCounts[r.id] ?? 0}
                 approvalCount={approvalCounts[r.id] ?? 0}
                 pending={pending}
@@ -1258,15 +1289,26 @@ function ChannelWorkbench({ id, panel }: { id: string; panel: WorkbenchPanel }) 
 export function ChannelsHeader({ subPath }: PluginNavPanelProps) {
   const botId = directMessageBotId(subPath);
   return botId
-    ? <BotDirectMessageHeader key={botId} botId={botId}
-        selectedThreadId={subPath.split("/")[2]} threadsTab={directThreadsTab} />
+    ? <DirectMessageHeader key={botId} botId={botId}
+        selectedThreadId={subPath.split("/")[2]} />
     : <ChannelHeader subPath={subPath} />;
+}
+
+function DirectMessageHeader({ botId, selectedThreadId }: {
+  botId: string;
+  selectedThreadId?: string;
+}) {
+  const { directThreads } = useRoster(true);
+  const thread = selectedThreadId ? undefined : directThreads[botId];
+  return <BotDirectMessageHeader botId={botId} selectedThreadId={selectedThreadId}
+    threadsTab={directThreadsTab}
+    thread={thread} />;
 }
 
 function ChannelHeader({ subPath }: PluginNavPanelProps) {
   const id = channelId(subPath),
     { data, error, load } = useChannel(id, false),
-    { bots } = useRoster();
+    { bots, roomThreads, roomWork, activeRoomIds, attentionCounts, approvalCounts } = useRoster(true);
   const rpc = useRpc<typeof rpcContract>(),
     navigate = useBbNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1358,6 +1400,13 @@ function ChannelHeader({ subPath }: PluginNavPanelProps) {
         <span className="channel-title-name">{room.name}</span>
       </span>
       {room.archived && <small>Archived</small>}
+      {!room.archived && <ChannelHeaderStatus roomId={room.id}
+        threads={roomThreads[room.id] ?? []}
+        work={roomWork[room.id]}
+        active={activeRoomIds.includes(room.id)}
+        unread={room.updatedAt > (room.lastReadAt ?? 0)}
+        needsAttention={(attentionCounts[room.id] ?? 0) +
+          (approvalCounts[room.id] ?? 0) > 0} />}
     </div>
   );
   return (

@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
-import type { Room } from "./contract";
+import type { Room, RoomWork, ThreadStatusView } from "./contract";
+import { ChannelStatusIcon, useChannelStatus } from "./channel-status-view";
 import { IconActionTooltip } from "./channel-controls";
 import {
   ContextMenu,
@@ -25,7 +26,9 @@ function openOptions(target: HTMLElement) {
 export function ChannelSidebarRow({
   room,
   selected,
-  working,
+  active,
+  threads,
+  work,
   attentionCount = 0,
   approvalCount = 0,
   pending,
@@ -40,7 +43,9 @@ export function ChannelSidebarRow({
 }: {
   room: Room;
   selected: boolean;
-  working: boolean;
+  active: boolean;
+  threads: readonly ThreadStatusView[];
+  work?: RoomWork;
   attentionCount?: number;
   /** Bot requests waiting for an approval or answer in this channel. */
   approvalCount?: number;
@@ -59,6 +64,8 @@ export function ChannelSidebarRow({
   const menuId = useId();
   const hasUnread = room.updatedAt > (room.lastReadAt ?? 0);
   const unread = hasUnread && !selected;
+  const status = useChannelStatus({ roomId: room.id, threads, work, active, unread,
+    needsAttention: attentionCount + approvalCount > 0 });
   const openInSplit = () => {
     // BB's route anchor delegate handles modified plugin links with its split placement rules.
     rowLink.current?.dispatchEvent(new MouseEvent("click", {
@@ -119,22 +126,7 @@ export function ChannelSidebarRow({
             )}
             <span className="channel-nav-name">{room.name}</span>
             {room.archived && <span className="channel-nav-archived">Archived</span>}
-            {(working || unread) && (
-              <span className="channel-nav-status">
-                {working ? (
-                  <span
-                    className="channel-working"
-                    role="img"
-                    aria-label="Channel working"
-                    title="Channel working"
-                  >
-                    <Icon name="Loading" />
-                  </span>
-                ) : (
-                  <span className="channel-unread-dot" aria-label="Unread" />
-                )}
-              </span>
-            )}
+            <ChannelStatusIcon status={status} />
           </a>
           <span className="channel-nav-actions">
             <IconActionTooltip label="Channel options">

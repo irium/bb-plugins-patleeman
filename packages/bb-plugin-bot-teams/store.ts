@@ -141,6 +141,21 @@ export class Store {
         .all(id) as { json: string }[]
     ).map((r) => JSON.parse(r.json));
   }
+  currentDirectConversation(botId: string): Conversation | null {
+    const row = this.db
+      .prepare("SELECT json FROM conversations WHERE bot_id=? AND key='admin'")
+      .get(botId) as { json: string } | undefined;
+    return row ? JSON.parse(row.json) : null;
+  }
+  activeGroupThreadRooms(): { threadId: string; roomId: string }[] {
+    const rows = this.db.prepare(
+      "SELECT key,thread_id FROM conversations WHERE key LIKE 'group:%'",
+    ).all() as { key: string; thread_id: string }[];
+    return rows.map(({ key, thread_id }) => ({
+      threadId: thread_id,
+      roomId: key.slice("group:".length).split(":")[0]!,
+    }));
+  }
   /** Each bot's primary work thread for one channel (forks excluded). */
   roomConversations(roomId: string): Conversation[] {
     return (
@@ -427,6 +442,37 @@ export class Store {
     `)
         .all() as { id: string }[]
     ).map((row) => row.id);
+  }
+  roomWorkSummary(): Record<string, { queued: number; running: number }> {
+    const summary: Record<string, { queued: number; running: number }> = {};
+    const add = (roomId: string, queued: number, running: number) => {
+      const entry = summary[roomId] ?? { queued: 0, running: 0 };
+      entry.queued += queued;
+      entry.running += running;
+      summary[roomId] = entry;
+    };
+    const jobs = this.db.prepare(`
+      SELECT json_extract(json,'$.roomId') AS roomId,
+        SUM(CASE WHEN status='queued' THEN 1 ELSE 0 END) AS queued,
+        SUM(CASE WHEN status IN ('dispatching','running')
+          OR json_extract(json,'$.cancellationPending')=1 THEN 1 ELSE 0 END) AS running
+      FROM jobs
+      WHERE json_extract(json,'$.roomId') IS NOT NULL
+        AND (status IN ('queued','dispatching','running')
+          OR json_extract(json,'$.cancellationPending')=1)
+      GROUP BY roomId
+    `).all() as { roomId: string; queued: number; running: number }[];
+    for (const row of jobs) add(row.roomId, row.queued, row.running);
+    const runs = this.db.prepare(`
+      SELECT room_id AS roomId,
+        SUM(CASE WHEN json_extract(json,'$.status')='queued' THEN 1 ELSE 0 END) AS queued,
+        SUM(CASE WHEN json_extract(json,'$.status')='running' THEN 1 ELSE 0 END) AS running
+      FROM room_runs
+      WHERE json_extract(json,'$.status') IN ('queued','running')
+      GROUP BY room_id
+    `).all() as { roomId: string; queued: number; running: number }[];
+    for (const row of runs) add(row.roomId, row.queued, row.running);
+    return summary;
   }
   room(id: string): Room {
     const room = this.findRoom(id);

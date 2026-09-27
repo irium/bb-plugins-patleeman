@@ -35,6 +35,7 @@ import {
 } from "./runtime";
 import { chatGuidance } from "./chat-guidance";
 import { directMessagesInTurn, managedPromptInTurn } from "./direct-messages";
+import { directThreadIndicator } from "./direct-status";
 import { ChannelAutomations } from "./channel-automations";
 import { imageMime } from "./image-format";
 import { isForkConversation } from "./send-mode";
@@ -157,6 +158,20 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("interaction.pending", ({ thread, interaction }) => {
     notifications.interaction(thread.id, interaction.id);
     void approvals.tick();
+    runtime.changed();
+  });
+  for (const event of ["message.queued", "message.dispatched", "message.cancelled"] as const)
+    bb.events.on(event, ({ entry }) => {
+      if (store.byThread(entry.threadId)) runtime.changed();
+    });
+  const threadRefreshAt = new Map<string, number>();
+  bb.events.on("experimental_thread.events", ({ thread }) => {
+    const conversation = store.byThread(thread.id);
+    if (thread.status !== "idle" ||
+      (conversation?.kind !== "admin" && conversation?.kind !== "group")) return;
+    const now = Date.now();
+    if (now - (threadRefreshAt.get(thread.id) ?? 0) < 2_500) return;
+    threadRefreshAt.set(thread.id, now);
     runtime.changed();
   });
 
@@ -766,10 +781,55 @@ export default async function plugin(bb: BbPluginApi) {
     automationUpdate: (input) => automations.update(input),
     automationAction: (input) => automations.action(input),
     automationRuns: (input) => automations.runs(input),
-    list: () => {
+    list: async () => {
       const activity = store.botActivitySummary();
+      const bots = store.all();
+      const rooms = store.rooms();
+      const directThreadIds = new Map(
+        bots.flatMap((bot) => {
+          const current = store.currentDirectConversation(bot.id);
+          return current ? [[current.threadId, bot.id] as const] : [];
+        }),
+      );
+      const roomIds = new Set(rooms.map((room) => room.id));
+      const roomThreadIds = new Map(store.activeGroupThreadRooms()
+        .filter(({ roomId }) => roomIds.has(roomId))
+        .map(({ threadId, roomId }) => [threadId, roomId] as const));
+      const directThreads: Record<string, {
+        threadId: string;
+        status: "pending" | "starting" | "active" | "stopping" | "idle" | "error";
+        indicator: ReturnType<typeof directThreadIndicator>;
+      }> = {};
+      const roomThreads: Record<string, {
+        threadId: string;
+        status: "pending" | "starting" | "active" | "stopping" | "idle" | "error";
+        indicator: ReturnType<typeof directThreadIndicator>;
+      }[]> = {};
+      for (let offset = 0; directThreadIds.size || roomThreadIds.size; offset += 100) {
+        const page = await bb.sdk.threads.list({
+          originPluginId: "bot-teams", includeHidden: true, limit: 100, offset,
+        });
+        for (const thread of page) {
+          const botId = directThreadIds.get(thread.id);
+          const view = {
+            threadId: thread.id,
+            status: thread.status,
+            indicator: directThreadIndicator(thread),
+          };
+          if (botId) {
+            directThreads[botId] = view;
+            directThreadIds.delete(thread.id);
+          }
+          const roomId = roomThreadIds.get(thread.id);
+          if (roomId) {
+            (roomThreads[roomId] ??= []).push(view);
+            roomThreadIds.delete(thread.id);
+          }
+        }
+        if (page.length < 100) break;
+      }
       return {
-        bots: store.all().map((bot) => {
+        bots: bots.map((bot) => {
           const summary = activity.get(bot.id);
           return {
             ...bot,
@@ -777,8 +837,11 @@ export default async function plugin(bb: BbPluginApi) {
             lastActivityAt: summary?.lastActivityAt ?? null,
           };
         }),
-        rooms: store.rooms(),
+        rooms,
         activeRoomIds: store.activeRoomIds(),
+        directThreads,
+        roomThreads,
+        roomWork: store.roomWorkSummary(),
         attentionCounts: store.attention.counts(),
         approvalCounts: approvals.counts(),
         botCreateRequests: store.botCreateRequests().map(botCreateRequestView),
@@ -1500,7 +1563,11 @@ export default async function plugin(bb: BbPluginApi) {
   };
   // A bot work thread must not outlive the thread it points at.
   bb.events.on("thread.deleted", ({ thread }) => {
-    if (store.byThread(thread.id)) store.deleteConversation(thread.id);
+    const conversation = store.byThread(thread.id);
+    if (!conversation) return;
+    threadRefreshAt.delete(thread.id);
+    store.deleteConversation(thread.id);
+    runtime.changed();
   });
   bb.events.on("thread.active", ({ thread }) => {
     const c = store.byThread(thread.id);
@@ -1520,8 +1587,8 @@ export default async function plugin(bb: BbPluginApi) {
     if (job && !job.startedAt) {
       job.startedAt = Date.now();
       store.putJob(job);
-      runtime.changed();
     }
+    runtime.changed();
   });
   bb.events.on("thread.idle", async ({ thread, lastAssistantText }) => {
     const c = store.byThread(thread.id);
@@ -1570,11 +1637,14 @@ export default async function plugin(bb: BbPluginApi) {
       } catch (cause) {
         bb.log.debug(`Memory snapshot unavailable: ${String(cause)}`);
       }
+    runtime.changed();
     await bb.experimental_hooks.recheck("message.dispatch");
   });
   bb.events.on("thread.failed", async ({ thread, error }) => {
-    if (!store.byThread(thread.id)) return;
+    const c = store.byThread(thread.id);
+    if (!c) return;
     await runtime.settleFromEvent(thread.id, null, error);
+    runtime.changed();
     await bb.experimental_hooks.recheck("message.dispatch");
   });
   bb.background.service("rooms", {
