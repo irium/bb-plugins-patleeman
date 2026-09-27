@@ -318,7 +318,7 @@ export default definePluginApp((app) => {
   });
   app.slots.navPanel({
     id: "channels",
-    title: "Channels",
+    title: "New channel",
     icon: "MessageSquare",
     path: "channels",
     component: ChannelsPage,
