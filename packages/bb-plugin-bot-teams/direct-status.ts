@@ -20,7 +20,6 @@ export function directThreadIndicator(thread: ListedThread): DirectThreadView["i
   if (thread.queuedWork === "failed") return "queued-failed";
   if (unreadDone) return "unread-success";
   if (thread.queuedWork === "waiting") return "queued-waiting";
-  if (thread.status === "pending") return "draft";
   return "none";
 }
 

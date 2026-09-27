@@ -96,7 +96,9 @@ test("hidden direct threads preserve background work and input status", () => {
     "queued-waiting");
   assert.equal(directThreadIndicator(listedThread({ queuedWork: "failed" })),
     "queued-failed");
-  assert.equal(directThreadIndicator(listedThread({ status: "pending" })), "draft");
+  assert.equal(directThreadIndicator(listedThread({ status: "pending" })), "none");
+  assert.equal(present(directThreadIndicator(listedThread({ status: "pending" })), true)
+    .shortLabel, "Draft");
   assert.equal(directThreadIndicator(listedThread({
     activity: { ...listedThread().activity, activePlanModeCount: 1 },
     runtime: { ...listedThread().runtime, displayStatus: "active" },
