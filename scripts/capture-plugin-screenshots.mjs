@@ -426,6 +426,49 @@ const threadUrl = `/projects/${projectId}/threads/${threadId}`;
 
 const captures = [
   {
+    id: "thread-list-plus",
+    packageDir: "bb-plugin-thread-list-plus",
+    showSidebar: true,
+    setup: async (client) => {
+      await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+      await client.waitForAriaButton("Threads actions");
+      await client.evaluate(`document.querySelector('button[aria-label="Threads actions"]')?.scrollIntoView({ block: 'center' })`);
+      await sleep(350);
+      await client.clickAriaButtonWithPointer("Threads actions");
+      await client.waitForSelector('[role="menuitem"]');
+      const hasAction = await client.evaluate(`Array.from(document.querySelectorAll('[role="menuitem"]'))
+        .some((item) => item.textContent?.trim() === "New project")`);
+      if (!hasAction) throw new Error("The live Threads actions menu is missing New project");
+    },
+    clip: async (client) => client.evaluate(`(() => {
+      const menu = Array.from(document.querySelectorAll('[role="menu"]'))
+        .find((item) => item.textContent?.includes('New project'));
+      if (!menu) throw new Error('Threads actions menu not found for capture');
+      const rect = menu.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    })()`),
+  },
+  {
+    id: "thread-list-plus-dialog",
+    packageDir: "bb-plugin-thread-list-plus",
+    fileName: "project-dialog.png",
+    showSidebar: true,
+    setup: async (client) => {
+      await captures.find((capture) => capture.id === "thread-list-plus").setup(client);
+      await client.clickElementWithTextAndPointer('[role="menuitem"]', "New project");
+      await client.waitForSelector('[role="dialog"]');
+      const hasTitle = await client.evaluate(`document.querySelector('[role="dialog"]')?.textContent?.includes('New project')`);
+      if (!hasTitle) throw new Error('The live New project dialog is missing its title');
+      for (const text of ["Folder path", "Browse", "Create project"]) await client.waitForText(text);
+    },
+    clip: async (client) => client.evaluate(`(() => {
+      const dialog = document.querySelector('[role="dialog"]');
+      if (!dialog) throw new Error('New project dialog not found for capture');
+      const rect = dialog.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    })()`),
+  },
+  {
     id: "automation-calendar",
     packageDir: "bb-plugin-automation-calendar",
     showSidebar: true,

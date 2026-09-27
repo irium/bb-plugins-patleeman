@@ -375,6 +375,28 @@
       }
     },
     {
+      "id": "thread-list-plus",
+      "displayName": "Thread List Plus",
+      "description": "BB's thread list with project creation in its actions menu.",
+      "icon": "ListView",
+      "tags": [
+        "sidebar",
+        "threads",
+        "projects"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-plugins.git",
+          "subdir": "packages/bb-plugin-thread-list-plus",
+          "ref": "main"
+        }
+      }
+    },
+    {
       "id": "traces",
       "displayName": "Traces",
       "description": "Index local agent sessions and trajectories in one private explorer.",

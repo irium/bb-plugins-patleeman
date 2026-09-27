@@ -1,0 +1,22 @@
+{
+  "name": "bb-plugin-thread-list-plus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "BB's thread list with project creation in its actions menu.",
+  "engines": {
+    "bb": ">=0.44.0",
+    "bbPluginSdk": ">=0.5.29"
+  },
+  "bb": {
+    "name": "Thread List Plus",
+    "description": "BB's thread list with project creation in its actions menu.",
+    "branding": {
+      "icon": "ListView"
+    },
+    "server": "./dist/server.js",
+    "app": "./dist/app.js",
+    "skills": []
+  }
+}
