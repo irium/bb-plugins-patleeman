@@ -2390,7 +2390,10 @@ export class Runtime {
         includeNestedRows: "true",
         segmentLimit: "100",
       });
-      const activitySnippet = activitySnippetFromTimeline(timeline);
+      const activitySnippet = activitySnippetFromTimeline(
+        timeline,
+        job.dispatchStartedAt ?? job.startedAt,
+      );
       if (!activitySnippet || activitySnippet === job.activitySnippet)
         return this.store.job(job.id) ?? job;
       return (

@@ -134,3 +134,46 @@ test("stopping and queued states replace stale activity in the compact row", () 
     "Preparing response…",
   );
 });
+
+test("activity snippets skip rows from earlier turns in a reused thread", () => {
+  const timeline = {
+    rows: [
+      {
+        id: "old-reply",
+        kind: "conversation",
+        role: "assistant",
+        createdAt: 1_000,
+        sourceSeqEnd: 4,
+        text: "Cleanup completed successfully.",
+      },
+      {
+        id: "new-prompt",
+        kind: "conversation",
+        role: "user",
+        createdAt: 2_000,
+        sourceSeqEnd: 5,
+        text: "How are you tracking me?",
+      },
+    ],
+  };
+  assert.equal(activitySnippetFromTimeline(timeline, 2_000), null);
+  assert.equal(
+    activitySnippetFromTimeline(
+      {
+        rows: [
+          ...timeline.rows,
+          {
+            id: "new-read",
+            kind: "work",
+            createdAt: 2_500,
+            sourceSeqEnd: 6,
+            workKind: "file-read",
+            path: "MEMORY.md",
+          },
+        ],
+      },
+      2_000,
+    ),
+    "Reading MEMORY.md",
+  );
+});

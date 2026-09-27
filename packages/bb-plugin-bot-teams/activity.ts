@@ -169,14 +169,25 @@ function collectRows(
  * Reduce the latest useful hidden-thread timeline row to one safe UI line.
  * It intentionally ignores active thinking text: that can contain private
  * reasoning, while conversation/work rows are the same user-facing progress
- * the native thread displays.
+ * the native thread displays. Bot threads persist across requests, so rows
+ * created before `since` belong to an earlier turn and are skipped; otherwise
+ * a new request would open with the previous reply as its progress line.
  */
-export function activitySnippetFromTimeline(timeline: unknown): string | null {
+export function activitySnippetFromTimeline(
+  timeline: unknown,
+  since?: number | null,
+): string | null {
   const value = asRecord(timeline);
   const rows: RecordValue[] = [];
   collectRows(Array.isArray(value?.rows) ? value.rows : [], rows, new Set());
   return (
     rows
+      .filter(
+        (row) =>
+          since == null ||
+          typeof row.createdAt !== "number" ||
+          row.createdAt >= since,
+      )
       .map((row, index) => ({
         row,
         index,
