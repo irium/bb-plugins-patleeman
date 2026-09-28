@@ -445,7 +445,7 @@ Smart parallel work creates a return group when it starts. Helpers can finish in
 
 ## Attention requests
 
-Decisions, blockers, and important updates appear under **Needs you** in **Channel details**. Each request stays open until you acknowledge it. Reading its channel does not dismiss it. Reply in the channel composer, or use **Acknowledge** and **Snooze 1 hour** on the message. The CLI supports other snooze durations from 1 minute to 30 days.
+Decisions, blockers, and important updates appear in the card above the channel thread's composer, with **Acknowledge** and **Snooze 1 hour**, and under **Needs you** in **Channel details**. Each request stays open until you acknowledge it. Reading its channel does not dismiss it. Reply in the channel composer, or use **Acknowledge** and **Snooze 1 hour** on the message. The CLI supports other snooze durations from 1 minute to 30 days.
 
 Open requests stay under **Needs you** until you acknowledge or snooze them. A bell replaces the channel’s sidebar hash while requests need attention, including when the channel is selected or working. Reading the channel does not clear the bell; acknowledge or snooze does. Historical pings from builds without attention capture show **Mentioned you** without sending old alerts.
 

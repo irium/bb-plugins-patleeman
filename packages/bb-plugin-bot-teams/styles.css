@@ -2217,3 +2217,22 @@
   border-radius: 4px;
   font-family: inherit;
 }
+.channel-banner-request {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 2px 0;
+}
+.channel-banner-request .channel-banner-avatar { color: var(--warning, #bf973f); padding-top: 2px; }
+.channel-banner-request-text {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.channel-banner-request-actions { display: inline-flex; flex: 0 0 auto; gap: 2px; }
+/* Acting on a request is the point of the row, so its buttons never hide. */
+.channel-rail-live:has(.channel-rail-attention) .channel-rail-stop { opacity: 1; }

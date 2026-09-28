@@ -16,6 +16,7 @@ import { ChannelMembersMenu } from "./channel-members";
 import { ChannelRail } from "./channel-rail-view";
 import { railLive, railRoutingCount } from "./channel-rail";
 import { message } from "./bot-ui";
+import { attentionReasons } from "./attention-view";
 import { ChannelAutomationsView } from "./channel-automations-view";
 import { ChannelSearch } from "./channel-search";
 import {
@@ -89,9 +90,10 @@ export function ChannelThreadHeader({ threadId }: PluginThreadHeaderActionProps)
 }
 
 /**
- * Above the composer, like a thread's follow-ups: who is working on what,
- * with Stop, while the channel stays free for new messages. A channel with
- * no bots yet says how to add one. Renders nothing otherwise.
+ * Above the composer, like a thread's follow-ups: requests a bot raised for
+ * you (acknowledge or snooze them here, or reply in the channel), and who is
+ * working on what, with Stop. A channel with no bots yet says how to add one.
+ * Renders nothing otherwise.
  */
 export function ChannelComposerBanner() {
   const view = useComposerView();
@@ -110,7 +112,17 @@ export function ChannelComposerBanner() {
     );
   const live = railLive(surface.jobs);
   const routing = railRoutingCount(surface.runs);
-  if (!live.length && !routing) return null;
+  const requests = surface.attention;
+  if (!live.length && !routing && !requests.length) return null;
+  const answer = async (id: string, action: "acknowledge" | "snooze") => {
+    setError(null);
+    try {
+      await rpc.call("attentionUpdate", action === "snooze" ? { id, action, minutes: 60 } : { id, action });
+      load();
+    } catch (cause) {
+      setError(message(cause));
+    }
+  };
   const stop = async (jobId: string) => {
     setStopping(jobId);
     setError(null);
@@ -125,6 +137,26 @@ export function ChannelComposerBanner() {
   };
   return (
     <div className="channel-banner" role="status" aria-label="Channel work">
+      {requests.map((request) => {
+        const bot = surface.bots.find((b) => b.id === request.message.botId);
+        return (
+          <div className="channel-banner-request" key={request.id}>
+            <span className="channel-banner-avatar" aria-hidden><Icon name="BellDot" /></span>
+            <span className="channel-banner-request-text" title={request.message.text}>
+              <strong>{attentionReasons[request.reason]}</strong>
+              {bot ? ` from ${bot.name}` : ""}: {request.message.text.replace(/\s+/gu, " ")}
+            </span>
+            <span className="channel-banner-request-actions">
+              <Button variant="ghost" size="sm" onClick={() => void answer(request.id, "acknowledge")}>
+                Acknowledge
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => void answer(request.id, "snooze")}>
+                Snooze 1 hour
+              </Button>
+            </span>
+          </div>
+        );
+      })}
       {routing > 0 && !live.length && (
         <div className="channel-banner-row">
           <span className="channel-banner-avatar"><Icon name="Loading" /></span>

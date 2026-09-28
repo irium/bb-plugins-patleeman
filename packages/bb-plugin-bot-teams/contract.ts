@@ -446,6 +446,8 @@ export const rpcContract = defineRpcContract({
         jobs: z.array(jobSchema),
         runs: z.array(runSchema),
         approvals: z.array(approvalSchema),
+        /** Open requests a bot raised for the owner in this channel. */
+        attention: z.array(attentionView),
       })
       .nullable(),
   },

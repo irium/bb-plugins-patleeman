@@ -712,6 +712,7 @@ export default async function plugin(bb: BbPluginApi) {
         jobs: await runtime.roomJobsWithActivity(room.id),
         runs: store.runs(room.id, 50),
         approvals: approvals.list(room.id),
+        attention: store.attention.list("open", 10, 0, room.id).items,
       };
     },
     openChannelThread: async ({ id }) => {
