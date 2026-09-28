@@ -11,8 +11,3 @@ export function imageMime(bytes: Uint8Array): string | null {
   if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return "image/webp";
   return null;
 }
-export const inlineImage = (a: { type: string; mimeType?: string }) =>
-  a.type === "localImage" &&
-  ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(
-    a.mimeType ?? "",
-  );

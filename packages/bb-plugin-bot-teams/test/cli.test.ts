@@ -665,7 +665,7 @@ test("CLI messages, replies, retries, reactions, and history pages share UI rule
   try {
     const room = roomSchema.parse(await x.ok(["channel", "create", "Notes"]));
     const id = randomUUID();
-    const first = messageSchema.parse(
+    messageSchema.parse(
       await x.ok([
         "channel",
         "send",

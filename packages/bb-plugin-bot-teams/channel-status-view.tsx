@@ -1,11 +1,15 @@
-import { experimental_Icon as Icon, useSidebarThreadRowStatuses } from "@get-bb/plugin-sdk/app";
+import {
+  experimental_Icon as Icon,
+  useSidebarThreadDraft,
+  useSidebarThreadRowStatuses,
+} from "@get-bb/plugin-sdk/app";
 import type { RoomWork, ThreadStatusView } from "./contract";
-import { StatusBadge } from "./bot-ui";
-import { useChannelDraft } from "./channel-draft-state";
 import { channelStatusPresentation } from "./channel-status";
 
 export type ChannelStatusInput = {
   roomId: string;
+  /** The channel's thread; its composer holds the channel's draft. */
+  threadId?: string;
   threads: readonly ThreadStatusView[];
   work?: RoomWork;
   active: boolean;
@@ -14,7 +18,8 @@ export type ChannelStatusInput = {
 };
 
 export function useChannelStatus(input: ChannelStatusInput) {
-  const draft = useChannelDraft(input.roomId);
+  const threadDraft = useSidebarThreadDraft(input.threadId ?? "");
+  const draft = !!input.threadId && threadDraft.hasUnsubmittedDraft;
   const rowStatuses = useSidebarThreadRowStatuses();
   return channelStatusPresentation({ ...input, work: input.work, draft, rowStatuses });
 }
@@ -30,13 +35,5 @@ export function ChannelStatusIcon({ status }: {
       {status.icon ? <Icon name={status.icon} /> :
         <span className="channel-unread-dot" aria-hidden="true" />}
     </span>
-  </span>;
-}
-
-export function ChannelHeaderStatus(input: ChannelStatusInput) {
-  const status = useChannelStatus(input);
-  if (status.shortLabel === "Ready") return null;
-  return <span className="bot-direct-header-state" title={status.label}>
-    <StatusBadge status={status.tone} label={status.shortLabel} />
   </span>;
 }

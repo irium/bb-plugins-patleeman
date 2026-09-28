@@ -8,18 +8,6 @@ export const sendModeLabels: Record<SendMode, string> = {
   followup: "Follow-up",
   fork: "Fork",
 };
-export const sendModeDescriptions: Record<SendMode, string> = {
-  auto: "Let Smart choose the coordinator and work order, and classify busy-bot actions.",
-  steer: "Change the task currently running.",
-  followup: "Wait for the current task to finish.",
-  fork: "Ask separately while the current task continues.",
-};
-
-/**
- * The send menu beside Send chooses the mode, so the composer row shows a
- * control only while a message overrides the classifier.
- */
-export const showsSendModeOverride = (mode: SendMode) => mode !== "auto";
 
 /** Commands are parsed once at the send boundary, never from quoted chat history. */
 export function parseSendMode(text: string, mode: SendMode = "auto") {

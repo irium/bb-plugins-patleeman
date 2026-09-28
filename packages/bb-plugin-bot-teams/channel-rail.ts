@@ -132,21 +132,3 @@ export const formatCountdown = (ms: number) =>
 /** Requests blocking a bot, newest last so the rail reads like the transcript. */
 export const railApprovals = (approvals: ChannelApproval[]) =>
   [...approvals].sort((a, b) => a.createdAt - b.createdAt);
-
-/**
- * A rail that looks the same busy and idle is just another tab. Sections with
- * nothing to say stay closed so the rail empties out with the channel.
- */
-export function railHasLiveWork(
-  jobs: Job[],
-  runs: RoomRun[],
-  approvals: ChannelApproval[],
-  attentionCount: number,
-) {
-  return (
-    railLive(jobs).length > 0 ||
-    railRoutingCount(runs) > 0 ||
-    approvals.length > 0 ||
-    attentionCount > 0
-  );
-}

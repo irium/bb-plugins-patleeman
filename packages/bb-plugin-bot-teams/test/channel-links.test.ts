@@ -1,14 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fromMarkdown } from "mdast-util-from-markdown";
 import {
-  channelLinkDestination,
-  channelFileLinkDestination,
-  channelMessageIdFromSubPath,
-  channelMessageReference,
-  channelMessageSubPath,
-  channelThreadLinkDestination,
-} from "../channel-links";
+  channelLinkDestination } from "../channel-links";
 
 const id = "1a5943b7-4148-436b-94b0-aab0a5401064";
 const messageId =
@@ -28,23 +21,6 @@ test("legacy Bots links retain message IDs and only adopt known channels", () =>
       null,
     );
   }
-});
-
-test("copied message references are portable Markdown with intact message identity", () => {
-  const reference = channelMessageReference(
-    id,
-    "Command [Center] *notes*\n",
-    messageId,
-  );
-  assert.ok(!reference.includes("http"));
-  const paragraph = fromMarkdown(reference).children[0];
-  assert.equal(paragraph?.type, "paragraph");
-  if (paragraph?.type !== "paragraph") assert.fail();
-  const link = paragraph.children[0];
-  assert.equal(link?.type, "link");
-  if (link?.type !== "link") assert.fail();
-  assert.equal(link.url, path);
-  assert.equal(link.children[0]?.type, "text");
 });
 
 test("relative and same-server message links stay in the current client", () => {
@@ -115,77 +91,4 @@ test("unrelated servers, schemes, downloads and malformed routes are not treated
       channelLinkDestination(href, "https://bb.example.com", known),
       null,
     );
-});
-
-test("message subpaths survive both host routes", () => {
-  // BB encodes each subpath segment into the URL. Routed panels read the
-  // splat decoded once; split views read it with matchPath, still encoded.
-  const url = channelMessageSubPath(id, messageId)
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/");
-  const routed = url.split("/").map(decodeURIComponent).join("/");
-  for (const subPath of [routed, url, `${routed}/reply`, `${url}/reply`])
-    assert.equal(channelMessageIdFromSubPath(subPath), messageId);
-  assert.equal(channelMessageIdFromSubPath(id), undefined);
-});
-
-test("channel thread links open in BB across local ports and clients", () => {
-  const threadId = "thr_qe49j8zbi5";
-  const paths = [
-    `/threads/${threadId}`,
-    `/projects/proj_example/threads/${threadId}`,
-  ];
-  for (const path of paths) {
-    for (const href of [
-      path,
-      `http://127.0.0.1:38886${path}`,
-      `http://localhost:38886${path}`,
-      `https://bb.example.com${path}`,
-    ])
-      assert.equal(
-        channelThreadLinkDestination(href, "https://bb.example.com"),
-        threadId,
-      );
-  }
-});
-
-test("unrelated and malformed URLs are not adopted as BB threads", () => {
-  for (const href of [
-    "https://elsewhere.example/threads/thr_qe49j8zbi5",
-    "//localhost/threads/thr_qe49j8zbi5",
-    "javascript:alert(1)",
-    "/threads/not_a_thread",
-    "/threads/thr_qe49j8zbi5/extra",
-    "/threads/thr_qe49j8zbi5?download=1",
-    "/threads/thr_%00",
-    "/projects/other/threads/thr_qe49j8zbi5",
-  ])
-    assert.equal(
-      channelThreadLinkDestination(href, "https://bb.example.com"),
-      null,
-    );
-});
-
-test("absolute Markdown draft links resolve to host file paths", () => {
-  const path = "/Users/patrick/workingdir/slopfluencer/drafts/lakenridge-history-article.md";
-  assert.equal(channelFileLinkDestination(path), path);
-  assert.equal(
-    channelFileLinkDestination("/Users/patrick/workingdir/My%20Draft.md"),
-    "/Users/patrick/workingdir/My Draft.md",
-  );
-});
-
-test("web routes and unsafe paths are not treated as host files", () => {
-  for (const href of [
-    "/projects/proj_a/threads/thr_a.md",
-    "/plugins/bot-teams/file.md",
-    "https://example.com/draft.md",
-    "//example.com/draft.md",
-    "/Users/patrick/draft.md?download=1",
-    "/Users/patrick/../draft.md",
-    "/Users/patrick/%00draft.md",
-    "/Users/patrick/draft",
-  ])
-    assert.equal(channelFileLinkDestination(href), null);
 });

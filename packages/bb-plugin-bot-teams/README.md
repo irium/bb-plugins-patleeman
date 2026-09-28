@@ -20,19 +20,13 @@ and a rendered preview. Use ⌘S / Ctrl+S to save. The editor adapts to the view
 and shows unsaved/saved state. Reloading with unsaved edits asks before
 discarding them. Profile, mission, and memory drafts survive navigation and reloads on the same device. Profile and document saves reject stale versions instead of overwriting newer edits. Interrupted host cancellation stays visible and retries automatically.
 
-Bots with direct threads appear under **Direct messages** in the Channels sidebar, one row per thread with the bot on the row. Search matches thread titles and bot names. Open any thread to continue it in BB's regular chat layout. Right-click a thread or use its options button to open it in a split, rename, pin, mark read, archive, restore, or delete it. The Direct messages **+** button starts a thread with any active bot, including one that is not yet listed. Use the three-dot menu to show archived bots or archived threads. New direct threads open empty, with no queued introduction. Use **New thread with …** in a row's menu, the page menu, or `/new` in the composer to start fresh. The **Threads** workbench tab also lists the current and previous direct threads. The composer model picker updates the bot's provider or model and starts fresh bot threads: the current direct chat is replaced immediately, while channel and mission work threads are created with the new selection on their next task. Wait for current work and queued messages to finish before changing a provider or model.
+Bots with direct threads appear under **Direct messages** in the Channels sidebar, one row per thread with the bot on the row. Search matches thread titles and bot names. Open any thread to continue it in BB's regular chat layout. Right-click a thread or use its options button to open it in a split, rename, pin, mark read, archive, restore, or delete it. The Direct messages **+** button starts a thread with any active bot, including one that is not yet listed. Use the three-dot menu to show archived bots or archived threads. New direct threads open empty, with no queued introduction. Use **New thread with …** in a row's menu, the page menu, or `/new` in the composer to start fresh. The composer model picker updates the bot's provider or model and starts fresh bot threads: the current direct chat is replaced immediately, while channel and mission work threads are created with the new selection on their next task. Wait for current work and queued messages to finish before changing a provider or model.
 
 Set a **fallback model** in the bot profile. **Use fallback now** swaps the primary and fallback selections, including their providers and reasoning levels. The direct chat also has **Swap model**, and `bb bots swap <bot>` does the same from the CLI. A manual swap starts fresh bot threads and keeps the old threads in history. If a provider error ends a managed channel or mission response, the bot retries that response once in a new thread with its fallback model. The primary selection stays configured; later responses in that channel continue in the fallback thread. Forked responses and direct chats use manual swaps. A failed fallback response remains visible for inspection. A retry can repeat tool actions taken before the provider failed, so inspect the failed thread when that matters.
 
 Your channel messages appear in right-aligned bubbles, like regular threads.
 Bot and BB agent messages stay left-aligned with their names and avatars.
 
-Channels open with the latest 50 messages. Scrolling toward either end loads
-another page while preserving your reading position. At most 150 messages
-stay mounted; the rest remain available in history. Message
-links and search results load a page around the target directly. **Jump to
-latest** returns from older history, and sending a message brings your new post
-into view.
 Channels with unfinished work show the same loading glyph as running threads
 in the sidebar, including while routing or stopping. It clears when all work
 settles; unread replies keep the usual unread indicator.
@@ -60,15 +54,13 @@ For provider-based classification, select **providers** explicitly. Its primary/
 
 Explicit modes override the busy-bot action. Smart still classifies dependency shape when more than one recipient is possible. Single-bot channels skip coordinator selection; busy Auto messages still classify the action in every channel mode. Directed and Everyone keep literal recipients. No keyword checks infer correction intent. See [OpenCode's Jev documentation](https://opencode.ai/docs/zen/#jev) for its endpoint and model availability.
 
-If a bot has live delegates, a steer queues as a follow-up so its return path stays attached to the original task. The message annotation shows the applied action.
+If a bot has live delegates, a steer queues as a follow-up so its return path stays attached to the original task.
 
-Smart messages show the selected execution mode beside the sent timestamp. Hover or focus the label to see the coordinator, collaborators, and applied busy-bot actions. Explicit send modes still show a Smart plan when topology was classified.
+Channel threads use BB's own composer, so attachments (plus button, paste, drag and drop), dictation, and drafts work as in any thread. Mention a bot with `@handle` to invite or address it.
 
-The composer is adapted from BB’s thread composer: the same prompt box, **+** menu, dictation strip, attachment previews, mention menu, and the row of controls beneath it. Work in progress sits in a card tucked behind the top of the box, like a thread’s follow-ups. Type `#` to find another channel; choosing one inserts a stable channel reference that renders as a link in the transcript. It supports attachments through the plus button, paste, and drag and drop (10 files per message, 8 MB each). Dictation uses BB’s configured transcription service and microphone preference. Message text, attachment references, and replies survive reloads. Unsent uploads expire after seven days.
+Files and images a bot publishes are listed as links under its reply. Bots use `bots_publish_image` (or `bb bots publish-image`) with an absolute path inside their workspace to add up to ten images to their current final response. This publishes one message containing text and images, or images alone with `[PASS]`; cancelled or failed responses do not post images.
 
-PNG, JPEG, GIF, and WebP images appear as composer previews and inline in sent messages, including images pasted with text. Click an image to expand it and download the original. Other file types stay downloadable. Image bytes are checked before inline display; SVG and HTML remain downloads. Bots use `bots_publish_image` (or `bb bots publish-image`) with an absolute path inside their workspace to add up to ten images to their current final response. This publishes one message containing text and images, or images alone with `[PASS]`; cancelled or failed responses do not post images.
-
-On desktop, hover over Channels to reveal its header actions; they stay visible on touch screens. Use the three-dot menu at the right of the Channels header to switch between active and archived channels, organize the list by pinned channels or activity, and sort by update time, creation time, or name. Select the current sort again to reverse its direction; the organize and sort choices persist on this device. Search finds channels in both views and labels archived results. Clearing or closing search returns to the selected view. Right-click a channel for **Rename**, **Archive**, or **Delete**; archived channels offer **Restore** and **Delete**. Keyboard users can open this menu with Shift+F10. The channel menu in the header contains rename, pin, archive, and delete actions. **Automations** and **Activity** open as separate tabs in BB’s right workbench. Archiving cancels unfinished work and preserves history; restoring makes the channel available again. Deletion requires confirmation, stops unfinished responses, and permanently removes channel messages, reactions, membership, activity, and draft uploads. Bot profiles, workspaces, and other channels are kept. Existing bot work threads and sent files in BB's project storage remain under BB's own retention. Removing a bot cancels its pending channel work and preserves its messages and reactions. Channels support up to 16 bots.
+On desktop, hover over Channels to reveal its header actions; they stay visible on touch screens. Use the three-dot menu at the right of the Channels header to switch between active and archived channels, organize the list by pinned channels or activity, and sort by update time, creation time, or name. Select the current sort again to reverse its direction; the organize and sort choices persist on this device. Search finds channels in both views and labels archived results. Clearing or closing search returns to the selected view. Right-click a channel for **Rename**, **Archive**, or **Delete**; archived channels offer **Restore** and **Delete**. Keyboard users can open this menu with Shift+F10. **Channel automations**, **Channel activity**, and **Channel usage** open as tabs in the channel thread's panel. Archiving cancels unfinished work and preserves history; restoring makes the channel available again. Deletion requires confirmation, stops unfinished responses, and permanently removes the channel thread, messages, membership, activity, and draft uploads. Bot profiles, workspaces, and other channels are kept. Existing bot work threads and sent files in BB's project storage remain under BB's own retention. Removing a bot cancels its pending channel work and preserves its messages. Channels support up to 16 bots.
 
 BB’s **Settings → Appearance** can select sidebar providers. **Channels navigation** places Channels and Direct messages in the same scrolling sidebar area as the selected thread list, below the normal navigation.
 The sidebar lists channels. Bot work threads stay available from channel messages, activity, and approvals.
@@ -79,17 +71,15 @@ Each channel is a hidden BB thread on the **Channel** provider, so it looks and 
 
 - **Your messages** go to the channel's router exactly as before: Smart, Directed, and Everyone modes, mentions, delegation, and bot work threads are unchanged. Images and files attached in the composer go with the message.
 - **Bot replies** arrive when each bot finishes, as assistant messages that start with the bot's avatar and name. Replies can arrive while the thread is idle; each one is its own short turn.
-- **Messages from elsewhere**, such as `bb bots channel send`, automations, or the older channel page, also appear in the thread, marked as sent outside it.
+- **Messages from elsewhere**, such as `bb bots channel send` or automations, also appear in the thread, marked as sent outside it.
 - Renaming a channel renames its thread. Deleting a channel deletes its thread. If the thread is deleted on its own, opening the channel creates a new one.
 
-The **Chat mode** (Smart, Directed, Everyone) and **Bot permissions** pickers sit beside the thread's composer; they hide when the composer is in its narrow one-line layout. The member list is in the thread header, and the channel rail opens as a **Channel details** tab in the thread panel. The older channel page at `/plugins/bot-teams/channels/<id>` still exists for search, message links, and editing past messages.
+The **Chat mode** (Smart, Directed, Everyone) and **Bot permissions** pickers sit beside the thread's composer; they hide when the composer collapses to one line. The thread header holds the member list, **Search channel**, and **Channel details**, which opens the channel rail in the thread panel. Old channel and message links (`/plugins/bot-teams/channels/…`, including those in notifications) open the channel's thread; a message link opens the channel rather than scrolling to that message. Past messages cannot be edited in a channel thread; send a correction instead.
 
 ## Channel workspace
 
-Activity, automations, and usage have separate
-tabs in BB’s right workbench. Use **Show right panel** to open the workbench. The labeled tabs share its
-resize, collapse, and split controls with Browser and Terminal. On compact screens, BB opens them in
-its workbench drawer.
+Activity, automations, and usage open as tabs in the channel thread's panel,
+from its new-tab launcher or from links in the channel rail.
 
 - There is no shared channel context. Each bot keeps its own `MISSION.md`,
   `MEMORY.md`, and one work thread per channel, which already holds that
@@ -99,23 +89,19 @@ its workbench drawer.
 - Files stay in the transcript. Bots can use `bots_publish_file` or
   `bb bots publish-file` to attach reports, CSVs, PDFs, and images from their
   workspace (8 MB each); failed responses do not publish their outputs.
-- Message menus offer **Copy message link**, and **Edit message** for your own
-  posts. Editing changes the transcript; already queued or running work keeps the
-  original task. Record settled choices in **Context → Decisions**, which every bot
-  in the channel reads.
+- Record settled choices in **Context → Decisions**, which every bot in the
+  channel reads.
 - Channel links store the channel ID, so renaming a channel keeps links working.
   Plain `#name` references resolve only when unambiguous and outside Markdown
   code, existing links, images, and URL fragments.
 - Activity shows each task, queue position or blocking reason, and **Open work thread**.
-  Reading marks messages seen only while the channel is focused and at the bottom.
 
 ## Channel rail
 
-The rail floats over the transcript's right gutter as its own card and answers
-"what is true in this channel right now". It is only as tall as it needs to
-be, so a quiet channel leaves almost nothing on screen. The workbench tabs
-stay for what is configured and what already happened; the rail holds live
-state.
+The rail answers "what is true in this channel right now". Open it with
+**Channel details** in the channel thread's header; it appears as a tab in the
+thread panel. The other channel tabs cover what is configured and what already
+happened; the rail holds live state.
 
 - **Live now** lists each working bot with its elapsed time, current activity,
   anything queued behind it, and a **Stop** button. It also shows the routing
@@ -138,20 +124,6 @@ carets, the **Stop**, **Pause** and **Add a bot** controls stay invisible until
 you hover the row or section that owns them. Long lists stop at four entries
 behind a **View all**. Sections with nothing to report are hidden entirely, and
 each one collapses and remembers its state per device.
-
-Use the header's **Show channel details** control to hide or show the rail;
-while it is hidden, that control carries a dot when the channel has live work.
-The rail takes no column out of the channel: on a wide channel it lands in
-empty gutter. As the channel narrows the transcript and composer shift left to
-stay clear of it, and the card gives up its own width before it gives up
-theirs. It stays put wherever it fits, including alongside BB's right
-workbench.
-
-Below roughly 560px there is no gutter left, so the card becomes a sheet over
-the whole channel instead. The header's control opens and closes it there like
-anywhere else, and the sheet is dismissed by its close button, that control, or
-Escape. Its own controls stay visible in this mode, since nothing reveals on
-hover on a touch screen.
 
 ## Parallel questions and tasks
 
@@ -215,7 +187,7 @@ this channel.” The bot can create a recurring schedule or a one-time reminder
 for itself. Each run reads the latest channel context, mission, and memory, and
 posts its answer in the same channel using its current model and permissions.
 
-Open the **Automations** workbench tab to create or edit a task with weekday, daily,
+Open **Channel automations** in the channel thread's panel to create or edit a task with weekday, daily,
 hourly, one-time, or custom schedules. New schedules start paused unless enabled.
 Review tasks, pause/resume schedules, run them now, view run history, or delete them. Native tools infer the active bot and channel; top-level agents supply
 both IDs. Bots can manage only their own schedules in channels they belong to.
@@ -262,7 +234,7 @@ Each bot lives at `<BB data directory>/plugins/bot-teams/homes/<bot-id>/`:
 
 Each bot has a hidden BB work thread for each channel. Channel tasks run in that thread, but requests and answers belong in the channel. The first turn receives bounded channel history and saved context. Later turns receive the new request and channel messages since the previous channel snapshot. When that gap exceeds the prompt budget, the bot gets exact start and end message IDs and can read the omitted range forward in pages. Previously delivered files are not attached again. Forks have separate work threads and reply histories. **Open work thread** shows the native execution record with its messages, tools, approvals, and failures. Typing a direct request there is rejected with a link to its channel. Existing group conversations appear as Channels without losing history; old group links redirect to their channel. Existing work sessions remain stored and accessible through BB. The Bot Teams page holds bot configuration; direct chats live below Channels in the sidebar.
 
-Channels initially load 200 messages. **Load earlier messages** pages through the retained transcript. **Search channel** searches all stored message text and names; selecting a result loads and focuses its message. This is a single-owner local feature. Bots use BB’s configured providers, credentials, tools, and skills on the primary machine. Separate directories provide persistent storage, not separate accounts. Shared `MEMORY.md` should contain only information appropriate for every channel the bot joins.
+**Search channel** in the channel thread's header searches all stored message text and names; selecting a result expands it to the full message. This is a single-owner local feature. Bots use BB’s configured providers, credentials, tools, and skills on the primary machine. Separate directories provide persistent storage, not separate accounts. Shared `MEMORY.md` should contain only information appropriate for every channel the bot joins.
 
 ## CLI
 

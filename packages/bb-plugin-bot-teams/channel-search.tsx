@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useRpc } from "@get-bb/plugin-sdk/app";
+import { Markdown, useRpc } from "@get-bb/plugin-sdk/app";
 import type { RoomMessage, rpcContract } from "./contract";
 import { Input } from "./components/ui/input";
 import { Button } from "./components/ui/button";
@@ -21,6 +21,8 @@ export function ChannelSearch({
   const [before, setBefore] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A channel thread cannot scroll to a stored message, so a result opens in place.
+  const [expanded, setExpanded] = useState<string | null>(null);
   const request = useRef(0);
   useEffect(() => {
     const seq = ++request.current;
@@ -88,14 +90,8 @@ export function ChannelSearch({
           <button
             key={m.id}
             className="channel-search-result"
-            onClick={() => {
-              onOpenChange(false);
-              window.dispatchEvent(
-                new CustomEvent("bb:bots:jump", {
-                  detail: { roomId: id, messageId: m.id },
-                }),
-              );
-            }}
+            aria-expanded={expanded === m.id}
+            onClick={() => setExpanded(expanded === m.id ? null : m.id)}
           >
             <span className="flex justify-between gap-3">
               <strong>{m.speaker}</strong>
@@ -103,9 +99,13 @@ export function ChannelSearch({
                 {new Date(m.createdAt).toLocaleString()}
               </time>
             </span>
-            <span className="line-clamp-3 whitespace-pre-wrap">
-              {m.text || "Attachment"}
-            </span>
+            {expanded === m.id ? (
+              <Markdown content={m.text || "Attachment"} />
+            ) : (
+              <span className="line-clamp-3 whitespace-pre-wrap">
+                {m.text || "Attachment"}
+              </span>
+            )}
           </button>
         ))}
       </div>

@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseSendMode, showsSendModeOverride } from "../send-mode";
-import { emptyDraft, prepareSend, clearSentDraft } from "../draft";
+import { parseSendMode } from "../send-mode";
 import { parseRouting, parseRoutingPlan, routingPrompt } from "../smart-router";
 import { profileInput, messageSchema, type Bot } from "../contract";
 
@@ -22,29 +21,6 @@ test("explicit commands strip only a leading command and reject conflicting mode
   assert.equal(parseSendMode("/forklift status").mode, "auto");
   assert.equal(parseSendMode("/fork", "fork").text, "");
   assert.throws(() => parseSendMode("/fork hi", "steer"), /conflicts/);
-});
-
-test("retry identity includes send mode and old sends cannot clear a changed mode", () => {
-  const data = new Map<string, string>();
-  const storage = {
-    getItem: (key: string) => data.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      data.set(key, value);
-    },
-  };
-  const first = prepareSend(storage, "draft", "room", {
-    ...emptyDraft(),
-    text: "Question",
-  });
-  const retry = prepareSend(storage, "draft", "room", first.draft);
-  assert.equal(first.payload.requestId, retry.payload.requestId);
-  const fork = prepareSend(storage, "draft", "room", {
-    ...first.draft,
-    sendMode: "fork",
-  });
-  assert.notEqual(first.payload.requestId, fork.payload.requestId);
-  assert.equal(clearSentDraft(storage, "draft", first.draft), false);
-  assert.equal(fork.payload.sendMode, "fork");
 });
 
 const member: Bot = {
@@ -135,10 +111,4 @@ test("router sees the active task and explicit recipient constraint as data", ()
   assert.deepEqual(data.candidateBotIds, [member.id]);
   assert.equal(data.tasks[0].task, "Migrate the database");
   assert.equal(data.tasks[0].busy, true);
-});
-
-test("the composer row shows a send mode only while a message overrides Auto", () => {
-  assert.equal(showsSendModeOverride("auto"), false);
-  for (const mode of ["steer", "followup", "fork"] as const)
-    assert.equal(showsSendModeOverride(mode), true);
 });

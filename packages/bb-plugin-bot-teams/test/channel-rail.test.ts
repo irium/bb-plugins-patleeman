@@ -4,7 +4,6 @@ import {
   formatCountdown,
   formatDuration,
   nextAutomation,
-  railHasLiveWork,
   railLive,
   railMembers,
   railRoutingCount,
@@ -185,11 +184,4 @@ test("durations read as two coarse units", () => {
 test("countdowns say now rather than counting the last second", () => {
   assert.equal(formatCountdown(500), "now");
   assert.equal(formatCountdown(150_000), "in 2m 30s");
-});
-
-test("the rail reports live work from any of its urgent sources", () => {
-  assert.equal(railHasLiveWork([], [], [], 0), false);
-  assert.equal(railHasLiveWork([job()], [], [], 0), true);
-  assert.equal(railHasLiveWork([], [run({ routing: "pending" })], [], 0), true);
-  assert.equal(railHasLiveWork([], [], [], 2), true);
 });

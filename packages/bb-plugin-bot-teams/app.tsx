@@ -9,7 +9,14 @@ import {
   useBbNavigate,
   type PluginNavPanelProps,
 } from "@get-bb/plugin-sdk/app";
-import type { Bot, BotListItem, Conversation, Job, Room, rpcContract } from "./contract";
+import type {
+  Bot,
+  BotListItem,
+  Conversation,
+  Job,
+  Room,
+  rpcContract,
+} from "./contract";
 import { Button } from "./components/ui/button";
 import {
   BackButton,
@@ -23,8 +30,6 @@ import {
 } from "./bot-ui";
 import {
   ChannelsPage,
-  ChannelsHeader,
-  channelWorkbenchTabs,
   ChannelsNavigation,
   ChannelRedirect,
   ChannelLinkNavigation,
@@ -44,7 +49,10 @@ import {
   ChannelHandoffPrefill,
   ChannelThreadHeader,
   channelDetailsPanelId,
+  channelWorkbenchPanel,
+  channelWorkbenchPanelIds,
 } from "./channel-thread-surfaces";
+import { workbenchLabels } from "./channel-workbench";
 const tabs = ["profile", "mission", "memory", "activity", "usage"] as const;
 
 function BotDetail({ id, tab }: { id: string; tab: string }) {
@@ -327,6 +335,14 @@ export default definePluginApp((app) => {
     icon: "ListView",
     component: ChannelDetailsPanel,
   });
+  for (const panel of ["automations", "activity", "usage"] as const)
+    app.slots.threadPanelAction({
+      id: channelWorkbenchPanelIds[panel],
+      title: `Channel ${workbenchLabels[panel].toLowerCase()}`,
+      icon: { automations: "Clock", activity: "List", usage: "ChartNoAxesCombined" }[panel],
+      layout: "flush",
+      component: channelWorkbenchPanel(panel),
+    });
   app.composer.customize({
     id: "channel-thread",
     scopes: ["thread"],
@@ -348,8 +364,6 @@ export default definePluginApp((app) => {
     icon: "MessageSquare",
     path: "channels",
     component: ChannelsPage,
-    headerContent: ChannelsHeader,
-    fixedTabs: channelWorkbenchTabs,
   });
   app.slots.experimental_sidebarNavigation({
     id: "channels",

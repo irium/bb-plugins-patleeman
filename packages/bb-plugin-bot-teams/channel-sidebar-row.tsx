@@ -70,7 +70,7 @@ export function ChannelSidebarRow({
   const menuId = useId();
   const hasUnread = room.updatedAt > (room.lastReadAt ?? 0);
   const unread = hasUnread && !selected;
-  const status = useChannelStatus({ roomId: room.id, threads, work, active, unread,
+  const status = useChannelStatus({ roomId: room.id, threadId: room.threadId, threads, work, active, unread,
     needsAttention: attentionCount + approvalCount > 0 });
   const openInSplit = () => {
     // BB's route anchor delegate handles modified plugin links with its split placement rules.

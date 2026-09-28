@@ -3,8 +3,7 @@ import * as Popover from "@radix-ui/react-popover";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
-import type { Bot, Room } from "./contract";
-import { channelSlug, matchingChannels } from "./channel-references";
+import type { Bot } from "./contract";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { matchingBroadcastMentions, type BroadcastMention } from "./mentions";
@@ -204,58 +203,6 @@ export function BotOptions({
   );
 }
 
-export function ChannelOptions({
-  rooms,
-  currentRoomId,
-  query,
-  selected,
-  onSelect,
-  listId,
-  onHover,
-}: {
-  rooms: Room[];
-  currentRoomId: string;
-  query: string;
-  selected?: number;
-  onSelect: (room: Room) => void;
-  listId?: string;
-  onHover?: (index: number) => void;
-}) {
-  const matches = matchingChannels(rooms, currentRoomId, query);
-  return (
-    <div
-      id={listId}
-      role="listbox"
-      aria-label="Channels"
-      className="channel-bot-options"
-    >
-      {matches.map((room, i) => (
-        <button
-          type="button"
-          role="option"
-          aria-selected={selected === i}
-          id={listId ? `${listId}-${i}` : undefined}
-          className="channel-menu-row"
-          key={room.id}
-          onMouseDown={(event) => event.preventDefault()}
-          onMouseEnter={() => onHover?.(i)}
-          onClick={() => onSelect(room)}
-        >
-          <span className="channel-hash" aria-hidden>
-            #
-          </span>
-          <span className="channel-bot-name">
-            {room.name}
-            <small>#{channelSlug(room.name)}</small>
-          </span>
-        </button>
-      ))}
-      {!matches.length && (
-        <p className="channel-menu-label">No matching channels</p>
-      )}
-    </div>
-  );
-}
 export function matchingBots(bots: Bot[], memberIds: string[], query: string) {
   const q = query.toLowerCase();
   return bots

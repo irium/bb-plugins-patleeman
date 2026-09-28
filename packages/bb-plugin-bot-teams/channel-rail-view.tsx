@@ -1,14 +1,6 @@
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   experimental_Icon as Icon,
-  experimental_useAppPanel as useAppPanel,
   experimental_useSidebarThreadActions as useSidebarThreadActions,
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
   useBbContext,
@@ -24,7 +16,6 @@ import type {
   RoomRun,
   rpcContract,
 } from "./contract";
-import type { PluginFixedTabRegistration } from "@get-bb/plugin-sdk/app";
 import type { ChannelAutomation } from "./automation-contract";
 import { Button } from "./components/ui/button";
 import { message } from "./bot-ui";
@@ -46,7 +37,6 @@ import {
   type RailMember,
 } from "./channel-rail";
 
-const railOpenKey = "bb:bots:rail-open";
 const collapsedKey = "bb:bots:rail-collapsed";
 
 type SectionId =
@@ -79,30 +69,6 @@ function writeStored(key: string, value: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {}
-}
-
-const railEvent = "bb:bots:rail";
-
-/**
- * Whether the rail is showing. Persists per device, and stays in sync across
- * the header and the transcript, which BB mounts as separate surfaces.
- */
-export function useChannelRail() {
-  const [open, setOpen] = useState(() => readStored(railOpenKey, true));
-  useEffect(() => {
-    const sync = (event: Event) =>
-      setOpen((event as CustomEvent<{ open: boolean }>).detail.open);
-    window.addEventListener(railEvent, sync);
-    return () => window.removeEventListener(railEvent, sync);
-  }, []);
-  const set = useCallback((next: boolean) => {
-    writeStored(railOpenKey, next);
-    window.dispatchEvent(
-      new CustomEvent(railEvent, { detail: { open: next } }),
-    );
-  }, []);
-  const toggle = useCallback(() => set(!readStored(railOpenKey, true)), [set]);
-  return { open, toggle, close: useCallback(() => set(false), [set]) };
 }
 
 function useCollapsed() {
@@ -367,9 +333,8 @@ type ChannelThread = {
   needsApproval: boolean;
 };
 
-
 export function ChannelRail({
-  automationsTab,
+  onOpenAutomations,
   room,
   bots,
   jobs,
@@ -380,7 +345,8 @@ export function ChannelRail({
   onClose,
   embedded = false,
 }: {
-  automationsTab: PluginFixedTabRegistration;
+  /** Opens the channel's automations somewhere roomier than the rail. */
+  onOpenAutomations?: () => void;
   room: Room;
   bots: Bot[];
   jobs: Job[];
@@ -395,7 +361,6 @@ export function ChannelRail({
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const { collapsed, toggle } = useCollapsed();
-  const appPanel = useAppPanel();
   const card = useRef<HTMLElement>(null);
   // Too narrow for a gutter, the card becomes a sheet over the whole channel.
   const [overlay, setOverlay] = useState(false);
@@ -627,17 +592,9 @@ export function ChannelRail({
                 type="button"
                 className="channel-rail-row"
                 title="Open automations"
-                onClick={() => {
-                  // BB owns the workbench; select our Automations tab there
-                  // rather than stacking a second copy of it in a dialog.
-                  if (
-                    !appPanel.openFixedTab({
-                      surface: { kind: "current" },
-                      tab: automationsTab,
-                    })
-                  )
-                    setAutomationsOpen(true);
-                }}
+                onClick={() =>
+                  onOpenAutomations ? onOpenAutomations() : setAutomationsOpen(true)
+                }
               >
                 <span className="channel-rail-live-text">
                   <span className="channel-rail-name">{upcoming.name}</span>

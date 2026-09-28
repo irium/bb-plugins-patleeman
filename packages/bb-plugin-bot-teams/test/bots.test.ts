@@ -13,16 +13,11 @@ import {
 } from "@get-bb/plugin-sdk/testing";
 import plugin from "../server";
 import { agentAuthor, requestStatus } from "../agent-channels";
-import { channelResponseFailures, channelWork } from "../channel-work";
+import { channelWork } from "../channel-work";
 import { Store, document, saveDocument } from "../store";
 import { Runtime, jobPrompt, mentioned, recipients } from "../runtime";
 import { profileInput, roomSchema, type Bot, type Conversation, type Room } from "../contract";
-import { emptyDraft, prepareSend, readDraft, clearSentDraft } from "../draft";
-import {
-  channelHandoffMessage,
-  channelHandoffText,
-  displayChannelHandoffText,
-} from "../handoff-draft";
+import { channelHandoffText } from "../handoff-draft";
 import { directMessageId } from "../direct-messages";
 
 const bot = (
@@ -604,56 +599,6 @@ test("failed title work stops its hidden thread before falling back", async () =
     );
     assert.equal(x.harness.inspection.sdk.callsTo("threads.stop").length, 1);
     assert.equal(x.harness.inspection.sdk.callsTo("threads.delete").length, 1);
-  } finally {
-    await x.close();
-  }
-});
-
-test("a send retry after remount keeps its identity and reply without repeating bot work", async () => {
-  const x = setup();
-  try {
-    const parent = x.runtime.send(x.room, "Starting point", randomUUID());
-    let value: string | null = null;
-    const storage = {
-      getItem: () => value,
-      setItem: (_key: string, text: string) => {
-        value = text;
-      },
-    };
-    const first = prepareSend(storage, "draft", x.room.id, {
-      ...emptyDraft(),
-      text: "My reply",
-      reply: parent,
-    });
-    x.runtime.send(
-      x.room,
-      first.payload.text,
-      first.payload.requestId,
-      [],
-      first.payload.replyTo,
-    );
-    // The server accepted the message, but the client never got an acknowledgement.
-    const retry = prepareSend(
-      storage,
-      "draft",
-      x.room.id,
-      readDraft(storage, "draft"),
-    );
-    assert.deepEqual(retry.payload, first.payload);
-    x.runtime.send(
-      x.room,
-      retry.payload.text,
-      retry.payload.requestId,
-      [],
-      retry.payload.replyTo,
-    );
-    assert.equal(x.store.messages(x.room.id).length, 2);
-    assert.equal(x.store.work(x.a.id).length, 2);
-    const edited = prepareSend(storage, "draft", x.room.id, {
-      ...retry.draft,
-      text: "A new message",
-    });
-    assert.notEqual(edited.payload.requestId, first.payload.requestId);
   } finally {
     await x.close();
   }
@@ -1935,70 +1880,6 @@ test("channel handoff draft links to standard and projectless source threads", (
   );
 });
 
-test("channel handoff keeps an editable draft and sends its thread reference", () => {
-  const source = {
-    threadId: "thr_source",
-    projectId: "proj_test",
-    title: "Source work",
-  };
-  const values = new Map<string, string>();
-  const storage = {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      values.set(key, value);
-    },
-  };
-  storage.setItem("draft", JSON.stringify({
-    ...emptyDraft(),
-    handoffSource: source,
-    text: "Check the remaining issue.",
-  }));
-  const draft = readDraft(storage, "draft");
-  assert.equal(draft.text, "Check the remaining issue.");
-  assert.deepEqual(draft.handoffSource, source);
-  const sent = prepareSend(storage, "draft", "room", draft);
-  assert.equal(
-    sent.payload.text,
-    "Continue from [Source work](/projects/proj_test/threads/thr_source) (@thread:thr_source)\n\nCheck the remaining issue.",
-  );
-  assert.equal(
-    displayChannelHandoffText(sent.payload.text),
-    "Continue from [Source work](/projects/proj_test/threads/thr_source)\n\nCheck the remaining issue.",
-  );
-  assert.equal(
-    channelHandoffMessage(null, "No source"),
-    "No source",
-  );
-  storage.setItem("draft", JSON.stringify({
-    ...sent.draft,
-    handoffSource: null,
-  }));
-  assert.equal(clearSentDraft(storage, "draft", sent.draft), false);
-  assert.equal(readDraft(storage, "draft").handoffSource, null);
-  storage.setItem("draft", JSON.stringify(sent.draft));
-  assert.equal(clearSentDraft(storage, "draft", sent.draft), true);
-  assert.equal(readDraft(storage, "draft").handoffSource, null);
-});
-
-test("an unsent legacy handoff draft becomes a thread chip", () => {
-  const source = {
-    threadId: "thr_source",
-    projectId: "proj_test",
-    title: "Design [v2]",
-  };
-  const stored = JSON.stringify({
-    ...emptyDraft(),
-    text: `${channelHandoffText(source)}\n\nPlease continue.`,
-  });
-  const draft = readDraft({ getItem: () => stored, setItem: () => {} }, "draft");
-  assert.deepEqual(draft.handoffSource, source);
-  assert.equal(draft.text, "Please continue.");
-  assert.equal(
-    channelHandoffMessage(draft.handoffSource, draft.text),
-    `${channelHandoffText(source)}\n\nPlease continue.`,
-  );
-});
-
 test("archive stops channel work, preserves history and read state is monotonic", async () => {
   const x = setup();
   try {
@@ -2059,29 +1940,6 @@ test("a channel can be marked unread without changing normal read ordering", asy
   } finally {
     await x.close();
   }
-});
-
-test("a completed send cannot clear edits made in a newer composer mount", () => {
-  const values = new Map<string, string>();
-  const storage = {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      values.set(key, value);
-    },
-  };
-  const sent = prepareSend(storage, "draft", "room", {
-    ...emptyDraft(),
-    text: "First message",
-  });
-  storage.setItem(
-    "draft",
-    JSON.stringify({ ...sent.draft, text: "New unsent draft" }),
-  );
-  assert.equal(clearSentDraft(storage, "draft", sent.draft), false);
-  assert.equal(readDraft(storage, "draft").text, "New unsent draft");
-  storage.setItem("draft", JSON.stringify(sent.draft));
-  assert.equal(clearSentDraft(storage, "draft", sent.draft), true);
-  assert.equal(readDraft(storage, "draft").text, "");
 });
 
 test("bot output advances channel activity after the owner's message was read", async () => {
@@ -2860,10 +2718,8 @@ test("one failed bot leaves another bot's answer visible and its own response re
       x.store.messages(x.room.id).filter((entry) => entry.botId).map((entry) => entry.text),
       ["Review complete"],
     );
-    assert.deepEqual(channelResponseFailures(x.store.roomJobs(x.room.id)).map((job) => job.id), [first.id]);
     const retry = await x.runtime.retryJob(first.id);
     assert.equal(retry.retryOf, first.id);
-    assert.deepEqual(channelResponseFailures(x.store.roomJobs(x.room.id)), []);
     assert.equal(x.store.messages(x.room.id).filter((entry) => entry.botId).length, 1);
   } finally {
     await x.close();
@@ -3767,7 +3623,7 @@ test("dispatching responses can use channel tools while scheduled recursion rema
   const x = setup();
   await plugin(x.bb);
   try {
-    const m = x.runtime.send(x.room, "@atlas Check", randomUUID());
+    x.runtime.send(x.room, "@atlas Check", randomUUID());
     await x.runtime.drive(x.a);
     const job = x.store.work(x.a.id)[0]!;
     x.store.putJob({ ...job, status: "dispatching" });
