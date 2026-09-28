@@ -487,7 +487,12 @@ export function ChannelsSidebar({
             variant="ghost"
             size="icon"
             aria-label="New channel"
-            onClick={() => open("new")}
+            onClick={() => {
+              // "new" is a panel route, not a channel ID; CreateChannel makes the room.
+              setFailure(null);
+              navigate.toPluginPanel("channels", { subPath: "new" });
+              onNavigate();
+            }}
           >
             <Icon name="Plus" />
           </Button>
