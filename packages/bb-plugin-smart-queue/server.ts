@@ -41,7 +41,7 @@ export default async function plugin(bb: BbPluginApi) {
       options: [...jevProviderChoices],
       default: "auto",
       description:
-        "Where Smart Queue calls Jev. Auto tries TypeSafe, Vercel AI Gateway, OpenRouter, OpenCode Zen, Datadog AI Gateway, then Custom, using each one that is configured, and moves on when one fails.",
+        "Where Smart Queue calls Jev. Auto tries TypeSafe, Vercel AI Gateway, OpenRouter, OpenCode Zen, then Custom, using each one that has a key, and moves on when one fails.",
     },
     typesafeApiKey: {
       type: "string",
@@ -75,19 +75,6 @@ export default async function plugin(bb: BbPluginApi) {
       secret: true,
       description: "Calls Jev through OpenCode Zen. Falls back to OPENCODE_API_KEY.",
     },
-    datadogAiGateway: {
-      type: "boolean",
-      label: "Use Datadog AI Gateway",
-      default: false,
-      description:
-        "For Datadog employees: calls Jev through the internal AI Gateway with a token from `ddtool auth token`. Needs ddtool and AppGate on this machine.",
-    },
-    datadogDatacenter: {
-      type: "string",
-      label: "Datadog AI Gateway datacenter",
-      default: "us1.prod.dog",
-      description: "The gateway datacenter, such as us1.prod.dog or us1.staging.dog.",
-    },
     customJevEndpoint: {
       type: "string",
       label: "Custom Jev endpoint",
@@ -99,6 +86,17 @@ export default async function plugin(bb: BbPluginApi) {
       label: "Custom Jev API key",
       secret: true,
       description: "Sent as a bearer token to the custom endpoint. Leave empty if it needs none.",
+    },
+    customJevApiKeyCommand: {
+      type: "string",
+      label: "Custom Jev key command",
+      description:
+        "For short-lived tokens: a shell command, run on the BB server, that prints the bearer token. The token is reused until its JWT expiry, or for five minutes. Use this instead of the API key.",
+    },
+    customJevHeaders: {
+      type: "string",
+      label: "Custom Jev headers",
+      description: "Extra request headers as `name: value` pairs separated by semicolons, such as `source: bb; org-id: 2`.",
     },
     customJevModel: {
       type: "string",

@@ -134,3 +134,22 @@ test("the model prompt carries bounded data and parses strict JSON", () => {
   assert.throws(() => parseModelVerdict('{"action":"fork"}'));
   assert.throws(() => parseModelVerdict("steer"));
 });
+
+test("a custom endpoint sends its extra headers and the key command's token", async (t) => {
+  const calls: RequestInit[] = [];
+  t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
+    calls.push(init);
+    return Response.json(jevAnswer("followup", 0.9));
+  });
+  const settings = {
+    customJevEndpoint: "https://gw.example.com/v1/systemone",
+    customJevModel: "jev",
+    customJevApiKeyCommand: "echo cmd-token",
+    customJevHeaders: "source: bb-smart-queue; org-id: 2",
+  };
+  await askJev(settings, situation, signal(), env);
+  const headers = calls[0]!.headers as Record<string, string>;
+  assert.equal(headers.Authorization, "Bearer cmd-token");
+  assert.equal(headers.source, "bb-smart-queue");
+  assert.equal(headers["org-id"], "2");
+});
