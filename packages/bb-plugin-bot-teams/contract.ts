@@ -159,6 +159,15 @@ export const conversationSchema = z.object({
   model: z.string().optional(),
 });
 export type Conversation = z.infer<typeof conversationSchema>;
+export const directThreadInfoSchema = z.object({
+  title: z.string(),
+  projectId: z.string(),
+  archivedAt: z.number().nullable(),
+  pinned: z.boolean(),
+  unread: z.boolean(),
+  sectionId: z.string().nullable(),
+});
+export type DirectThreadInfo = z.infer<typeof directThreadInfoSchema>;
 export const attachmentSchema = z.object({
   id: z.string().uuid(),
   roomId: z.string().uuid(),
@@ -533,6 +542,8 @@ export const rpcContract = defineRpcContract({
       rooms: z.array(roomSchema),
       activeRoomIds: z.array(z.string()),
       directThreads: z.record(idSchema, directThreadViewSchema),
+      directConversations: z.record(idSchema, z.array(conversationSchema)),
+      directThreadInfo: z.record(z.string(), directThreadInfoSchema),
       roomThreads: z.record(z.string(), z.array(threadStatusViewSchema)),
       roomWork: z.record(z.string(), roomWorkSchema),
       attentionCounts: z.record(z.string(), z.number().int().nonnegative()),

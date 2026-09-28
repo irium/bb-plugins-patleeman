@@ -43,6 +43,7 @@ const bot = (
 });
 const setup = () => {
   let sequence = 0;
+  const pendingDirectStarts = new Map<string, string>();
   const host = createFakePluginHost({
     pluginId: "bot-teams",
     agentSkillIds: ["bots"],
@@ -66,10 +67,14 @@ const setup = () => {
           assert.equal(args.executionInputSources?.reasoningLevel, "explicit");
           if (args.model)
             assert.equal(args.executionInputSources?.model, "explicit");
-          assert.ok(
-            args.input?.some((i) => i.type === "text" && i.text.trim()),
-            "BB requires nonempty first input",
-          );
+          assert.ok(args.input?.length, "BB requires an input entry");
+          const emptyDirect = args.input?.length === 1 &&
+            args.input[0]?.type === "text" && args.input[0].text === "";
+          if (!emptyDirect)
+            assert.ok(
+              args.input?.some((i) => i.type === "text" && i.text.trim()),
+              "BB requires nonempty first input",
+            );
           if (args.origin === "sdk" && args.visibility === "hidden")
             assert.equal(
               args.sendAt,
@@ -81,8 +86,10 @@ const setup = () => {
               args.sendAt! > Date.now(),
               "Registration must precede dispatch",
             );
+          const id = `thr_bot_${++sequence}`;
+          if (emptyDirect) pendingDirectStarts.set(id, `start_${id}`);
           return makeThreadResponse({
-            id: `thr_bot_${++sequence}`,
+            id,
             status: "idle",
           });
         },
@@ -91,8 +98,14 @@ const setup = () => {
         list: async () => [],
         stop: async () => ({ ok: true }),
         queuedMessages: {
-          list: async () => [],
-          delete: async () => ({ ok: true }),
+          list: async ({ threadId }) => {
+            const id = pendingDirectStarts.get(threadId);
+            return id ? [{ id, content: [{ type: "text", text: "" }] }] : [];
+          },
+          delete: async ({ threadId }) => {
+            pendingDirectStarts.delete(threadId);
+            return { ok: true };
+          },
         },
       },
     },
@@ -1010,6 +1023,8 @@ test("unrelated threads cannot claim a bot identity using metadata", async () =>
       rooms: [],
       activeRoomIds: [],
       directThreads: {},
+      directConversations: {},
+      directThreadInfo: {},
       roomThreads: {},
       roomWork: {},
       attentionCounts: {},
@@ -2495,24 +2510,10 @@ test("a deleted admin conversation does not block future bot work", async () => 
   }
 });
 
-function stubDirectStartQueue(x: ReturnType<typeof setup>) {
-  const queueReads = new Map<string, number>();
-  x.harness.inspection.sdk.stub("threads.queuedMessages.list", async ({ threadId }) => {
-    if (x.store.byThread(threadId)?.kind === "group") return [];
-    const reads = queueReads.get(threadId) ?? 0;
-    queueReads.set(threadId, reads + 1);
-    return reads ? [] : [{
-      id: `start_${threadId}`,
-      content: [{ type: "text", text: "Preparing direct message" }],
-    }];
-  });
-}
-
-test("a bot keeps one current direct thread and preserves earlier threads in history", async () => {
+test("a bot keeps one current direct thread and earlier threads remain usable", async () => {
   const x = setup();
   await plugin(x.bb);
   try {
-    stubDirectStartQueue(x);
     const first = await x.harness.behavior.callRpc("conversation", { id: x.a.id }) as Conversation;
     const repeated = await x.harness.behavior.callRpc("conversation", { id: x.a.id }) as Conversation;
     assert.equal(repeated.threadId, first.threadId);
@@ -2520,16 +2521,13 @@ test("a bot keeps one current direct thread and preserves earlier threads in his
     const second = await x.harness.behavior.callRpc("newConversation", { id: x.a.id }) as Conversation;
     assert.notEqual(second.threadId, first.threadId);
     const directSpawns = x.harness.inspection.sdk.callsTo("threads.spawn")
-      .map(([args]) => args as { input: unknown[]; sendAt?: number; title?: string })
-      .filter((args) => args.title === `${x.a.name} thread`);
+      .map(([args]) => args as { input: unknown[]; sendAt?: number; title?: string; pluginMetadata?: { botId: string } })
+      .filter((args) => args.pluginMetadata?.botId === x.a.id);
     assert.equal(directSpawns.length, 2);
     for (const spawn of directSpawns) {
-      assert.deepEqual(spawn.input, [{
-        type: "text",
-        text: "Preparing direct message",
-        mentions: [],
-      }]);
-      assert.ok(spawn.sendAt);
+      assert.deepEqual(spawn.input, [{ type: "text", text: "", mentions: [] }]);
+      assert.ok(spawn.sendAt! > Date.now());
+      assert.equal(spawn.title, undefined);
     }
     assert.equal(x.harness.inspection.sdk.callsTo("threads.queuedMessages.delete").length, 2);
     const history = await x.harness.behavior.callRpc("get", { id: x.a.id }) as { conversations: Conversation[] };
@@ -2537,6 +2535,13 @@ test("a bot keeps one current direct thread and preserves earlier threads in his
     assert.equal(history.conversations.find((c: { threadId: string }) => c.threadId === first.threadId)?.originalKey, "admin");
     assert.ok(history.conversations.find((c: { threadId: string }) => c.threadId === first.threadId)?.archivedAt);
     assert.equal(new Store(x.store.db).conversations(x.a.id).length, 2);
+    const roster = await x.harness.behavior.callRpc("list", null) as {
+      directConversations: Record<string, Conversation[]>;
+      directThreadInfo: Record<string, { title: string; archivedAt: number | null }>;
+    };
+    assert.equal(roster.directConversations[x.a.id]?.length, 2);
+    assert.ok(roster.directThreadInfo[first.threadId]);
+    assert.ok(roster.directThreadInfo[second.threadId]);
 
     const hook = x.harness.inspection.registrations.hooks["message.dispatch"]!;
     const archived = await hook(makeMessageDispatchHookContext({
@@ -2544,7 +2549,7 @@ test("a bot keeps one current direct thread and preserves earlier threads in his
       origin: "plugin",
       originPluginId: "bot-teams",
     }));
-    assert.equal(archived.action, "reject");
+    assert.equal(archived.action, "proceed");
   } finally {
     await x.close();
   }
@@ -2554,7 +2559,6 @@ test("changing a model or provider starts new bot sessions and retains their his
   const x = setup();
   await plugin(x.bb);
   try {
-    stubDirectStartQueue(x);
     const direct = await x.harness.behavior.callRpc("conversation", { id: x.a.id }) as Conversation;
     const group = await x.runtime.conversation(x.a, `group:${x.room.id}`, "group", x.room.name);
     const updated = await x.harness.behavior.callRpc("update", {
@@ -2588,7 +2592,6 @@ test("new direct threads and model changes wait for active work", async () => {
   const x = setup();
   await plugin(x.bb);
   try {
-    stubDirectStartQueue(x);
     await x.harness.behavior.callRpc("conversation", { id: x.a.id });
     x.harness.inspection.sdk.stub("threads.get", async () =>
       makeThreadResponse({ status: "active" }));

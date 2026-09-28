@@ -406,16 +406,20 @@ test("CLI updates reasoning and starts fresh threads when a model changes", asyn
   const x = await setup();
   try {
     let sequence = 0;
-    x.harness.sdk.stub("threads.spawn", async () =>
-      makeThreadResponse({ id: `thr_replacement_${++sequence}`, status: "idle" }));
-    const clearedStarts = new Set<string>();
-    x.harness.inspection.sdk.stub("threads.queuedMessages.list", async ({ threadId }) =>
-      String(threadId).startsWith("thr_replacement_") && !clearedStarts.has(threadId) ? [{
-        id: `start_${threadId}`,
-        content: [{ type: "text", text: "Preparing direct message" }],
-      }] : []);
+    const pendingDirectStarts = new Map<string, string>();
+    x.harness.sdk.stub("threads.spawn", async (args) => {
+      const id = `thr_replacement_${++sequence}`;
+      const input = (args as { input?: { type: string; text?: string }[] }).input;
+      if (input?.length === 1 && input[0]?.type === "text" && input[0].text === "")
+        pendingDirectStarts.set(id, `start_${id}`);
+      return makeThreadResponse({ id, status: "idle" });
+    });
+    x.harness.inspection.sdk.stub("threads.queuedMessages.list", async ({ threadId }) => {
+      const id = pendingDirectStarts.get(threadId);
+      return id ? [{ id, content: [{ type: "text", text: "" }] }] : [];
+    });
     x.harness.inspection.sdk.stub("threads.queuedMessages.delete", async ({ threadId }) => {
-      clearedStarts.add(threadId);
+      pendingDirectStarts.delete(threadId);
       return { ok: true };
     });
     const bot = botSchema.parse(

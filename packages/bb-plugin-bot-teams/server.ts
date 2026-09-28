@@ -785,6 +785,33 @@ export default async function plugin(bb: BbPluginApi) {
       const activity = store.botActivitySummary();
       const bots = store.all();
       const rooms = store.rooms();
+      const directConversations = Object.fromEntries(bots.map((bot) => [
+        bot.id,
+        store.conversations(bot.id).filter((conversation) => conversation.kind === "admin"),
+      ]));
+      const directThreadInfo: Record<string, {
+        title: string;
+        projectId: string;
+        archivedAt: number | null;
+        pinned: boolean;
+        unread: boolean;
+        sectionId: string | null;
+      }> = {};
+      await Promise.all(Object.values(directConversations).flat().map(async (conversation) => {
+        try {
+          const thread = await bb.sdk.threads.get({ threadId: conversation.threadId });
+          directThreadInfo[conversation.threadId] = {
+            title: thread.title?.trim() || thread.titleFallback?.trim() || conversation.title,
+            projectId: thread.projectId,
+            archivedAt: thread.archivedAt,
+            pinned: thread.pinnedAt !== null,
+            unread: thread.latestAttentionAt > (thread.lastReadAt ?? 0),
+            sectionId: thread.sectionId,
+          };
+        } catch (cause) {
+          if (!missingThread(cause)) throw cause;
+        }
+      }));
       const directThreadIds = new Map(
         bots.flatMap((bot) => {
           const current = store.currentDirectConversation(bot.id);
@@ -840,6 +867,8 @@ export default async function plugin(bb: BbPluginApi) {
         rooms,
         activeRoomIds: store.activeRoomIds(),
         directThreads,
+        directConversations,
+        directThreadInfo,
         roomThreads,
         roomWork: store.roomWorkSummary(),
         attentionCounts: store.attention.counts(),
@@ -1479,12 +1508,10 @@ export default async function plugin(bb: BbPluginApi) {
           (context.input.text === jobPrompt(job) ||
             context.input.text === job.pendingSteer?.priorPrompt),
       );
-    if (c.archivedAt)
+    if (c.archivedAt && c.kind !== "admin")
       return {
         action: "reject",
-        message: c.kind === "admin"
-          ? `This direct message is in history. Open the current chat: /plugins/bot-teams/channels/dm/${c.botId}`
-          : "This bot thread is in history. Send a new request in its channel.",
+        message: "This bot thread is in history. Send a new request in its channel.",
       };
     if (c.kind === "group" && context.initiator === "user" &&
         context.originPluginId !== "bot-teams" && !managedInput) {

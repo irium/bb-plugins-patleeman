@@ -7,6 +7,25 @@ import { LIST_HOVER_TRANSITION } from "./motion";
 
 export const ContextMenu = Primitive.Root;
 export const ContextMenuTrigger = Primitive.Trigger;
+export const ContextMenuSub = Primitive.Sub;
+
+export function ContextMenuSubTrigger({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Primitive.SubTrigger>) {
+  return <Primitive.SubTrigger
+    className={cn("relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-[0.3125rem] text-xs outline-none focus:bg-state-hover focus:text-foreground data-[state=open]:bg-state-hover [&_[data-icon-root]]:size-4", className)}
+    {...props} />;
+}
+
+export function ContextMenuSubContent({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Primitive.SubContent>) {
+  return <Primitive.Portal><Primitive.SubContent
+    className={cn("z-[70] min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md", className)}
+    {...props} /></Primitive.Portal>;
+}
 
 export function ContextMenuSeparator({
   className,

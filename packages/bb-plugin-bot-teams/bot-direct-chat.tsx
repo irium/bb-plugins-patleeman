@@ -114,8 +114,8 @@ export function BotDirectMessageHeader({ botId, selectedThreadId, threadsTab, th
     setPending(true);
     setError(null);
     try {
-      await rpc.call("newConversation", { id: bot.id });
-      navigate.toPluginPanel("channels", { subPath: `dm/${bot.id}` });
+      const conversation = await rpc.call("newConversation", { id: bot.id });
+      navigate.toThread(conversation.threadId);
       load();
     } catch (cause) {
       setError(message(cause));
@@ -125,7 +125,6 @@ export function BotDirectMessageHeader({ botId, selectedThreadId, threadsTab, th
   };
   const title = (
     <span className="bot-direct-header-title">
-      <span aria-hidden>{bot.avatar}</span>
       <span>{bot.name}</span>
       {selectedThreadId && <small>Past thread</small>}
       {bot.retired ? <StatusBadge status="paused" label="Archived" /> :
@@ -218,7 +217,7 @@ export function BotDirectThreadsPanel({ botId, selectedThreadId }: {
               navigate.toPluginPanel("channels", { subPath });
             }}>
             <span>{current ? "Current thread" : dateLabel(conversation.createdAt)}</span>
-            <small>{current ? dateLabel(conversation.createdAt) : "Past thread · read-only"}</small>
+            <small>{dateLabel(conversation.createdAt)}</small>
           </a>
         );
       })}
@@ -252,7 +251,7 @@ export function BotDirectChat({
     : current;
 
   useEffect(() => {
-    if (!selected || selected.archivedAt) return;
+    if (!selected) return;
     const syncDraft = () => {
       const root = chatRoot.current;
       if (!root) return;
@@ -272,11 +271,11 @@ export function BotDirectChat({
     syncDraft();
     const timer = window.setInterval(syncDraft, 500);
     return () => window.clearInterval(timer);
-  }, [selected?.threadId, selected?.archivedAt]);
+  }, [selected?.threadId]);
 
   useEffect(() => {
     const root = chatRoot.current;
-    if (!root || !selected || selected.archivedAt) return;
+    if (!root || !selected) return;
     const placePicker = () => {
       if (pickerHostRef.current?.isConnected) return;
       const native = Array.from(root.querySelectorAll<HTMLElement>(
@@ -299,7 +298,7 @@ export function BotDirectChat({
       pickerHostRef.current = null;
       setPickerHost(null);
     };
-  }, [selected?.threadId, selected?.archivedAt]);
+  }, [selected?.threadId]);
 
   useEffect(() => {
     if (bot.retired || requested.current) return;
@@ -322,8 +321,8 @@ export function BotDirectChat({
     setPending(true);
     setError(null);
     try {
-      await rpc.call("newConversation", { id: bot.id });
-      navigate.toPluginPanel("channels", { subPath: `dm/${bot.id}` });
+      const conversation = await rpc.call("newConversation", { id: bot.id });
+      navigate.toThread(conversation.threadId);
       onChanged();
     } catch (cause) {
       setError(message(cause));
@@ -344,7 +343,8 @@ export function BotDirectChat({
         expectedUpdatedAt: bot.updatedAt,
         ...selection,
       });
-      navigate.toPluginPanel("channels", { subPath: `dm/${bot.id}` });
+      const conversation = await rpc.call("conversation", { id: bot.id });
+      navigate.toThread(conversation.threadId);
       onChanged();
     } catch (cause) {
       setError(message(cause));
@@ -353,8 +353,8 @@ export function BotDirectChat({
     }
   };
   const handleSlashCommand = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey ||
-        event.metaKey || event.nativeEvent.isComposing || !selected || selected.archivedAt)
+        if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey ||
+        event.metaKey || event.nativeEvent.isComposing || !selected)
       return;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
@@ -373,7 +373,7 @@ export function BotDirectChat({
       <ErrorMessage error={error} />
       {selected ? (
         <ThreadChat key={selected.threadId} threadId={selected.threadId}
-          variant={selected.archivedAt ? "timeline" : "full"}
+          variant="full"
           layout="contained" className="bot-direct-thread" />
       ) : selectedThreadId ? (
         <p role="status" className="bot-direct-empty">Thread not found in this bot's history.</p>

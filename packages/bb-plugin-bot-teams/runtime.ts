@@ -77,7 +77,6 @@ export const jobPrompt = (job: Job) => {
 };
 export const legacyBotStartMessage =
   "Read MISSION.md and MEMORY.md. Introduce yourself in one short sentence based on your mission. Then wait for a message.";
-const emptyDirectStart = "Preparing direct message";
 
 const jobInput = (job: Job) => [
   { type: "text" as const, text: jobPrompt(job), mentions: [] },
@@ -287,7 +286,7 @@ export class Runtime {
       },
       input: emptyDirectMessage ? [{
         type: "text",
-        text: emptyDirectStart,
+        text: "",
         mentions: [],
       }] : [
         {
@@ -308,12 +307,9 @@ export class Runtime {
         ),
       ],
       sendAt: Date.now() + (emptyDirectMessage ? 60_000 : 1500),
-      title:
-        kind === "group"
-          ? `${bot.name} work · #${title}`
-          : kind === "admin"
-            ? `${bot.name} thread`
-            : `${bot.name} · ${title}`,
+      ...(kind === "admin" ? {} : {
+        title: kind === "group" ? `${bot.name} work · #${title}` : `${bot.name} · ${title}`,
+      }),
       visibility: "hidden",
       providerId: bot.providerId,
       ...(bot.model ? { model: bot.model } : {}),
@@ -329,19 +325,19 @@ export class Runtime {
     if (emptyDirectMessage) {
       try {
         let removed = false;
-        for (let attempt = 0; attempt < 3 && !removed; attempt++) {
+        for (let attempt = 0; attempt < 10 && !removed; attempt++) {
           const queued = await this.bb.sdk.threads.queuedMessages.list({ threadId: thread.id });
           const start = queued.find((item) =>
             item.content.length === 1 && item.content[0]?.type === "text" &&
-            item.content[0].text === emptyDirectStart);
+            item.content[0].text === "");
           if (start) {
             await this.bb.sdk.threads.queuedMessages.delete({
               threadId: thread.id,
               queuedMessageId: start.id,
             });
             removed = true;
-          } else if (attempt < 2) {
-            await new Promise((resolve) => setTimeout(resolve, 50));
+          } else if (attempt < 9) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
           }
         }
         if (!removed) throw new Error("Could not clear the pending direct-message start.");

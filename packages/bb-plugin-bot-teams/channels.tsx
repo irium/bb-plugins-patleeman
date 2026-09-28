@@ -35,6 +35,8 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type {
   Bot,
+  Conversation,
+  DirectThreadInfo,
   Room,
   RoomMessage,
   Job,
@@ -72,12 +74,12 @@ import { ChannelApprovalDeck } from "./channel-approvals";
 import { ChannelSearch } from "./channel-search";
 import { ChannelAttentionBanner, MessageAttention } from "./attention-view";
 import { ChannelSidebarRow } from "./channel-sidebar-row";
+import { DirectSidebarBot } from "./direct-sidebar-row";
 import { ChannelHeaderStatus } from "./channel-status-view";
 import {
   BotDirectMessageHeader,
   BotDirectMessagePage,
   BotDirectThreadsPanel,
-  DirectMessageStatus,
 } from "./bot-direct-chat";
 import { ChannelPermissionPicker } from "./channel-permissions";
 import {
@@ -138,6 +140,8 @@ function useRoster(reconcile = false) {
     rooms: Room[];
     activeRoomIds: string[];
     directThreads: Record<string, DirectThreadView>;
+    directConversations: Record<string, Conversation[]>;
+    directThreadInfo: Record<string, DirectThreadInfo>;
     roomThreads: Record<string, ThreadStatusView[]>;
     roomWork: Record<string, RoomWork>;
     attentionCounts: Record<string, number>;
@@ -147,6 +151,8 @@ function useRoster(reconcile = false) {
     rooms: [],
     activeRoomIds: [],
     directThreads: {},
+    directConversations: {},
+    directThreadInfo: {},
     roomThreads: {},
     roomWork: {},
     attentionCounts: {},
@@ -702,8 +708,8 @@ export function ChannelsSidebar({
   onNavigate,
   activeThreadId,
 }: Pick<PluginThreadListProps, "activeThreadId" | "onNavigate">) {
-  const { bots, rooms, activeRoomIds, directThreads, roomThreads, roomWork,
-    attentionCounts, approvalCounts, error } =
+  const { bots, rooms, activeRoomIds, directThreads, directConversations, directThreadInfo, roomThreads, roomWork,
+    attentionCounts, approvalCounts, error, load } =
       useRoster(true),
     rpc = useRpc<typeof rpcContract>(),
     navigate = useBbNavigate();
@@ -716,6 +722,7 @@ export function ChannelsSidebar({
     [directCollapsed, setDirectCollapsed] = useState(false),
     [archived, setArchived] = useState(false),
     [showArchivedBots, setShowArchivedBots] = useState(false),
+    [showArchivedDirectThreads, setShowArchivedDirectThreads] = useState(false),
     [display, setDisplay] = useState(readChannelDisplay),
     [renaming, setRenaming] = useState<Room | null>(null),
     [deleting, setDeleting] = useState<Room | null>(null),
@@ -808,31 +815,37 @@ export function ChannelsSidebar({
   const directQuery = directSearch.trim().toLowerCase();
   const directBots = bots
     .filter((bot) => `${bot.name} @${bot.handle}`.toLowerCase().includes(directQuery))
+    .filter((bot) => (directConversations[bot.id] ?? []).some((conversation) => {
+      const thread = directThreadInfo[conversation.threadId];
+      return thread && (showArchivedDirectThreads || !thread.archivedAt);
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
   const activeDirectBots = directBots.filter((bot) => !bot.retired);
   const archivedDirectBots = directBots.filter((bot) => bot.retired);
   const visibleDirectBots = showArchivedBots
     ? [...activeDirectBots, ...archivedDirectBots]
     : activeDirectBots;
-  const directBotRow = (bot: Bot) => {
-    const thread = directThreads[bot.id];
-    return (
-      <a key={bot.id}
-        href={`/plugins/bot-teams/channels/dm/${bot.id}`}
-        className="channel-nav-row direct-message-nav-row"
-        aria-current={selected === `dm:${bot.id}` ? "page" : undefined}
-        onClick={(event) => {
-          if (event.metaKey || event.ctrlKey) return;
-          event.preventDefault();
-          openDirectMessage(bot.id);
-        }}>
-        <span className="direct-message-avatar" aria-hidden>{bot.avatar}</span>
-        <span className="channel-nav-name">{bot.name}</span>
-        {bot.retired && <span className="channel-nav-archived">Archived</span>}
-        {!bot.retired && thread && <DirectMessageStatus thread={thread} />}
-      </a>
-    );
+  const startDirectThread = async (bot: Bot) => {
+    setPending(true);
+    setFailure(null);
+    try {
+      const conversation = await rpc.call("newConversation", { id: bot.id });
+      navigate.toThread(conversation.threadId);
+      onNavigate();
+    } catch (cause) {
+      setFailure(message(cause));
+    } finally {
+      setPending(false);
+    }
   };
+  const directBotRow = (bot: Bot) => (
+    <DirectSidebarBot key={bot.id} bot={bot}
+      conversations={directConversations[bot.id] ?? []}
+      threadInfo={directThreadInfo} currentStatus={directThreads[bot.id]}
+      showArchivedThreads={showArchivedDirectThreads}
+      activeThreadId={activeThreadId ?? undefined} onNavigate={onNavigate}
+      onNewThread={() => void startDirectThread(bot)} onChanged={load} />
+  );
   const list = rooms
     .filter(
       (r) =>
@@ -1023,7 +1036,7 @@ export function ChannelsSidebar({
                     ? { lastReadAt: r.updatedAt }
                     : { markUnread: true })}
                 onPin={() => void changeChannelState(r.id, { pinned: !r.pinned })}
-                onRename={() => setRenaming(r)}
+                onRename={(name) => rpc.call("updateRoom", { id: r.id, name })}
                 onCopyLink={() => void copyChannelLink(r.id)}
                 onCopyId={() => void copyChannelId(r.id)}
                 onArchive={() => void archive(r)}
@@ -1065,11 +1078,33 @@ export function ChannelsSidebar({
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="New direct message">
+                <Icon name="Plus" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" aria-label="Choose a bot">
+              {bots.filter((bot) => !bot.retired).sort((a, b) =>
+                a.name.localeCompare(b.name)).map((bot) => (
+                <DropdownMenuItem key={bot.id} disabled={pending}
+                  onSelect={() => void startDirectThread(bot)}>
+                  {bot.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Direct message list options">
                 <Icon name="MoreHorizontal" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" aria-label="Direct message list options">
+              <DropdownMenuItem
+                aria-label={showArchivedDirectThreads ? "Hide archived threads" : "Show archived threads"}
+                onSelect={() => setShowArchivedDirectThreads(!showArchivedDirectThreads)}>
+                <Icon name="Archive" />
+                {showArchivedDirectThreads ? "Hide archived threads" : "Show archived threads"}
+              </DropdownMenuItem>
               <DropdownMenuItem
                 aria-label={showArchivedBots ? "Hide archived bots" : "Show archived bots"}
                 onSelect={() => {
@@ -1091,7 +1126,7 @@ export function ChannelsSidebar({
         {activeDirectBots.map(directBotRow)}
         {showArchivedBots && archivedDirectBots.map(directBotRow)}
         {!visibleDirectBots.length && <p className="channel-menu-label">
-          {directQuery ? "No matching bots" : "No active bots"}
+          {directQuery ? "No matching direct messages" : "No direct messages yet"}
         </p>}
         </div>
       </section>

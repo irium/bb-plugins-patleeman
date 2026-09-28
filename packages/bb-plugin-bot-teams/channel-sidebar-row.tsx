@@ -3,6 +3,7 @@ import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
 import type { Room, RoomWork, ThreadStatusView } from "./contract";
 import { ChannelStatusIcon, useChannelStatus } from "./channel-status-view";
 import { IconActionTooltip } from "./channel-controls";
+import { useSidebarInlineRename } from "./sidebar-inline-rename";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -53,13 +54,18 @@ export function ChannelSidebarRow({
   onOpen: () => void;
   onMarkRead: () => void;
   onPin: () => void;
-  onRename: () => void;
+  onRename: (name: string) => Promise<unknown>;
   onCopyLink: () => void;
   onCopyId: () => void;
   onArchive: () => void;
   onDelete: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const rename = useSidebarInlineRename({
+    name: room.name,
+    label: "Channel name",
+    onSave: onRename,
+  });
   const rowLink = useRef<HTMLAnchorElement>(null);
   const menuId = useId();
   const hasUnread = room.updatedAt > (room.lastReadAt ?? 0);
@@ -100,7 +106,10 @@ export function ChannelSidebarRow({
             openOptions(event.target as HTMLElement);
           }}
         >
-          <a
+          {rename.editing ? <span className="channel-nav-row channel-sidebar-rename-row">
+            <span className="channel-hash" aria-hidden>#</span>
+            {rename.editor}
+          </span> : <a
             ref={rowLink}
             href={`/plugins/bot-teams/channels/${room.id}`}
             className={`channel-nav-row ${unread ? "is-unread" : ""}`}
@@ -127,7 +136,7 @@ export function ChannelSidebarRow({
             <span className="channel-nav-name">{room.name}</span>
             {room.archived && <span className="channel-nav-archived">Archived</span>}
             <ChannelStatusIcon status={status} />
-          </a>
+          </a>}
           <span className="channel-nav-actions">
             <IconActionTooltip label="Channel options">
               <button
@@ -145,7 +154,8 @@ export function ChannelSidebarRow({
           </span>
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent id={menuId} aria-label={`${room.name} options`}>
+      <ContextMenuContent id={menuId} aria-label={`${room.name} options`}
+        onCloseAutoFocus={rename.onCloseAutoFocus}>
         <ContextMenuItem onSelect={openInSplit}>
           <Icon name="PanelRight" />
           Open in split
@@ -162,7 +172,7 @@ export function ChannelSidebarRow({
           <Icon name="Pin" />
           {room.pinned ? "Unpin" : "Pin"}
         </ContextMenuItem>
-        <ContextMenuItem onSelect={onRename}>
+        <ContextMenuItem onSelect={rename.startFromMenu}>
           <Icon name="Edit" />
           Rename
         </ContextMenuItem>
