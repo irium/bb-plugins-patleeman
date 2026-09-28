@@ -1,6 +1,5 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import type { ApprovalDecision, ChannelApproval, Job } from "./contract";
-import { isExecuting } from "./job-state";
+import type { ChannelApproval, Job } from "./contract";
 import { missingThread } from "./runtime";
 import type { Store } from "./store";
 
@@ -131,12 +130,6 @@ export class ChannelApprovals {
     return new Set(this.list(roomId).map((a) => a.threadId));
   }
 
-  private forget(roomId: string, interactionId: string) {
-    const remaining = this.list(roomId).filter((a) => a.id !== interactionId);
-    if (remaining.length) this.byRoom.set(roomId, remaining);
-    else this.byRoom.delete(roomId);
-  }
-
   private eligible(job: Job) {
     if (!job.threadId || !job.roomId) return null;
     const room = this.store.findRoom(job.roomId);
@@ -184,92 +177,4 @@ export class ChannelApprovals {
     if (key([...next.values()].flat()) !== before) this.changed();
   }
 
-  async resolve(input: {
-    id: string;
-    threadId: string;
-    interactionId: string;
-    decision?: ApprovalDecision;
-    answers?: Record<string, { selected: string[]; freeText?: string }>;
-  }) {
-    const room = this.store.room(input.id);
-    if (room.archived)
-      throw new Error("This channel is archived. Restore it to answer.");
-    const conversation = this.store.byThread(input.threadId);
-    if (!conversation || !room.memberIds.includes(conversation.botId))
-      throw new Error("That request does not belong to this channel.");
-    if (
-      !this.store
-        .roomJobs(input.id)
-        .some((j) => j.threadId === input.threadId && isExecuting(j))
-    )
-      throw new Error("That bot is no longer working in this channel.");
-    const interaction = await this.bb.sdk.threads.interactions.get({
-      threadId: input.threadId,
-      interactionId: input.interactionId,
-    });
-    if (interaction.status !== "pending")
-      throw new Error("This request was already answered.");
-    const payload = interaction.payload;
-    if (input.decision) {
-      if (payload.kind !== "approval")
-        throw new Error("This request is not an approval.");
-      if (!payload.availableDecisions.includes(input.decision))
-        throw new Error("That decision is not available for this request.");
-      await this.bb.sdk.threads.interactions.resolve({
-        threadId: input.threadId,
-        interactionId: input.interactionId,
-        resolution:
-          input.decision === "deny"
-            ? { decision: "deny" }
-            : {
-                decision: input.decision,
-                grantedPermissions:
-                  payload.subject.kind === "permission_grant"
-                    ? payload.subject.permissions
-                    : input.decision === "allow_for_session" &&
-                        "sessionGrant" in payload.subject
-                      ? (payload.subject.sessionGrant ?? null)
-                      : null,
-              },
-      });
-    } else {
-      const answers = input.answers!;
-      if (payload.kind !== "user_question")
-        throw new Error("This request is not a question.");
-      if (Object.keys(answers).length !== payload.questions.length ||
-          payload.questions.some((question) => !Object.hasOwn(answers, question.id)))
-        throw new Error("Answer every question before sending.");
-      const checked: Record<string, { selected: string[]; freeText?: string }> = {};
-      for (const question of payload.questions) {
-        const answer = answers[question.id]!;
-        const options = question.options ?? [];
-        if (answer.selected.some((value) =>
-          !options.some((option) => option.value === value)))
-          throw new Error("That choice is no longer offered.");
-        if (new Set(answer.selected).size !== answer.selected.length ||
-            (!question.multiSelect && answer.selected.length > 1))
-          throw new Error("Choose only the offered number of options.");
-        const freeText = answer.freeText?.trim();
-        if (freeText && !question.allowFreeText)
-          throw new Error("Free text is not offered for this question.");
-        if (!answer.selected.length && !freeText)
-          throw new Error("Answer every question before sending.");
-        checked[question.id] = {
-          selected: answer.selected,
-          ...(freeText ? { freeText } : {}),
-        };
-      }
-      await this.bb.sdk.threads.interactions.resolve({
-        threadId: input.threadId,
-        interactionId: input.interactionId,
-        resolution: {
-          kind: "user_answer",
-          answers: checked,
-        },
-      });
-    }
-    this.forget(input.id, input.interactionId);
-    this.changed();
-    return { resolved: true as const };
-  }
 }

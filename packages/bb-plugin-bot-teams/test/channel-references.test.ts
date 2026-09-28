@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import {
   channelSlug,
   linkChannelReferences,
-  matchingChannels,
 } from "../channel-references";
 import type { Room } from "../contract";
 
@@ -28,15 +27,8 @@ test("channel references link known slugs and preserve unknown text", () => {
   );
 });
 
-test("channel picker excludes the current and archived channels", () => {
-  const current = room("11111111-1111-4111-8111-111111111111", "Design Notes");
-  const rooms = [
-    current,
-    room("22222222-2222-4222-8222-222222222222", "Design Review"),
-    room("33333333-3333-4333-8333-333333333333", "Archived Design", true),
-  ];
+test("channel names become stable slugs", () => {
   assert.equal(channelSlug("Design Review"), "design-review");
-  assert.deepEqual(matchingChannels(rooms, current.id, "design"), [rooms[1]]);
 });
 
 test("selected references retain channel identity across rename and slug collisions", async () => {

@@ -323,7 +323,6 @@ export const approvalDecision = z.enum([
   "allow_for_session",
   "deny",
 ]);
-export type ApprovalDecision = z.infer<typeof approvalDecision>;
 export const approvalQuestion = z.object({
   id: z.string(),
   prompt: z.string(),

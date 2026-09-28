@@ -12,21 +12,6 @@ export function channelSlug(name: string) {
   );
 }
 
-export function matchingChannels(
-  rooms: Room[],
-  currentRoomId: string,
-  query: string,
-) {
-  const q = query.toLowerCase();
-  return rooms
-    .filter((room) => !room.archived && room.id !== currentRoomId)
-    .filter((room) => {
-      const slug = channelSlug(room.name);
-      return slug.includes(q) || room.name.toLowerCase().includes(q);
-    })
-    .sort((a, b) => channelSlug(a.name).localeCompare(channelSlug(b.name)));
-}
-
 export function channelReference(room: Pick<Room, "id" | "name">) {
   const label = room.name
     .replace(/[\\[\]<>]/gu, "\\$&")

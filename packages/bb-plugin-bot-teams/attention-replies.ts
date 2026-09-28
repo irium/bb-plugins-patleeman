@@ -89,14 +89,4 @@ export class AttentionReplies {
     }
   }
 
-  discardReply(id: string) {
-    if (this.sending.has(id)) throw new Error("This answer is being sent. Wait for delivery to finish.");
-    const row = this.store.db.prepare("SELECT error FROM attention_question_replies WHERE id=?")
-      .get(id) as { error: string | null } | undefined;
-    if (!row) throw new Error("This answer is no longer waiting to be sent. Refresh the inbox.");
-    if (!row.error) throw new Error("Only a failed answer can be discarded.");
-    this.store.db.prepare("DELETE FROM attention_question_replies WHERE id=?").run(id);
-    this.changed();
-    return { ok: true as const };
-  }
 }
