@@ -53,3 +53,24 @@ test("a broken custom provider never blocks the presets in auto", () => {
   assert.deepEqual(result.routes.map((route) => route.name), ["TypeSafe"]);
   assert.equal(result.problems.length, 1);
 });
+
+test("Datadog AI Gateway is opt-in for auto and sends the gateway's headers", () => {
+  assert.deepEqual(names({}), []);
+  const [route] = jevRoutes({ datadogAiGateway: true }, {}).routes;
+  assert.equal(route!.name, "Datadog AI Gateway");
+  assert.equal(route!.endpoint, "https://ai-gateway.us1.prod.dog/v1/systemone");
+  assert.equal(route!.model, "typesafe/jev-latest");
+  assert.equal(route!.apiKey, null);
+  assert.equal(route!.ddtoolDatacenter, "us1.prod.dog");
+  assert.deepEqual(route!.headers, { source: "bb-smart-queue", "org-id": "2" });
+  assert.deepEqual(names({ jevProvider: "datadog" }), ["Datadog AI Gateway"]);
+  assert.deepEqual(names({ datadogAiGateway: true, zenApiKey: "z" }), ["OpenCode Zen", "Datadog AI Gateway"]);
+});
+
+test("the Datadog datacenter must be a Datadog host", () => {
+  const staging = jevRoutes({ jevProvider: "datadog", datadogDatacenter: "us1.staging.dog" }, {});
+  assert.equal(staging.routes[0]!.endpoint, "https://ai-gateway.us1.staging.dog/v1/systemone");
+  const bad = jevRoutes({ jevProvider: "datadog", datadogDatacenter: "evil.example.com/x" }, {});
+  assert.deepEqual(bad.routes, []);
+  assert.match(bad.problems[0]!, /not a Datadog datacenter/);
+});

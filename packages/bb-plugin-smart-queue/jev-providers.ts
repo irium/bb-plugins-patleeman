@@ -37,10 +37,24 @@ export const jevPresets = {
   },
 } as const;
 export type JevPresetId = keyof typeof jevPresets;
-export type JevProviderId = JevPresetId | "custom";
+export type JevProviderId = JevPresetId | "datadog" | "custom";
 /** `auto` tries every configured provider in this order. */
-export const jevProviderOrder: JevProviderId[] = ["typesafe", "vercel", "openrouter", "opencode-zen", "custom"];
+export const jevProviderOrder: JevProviderId[] = ["typesafe", "vercel", "openrouter", "opencode-zen", "datadog", "custom"];
 export const jevProviderChoices = ["auto", ...jevProviderOrder] as const;
+
+/**
+ * Datadog's internal AI Gateway serves Jev to Datadog employees. It needs a
+ * `ddtool` token instead of a key, plus the `source` and `org-id` headers the
+ * gateway requires for compliance and observability.
+ */
+export const datadogGateway = {
+  name: "Datadog AI Gateway",
+  model: "typesafe/jev-latest",
+  defaultDatacenter: "us1.prod.dog",
+  source: "bb-smart-queue",
+  orgId: "2",
+} as const;
+const datacenterPattern = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.dog$/;
 
 export type JevProviderSettings = {
   jevProvider?: string;
@@ -49,6 +63,8 @@ export type JevProviderSettings = {
   vercelApiKey?: string;
   openRouterApiKey?: string;
   zenApiKey?: string;
+  datadogAiGateway?: boolean;
+  datadogDatacenter?: string;
   customJevEndpoint?: string;
   customJevApiKey?: string;
   customJevModel?: string;
@@ -58,8 +74,11 @@ export type JevRoute = {
   name: string;
   endpoint: string;
   model: string;
-  /** Null for a custom endpoint that takes no key. */
+  /** Null for a custom endpoint that takes no key, or one that gets a token another way. */
   apiKey: string | null;
+  headers?: Record<string, string>;
+  /** Fetch a `ddtool` token for this datacenter instead of sending `apiKey`. */
+  ddtoolDatacenter?: string;
 };
 
 const text = (value: string | undefined) => value?.trim() || "";
@@ -97,6 +116,25 @@ export function jevRoutes(
   const routes: JevRoute[] = [];
   const problems: string[] = [];
   for (const id of wanted) {
+    if (id === "datadog") {
+      // Opt-in: auto must not run ddtool on machines that never asked for it.
+      if (mode === "auto" && !settings.datadogAiGateway) continue;
+      const datacenter = text(settings.datadogDatacenter) || datadogGateway.defaultDatacenter;
+      if (!datacenterPattern.test(datacenter)) {
+        problems.push(`"${datacenter}" is not a Datadog datacenter, such as ${datadogGateway.defaultDatacenter}.`);
+        continue;
+      }
+      routes.push({
+        id,
+        name: datadogGateway.name,
+        endpoint: `https://ai-gateway.${datacenter}/v1/systemone`,
+        model: datadogGateway.model,
+        apiKey: null,
+        headers: { source: datadogGateway.source, "org-id": datadogGateway.orgId },
+        ddtoolDatacenter: datacenter,
+      });
+      continue;
+    }
     if (id === "custom") {
       const endpoint = text(settings.customJevEndpoint);
       const model = text(settings.customJevModel);
@@ -132,7 +170,8 @@ export function jevRoutes(
 }
 
 export function describeHttpFailure(route: JevRoute, status: number) {
-  if (status === 401 || status === 403) return `${route.name} rejected the API key (HTTP ${status}).`;
+  if (status === 401 || status === 403)
+    return `${route.name} rejected the ${route.ddtoolDatacenter ? "ddtool token" : "API key"} (HTTP ${status}).`;
   if (status === 402) return `${route.name} says the account is out of credit (HTTP 402).`;
   if (status === 429 || status === 529) return `${route.name} rate-limited Jev (HTTP ${status}).`;
   return `${route.name} request failed (HTTP ${status}).`;

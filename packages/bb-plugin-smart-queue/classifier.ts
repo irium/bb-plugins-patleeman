@@ -1,6 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { Fallback } from "./contract";
+import { datadogToken, forgetDatadogToken } from "./datadog-token";
 import { describeHttpFailure, jevRoutes, type JevProviderSettings, type JevRoute } from "./jev-providers";
 
 export type Action = "steer" | "followup";
@@ -89,12 +90,15 @@ async function boundedJson(response: Response): Promise<unknown> {
 }
 
 async function askRoute(route: JevRoute, situation: Situation, timeoutMs: number, signal: AbortSignal) {
+  const bearer = route.ddtoolDatacenter ? await datadogToken(route.ddtoolDatacenter) : route.apiKey;
+  signal.throwIfAborted();
   const response = await fetch(route.endpoint, {
     method: "POST",
     redirect: "error",
     headers: {
-      ...(route.apiKey ? { Authorization: `Bearer ${route.apiKey}` } : {}),
+      ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
       "Content-Type": "application/json",
+      ...route.headers,
       ...(route.id === "openrouter"
         ? { "HTTP-Referer": "https://github.com/patleeman/bb-plugins", "X-OpenRouter-Title": "BB Smart Queue" }
         : {}),
@@ -108,6 +112,8 @@ async function askRoute(route: JevRoute, situation: Situation, timeoutMs: number
   });
   if (!response.ok) {
     await response.body?.cancel();
+    if (route.ddtoolDatacenter && (response.status === 401 || response.status === 403))
+      forgetDatadogToken(route.ddtoolDatacenter);
     throw new Error(describeHttpFailure(route, response.status));
   }
   const parsed = jevResponseSchema.safeParse(await boundedJson(response));

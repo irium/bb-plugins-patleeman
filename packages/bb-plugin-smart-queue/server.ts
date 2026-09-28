@@ -41,7 +41,7 @@ export default async function plugin(bb: BbPluginApi) {
       options: [...jevProviderChoices],
       default: "auto",
       description:
-        "Where Smart Queue calls Jev. Auto tries TypeSafe, Vercel AI Gateway, OpenRouter, OpenCode Zen, then Custom, using each one that has a key, and moves on when one fails.",
+        "Where Smart Queue calls Jev. Auto tries TypeSafe, Vercel AI Gateway, OpenRouter, OpenCode Zen, Datadog AI Gateway, then Custom, using each one that is configured, and moves on when one fails.",
     },
     typesafeApiKey: {
       type: "string",
@@ -74,6 +74,19 @@ export default async function plugin(bb: BbPluginApi) {
       label: "OpenCode Zen API key",
       secret: true,
       description: "Calls Jev through OpenCode Zen. Falls back to OPENCODE_API_KEY.",
+    },
+    datadogAiGateway: {
+      type: "boolean",
+      label: "Use Datadog AI Gateway",
+      default: false,
+      description:
+        "For Datadog employees: calls Jev through the internal AI Gateway with a token from `ddtool auth token`. Needs ddtool and AppGate on this machine.",
+    },
+    datadogDatacenter: {
+      type: "string",
+      label: "Datadog AI Gateway datacenter",
+      default: "us1.prod.dog",
+      description: "The gateway datacenter, such as us1.prod.dog or us1.staging.dog.",
     },
     customJevEndpoint: {
       type: "string",

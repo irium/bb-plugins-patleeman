@@ -35,11 +35,20 @@ Every provider serves the same Jev model through TypeSafe's
 | Vercel AI Gateway | `vercelApiKey` | `AI_GATEWAY_API_KEY` | `typesafe-ai/jev` |
 | OpenRouter | `openRouterApiKey` | `OPENROUTER_API_KEY` | `typesafe/jev-1.13` |
 | OpenCode Zen | `zenApiKey` | `OPENCODE_API_KEY` | `jev-1.13` |
+| Datadog AI Gateway | none; uses `ddtool` | — | `typesafe/jev-latest` |
 | Custom | `customJevApiKey` (optional) | — | `customJevModel` |
 
 `jevProvider` chooses where to call Jev. `auto`, the default, tries the
-providers in the order above, uses each one that has a key, and moves to the
-next when one fails. Name one provider to use only that one.
+providers in the order above, uses each one that is configured, and moves to
+the next when one fails. Name one provider to use only that one.
+
+**Datadog AI Gateway.** Datadog employees can turn on `datadogAiGateway`
+instead of adding a key. Smart Queue runs
+`ddtool auth token rapid-ai-platform --datacenter <datacenter>` for a token,
+reuses it until it expires, and calls
+`https://ai-gateway.<datacenter>/v1/systemone` with the gateway's `source`
+(`bb-smart-queue`) and `org-id` headers. `datadogDatacenter` defaults to
+`us1.prod.dog`. The machine running BB needs `ddtool` and AppGate access.
 
 **Bring your own provider.** Set `customJevEndpoint` to the full URL of any
 endpoint that accepts System One requests, such as a company gateway or a

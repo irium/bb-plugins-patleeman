@@ -40,12 +40,16 @@ bb smart-queue fallback [thread | off | <provider-id> <model> [<reasoning-level>
 Change settings with `bb plugin config smart-queue set <key> <value>`.
 
 - `jevProvider`: `auto` (default), `typesafe`, `vercel`, `openrouter`,
-  `opencode-zen`, or `custom`. `auto` tries each configured provider in that
+  `opencode-zen`, `datadog`, or `custom`. `auto` tries each configured provider in that
   order and moves on when one fails.
 - Provider keys are secrets: `typesafeApiKey`, `vercelApiKey`,
   `openRouterApiKey`, `zenApiKey`, and `customJevApiKey`. Ask the owner for
   them; never print them. Environment fallbacks are `TYPESAFE_API_KEY`,
   `AI_GATEWAY_API_KEY`, `OPENROUTER_API_KEY`, and `OPENCODE_API_KEY`.
+- `datadogAiGateway` (default `false`) calls Jev through Datadog's internal
+  AI Gateway with a `ddtool` token, so it needs no key. `datadogDatacenter`
+  defaults to `us1.prod.dog`. If it fails, check that `ddtool auth token
+  rapid-ai-platform --datacenter us1.prod.dog` works and AppGate is connected.
 - `typesafeModel`: `jev-latest` (default), `jev-preview`, or `jev-1.13.0`.
 - A custom provider needs `customJevEndpoint` (full HTTPS URL of a System One
   endpoint, or HTTP on localhost) and `customJevModel`.
