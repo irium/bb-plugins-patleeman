@@ -26,6 +26,14 @@ import {
 import { Store, newId, document, saveDocument } from "./store";
 import { liveChannelDms } from "./channel-dms";
 import { usePersonalProject } from "./bot-project";
+import { ChannelThreads } from "./channel-thread-link";
+import {
+  channelModel,
+  channelPostInput,
+  channelPostTool,
+  channelProviderId,
+} from "./channel-provider";
+import { stat } from "node:fs/promises";
 import {
   Runtime,
   jobPrompt,
@@ -338,6 +346,8 @@ export default async function plugin(bb: BbPluginApi) {
       ),
     );
   }
+  const channelThreads = new ChannelThreads(bb, store, project);
+  runtime.onChanged.add(() => channelThreads.syncAll());
   // Repair saved bot profiles before handlers or background work can dispatch.
   // A lookup failure must fail loading, never create another deletable project.
   if (store.all().length) await project();
@@ -729,6 +739,12 @@ export default async function plugin(bb: BbPluginApi) {
       runtime.data.snapshot(`${id}:${file}`, latest.text, "Observed file");
       return runtime.data.revisions(`${id}:${file}`, before);
     },
+    openChannelThread: async ({ id }) => {
+      const room = store.room(id);
+      const threadId = await channelThreads.ensure(room);
+      void channelThreads.sync(room.id);
+      return { threadId };
+    },
     channelThreads: async ({ id }) => {
       store.room(id);
       const waiting = approvals.waitingThreadIds(id);
@@ -764,6 +780,8 @@ export default async function plugin(bb: BbPluginApi) {
       });
     },
     channelForThread: ({ threadId }) => {
+      const linked = channelThreads.roomForThread(threadId);
+      if (linked) return linked.id;
       const conversation = store.byThread(threadId);
       const key = conversation?.originalKey ?? conversation?.key;
       if (conversation?.kind !== "group" || !key?.startsWith("group:"))
@@ -854,7 +872,19 @@ export default async function plugin(bb: BbPluginApi) {
     list: async () => {
       const activity = store.botActivitySummary();
       const bots = store.all();
-      const rooms = store.rooms();
+      // A linked channel is read when its thread is: reading happens there now.
+      const rooms = await Promise.all(store.rooms().map(async (room) => {
+        const threadId = channelThreads.threadId(room.id);
+        if (!threadId) return room;
+        try {
+          const thread = await bb.sdk.threads.get({ threadId });
+          const lastReadAt = Math.max(room.lastReadAt ?? 0, thread.lastReadAt ?? 0);
+          return { ...room, threadId, lastReadAt };
+        } catch (cause) {
+          if (!missingThread(cause)) throw cause;
+          return room;
+        }
+      }));
       const directConversations = Object.fromEntries(bots.map((bot) => [
         bot.id,
         store.conversations(bot.id).filter((conversation) => conversation.kind === "admin"),
@@ -866,6 +896,7 @@ export default async function plugin(bb: BbPluginApi) {
         pinned: boolean;
         unread: boolean;
         sectionId: string | null;
+        updatedAt: number;
       }> = {};
       await Promise.all(Object.values(directConversations).flat().map(async (conversation) => {
         try {
@@ -877,6 +908,7 @@ export default async function plugin(bb: BbPluginApi) {
             pinned: thread.pinnedAt !== null,
             unread: thread.latestAttentionAt > (thread.lastReadAt ?? 0),
             sectionId: thread.sectionId,
+            updatedAt: thread.updatedAt,
           };
         } catch (cause) {
           if (!missingThread(cause)) throw cause;
@@ -1129,7 +1161,11 @@ export default async function plugin(bb: BbPluginApi) {
           return store.room(id);
         }),
       ),
-    deleteRoom: async ({ id }) => ({ deleted: await runtime.deleteRoom(id) }),
+    deleteRoom: async ({ id }) => {
+      const deleted = await runtime.deleteRoom(id);
+      if (deleted) await channelThreads.forget(id);
+      return { deleted };
+    },
     room: async ({ id, start, limit }) => {
       return {
         room: store.room(id),
@@ -1464,11 +1500,78 @@ export default async function plugin(bb: BbPluginApi) {
       return JSON.stringify({ ok: true });
     },
   });
+  // A message typed in a channel thread enters the room like one sent from the
+  // channel page, so routing, delegation, and history behave the same.
+  bb.agents.registerTool({
+    name: channelPostTool,
+    description: "Posts the owner's message from a channel thread to its channel.",
+    parameters: channelPostInput,
+    presentation: {
+      label: { pending: "Sending to channel", completed: "Sent to channel" },
+      icon: { glyph: "Send" },
+      suppress: true,
+    },
+    async execute({ text, attachments }, context) {
+      const room = channelThreads.roomForThread(context.threadId);
+      if (!room) throw new Error("This thread is not linked to a channel.");
+      const projectId = await project();
+      const attachmentIds: string[] = [];
+      for (const file of attachments) {
+        const id = randomUUID();
+        store.putAttachment({
+          id,
+          roomId: room.id,
+          projectId,
+          name: file.name ?? basename(file.path),
+          path: file.path,
+          ...(file.mimeType ? { mimeType: file.mimeType } : {}),
+          type: file.image ? "localImage" : "localFile",
+          sizeBytes: file.sizeBytes ?? (await stat(file.path)).size,
+        });
+        attachmentIds.push(id);
+      }
+      const requestId = randomUUID();
+      channelThreads.markOrigin(requestId);
+      await sendMessage(
+        rpcContract.send.input.parse({ id: room.id, text, requestId, attachmentIds }),
+      );
+      return "Sent to the channel.";
+    },
+  });
+  bb.providers.register({
+    id: channelProviderId,
+    displayName: "Channel",
+    icon: "Hash",
+    strings: {
+      signInHint: "Channel threads need no sign-in.",
+      expiredHint: "Channel threads never expire.",
+      installUrl: "https://github.com/patleeman/bb-plugins/tree/main/packages/bb-plugin-bot-teams",
+    },
+    // Hidden from the model picker: channel threads are created from the
+    // Channels sidebar, which names this provider directly.
+    experimental_visibility: "installed",
+    maintenance: { health: true, usage: false, installation: false },
+    capabilities: {
+      supportsServiceTier: false,
+      supportsNativeUserQuestion: false,
+      fork: "none",
+      supportsManualCompaction: false,
+      supportsThreadArchive: false,
+      supportsThreadRename: false,
+      permissionModes: ["full"],
+      reasoningLevels: ["none"],
+    },
+    completedTurnDisplay: "flat",
+    composerActions: [],
+    models: { scope: "host", fallback: [channelModel] },
+  });
   const channelTools = [
     ...registerChannelTools(bb, store, handlers, sendMessage),
     ...automations.registerTools(),
   ];
   bb.agents.configure((context) => {
+    if (context.provider.id === channelProviderId)
+      return { tools: [channelPostTool], skills: [] };
     if (store.routingSession(context.thread.id))
       return { tools: [], skills: [], instructions: routerInstructions };
     if (context.thread.title?.startsWith(roomTitleThreadPrefix))
@@ -1502,6 +1605,7 @@ export default async function plugin(bb: BbPluginApi) {
     };
   });
   bb.experimental_hooks.on("message.dispatch", (context) => {
+    if (channelThreads.roomForThread(context.thread.id)) return { action: "proceed" };
     const routingId = store.routingSession(context.thread.id);
     if (routingId) {
       const message = store.message(routingId),
@@ -1727,6 +1831,7 @@ export default async function plugin(bb: BbPluginApi) {
           await recoverApprovedBotCreates(signal);
         }
         await runtime.tick();
+        channelThreads.syncAll();
         try {
           await delay(1500, undefined, { signal });
         } catch {

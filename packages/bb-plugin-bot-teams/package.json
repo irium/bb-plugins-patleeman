@@ -13,6 +13,7 @@
       "icon": "Bot"
     },
     "server": "./server.ts",
+    "host": "./host.ts",
     "app": "./app.tsx"
   },
   "dependencies": {

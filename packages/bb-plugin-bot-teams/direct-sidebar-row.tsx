@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useState } from "react";
 import {
   experimental_Icon as Icon,
   useBbNavigate,
@@ -29,18 +29,30 @@ import {
   DropdownMenuTrigger,
 } from "./components/ui/dropdown-menu";
 
+const botPages = [
+  ["profile", "View profile", "UserRound"],
+  ["mission", "View mission", "Target"],
+  ["memory", "View memory", "Brain"],
+  ["activity", "View activity", "Activity"],
+] as const;
+
+/** One direct thread. The bot rides on the row, so the list needs no bot headings. */
 export function DirectSidebarThread({
+  bot,
   conversation,
   info,
   status,
   onNavigate,
+  onNewThread,
   onChanged,
   selected,
 }: {
+  bot: Bot;
   conversation: Conversation;
   info: DirectThreadInfo;
   status?: DirectThreadView;
   onNavigate: () => void;
+  onNewThread: () => void;
   onChanged: () => void;
   selected: boolean;
 }) {
@@ -49,6 +61,9 @@ export function DirectSidebarThread({
   const [error, setError] = useState<string | null>(null);
   const [sections, setSections] = useState<{ id: string; name: string }[]>([]);
   const title = info.title || conversation.title || "Direct message";
+  // An untitled thread is named for its bot; the muted bot label would only repeat it.
+  const untitled = /^direct message$/i.test(title.trim());
+  const label = untitled ? bot.name : title;
   const rename = useSidebarInlineRename({
     name: title,
     label: "Thread name",
@@ -98,6 +113,10 @@ export function DirectSidebarThread({
     const SubTrigger = surface === "context" ? ContextMenuSubTrigger : DropdownMenuSubTrigger;
     const SubContent = surface === "context" ? ContextMenuSubContent : DropdownMenuSubContent;
     return <>
+      {!bot.retired && <>
+        <Item onSelect={onNewThread}><Icon name="Plus" /> New thread with {bot.name}</Item>
+        <Separator />
+      </>}
       <Item onSelect={() => void run(() => sdk.threads.open({
         threadId: conversation.threadId, file: null, split: "right",
       }))}>
@@ -136,6 +155,15 @@ export function DirectSidebarThread({
         </SubContent>
       </Sub>}
       <Item onSelect={rename.startFromMenu}><Icon name="Edit" /> Rename</Item>
+      <Sub>
+        <SubTrigger><Icon name="Bot" /> {bot.name}</SubTrigger>
+        <SubContent>
+          {botPages.map(([tab, label, icon]) => <Item key={tab} onSelect={() => {
+            navigate.toPluginPanel("bots", { subPath: `${bot.id}/${tab}` });
+            onNavigate();
+          }}><Icon name={icon} /> {label}</Item>)}
+        </SubContent>
+      </Sub>
       <Separator />
       <Item onSelect={archive}>
         <Icon name={archived ? "ArchiveRestore" : "Archive"} />
@@ -168,13 +196,15 @@ export function DirectSidebarThread({
           </span> : <a href={href} className="channel-nav-row direct-thread-nav-link"
             data-sidebar-thread-id={conversation.threadId}
             aria-current={selected ? "page" : undefined}
-            title={title}
+            title={untitled ? bot.name : `${title} · ${bot.name}`}
             onClick={(event) => {
               if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
               event.preventDefault();
               open();
             }}>
-            <span className="channel-nav-name">{title}</span>
+            <span className="direct-thread-avatar" aria-hidden>{bot.avatar}</span>
+            <span className="channel-nav-name">{label}</span>
+            {!untitled && <span className="direct-thread-bot">{bot.name}</span>}
             {archived && <span className="channel-nav-archived">Archived</span>}
             {status && !archived && <DirectMessageStatus thread={status} />}
           </a>}
@@ -202,92 +232,4 @@ export function DirectSidebarThread({
     </ContextMenu>
     {error && <p role="alert" className="channel-menu-label">{error}</p>}
   </>;
-}
-
-export function DirectSidebarBot({
-  bot,
-  conversations,
-  threadInfo,
-  currentStatus,
-  showArchivedThreads,
-  activeThreadId,
-  onNavigate,
-  onNewThread,
-  onChanged,
-}: {
-  bot: Bot;
-  conversations: Conversation[];
-  threadInfo: Record<string, DirectThreadInfo>;
-  currentStatus?: DirectThreadView;
-  showArchivedThreads: boolean;
-  activeThreadId?: string;
-  onNavigate: () => void;
-  onNewThread: () => void;
-  onChanged: () => void;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const navigate = useBbNavigate();
-  useEffect(() => {
-    if (conversations.some((conversation) => conversation.threadId === activeThreadId))
-      setExpanded(true);
-  }, [activeThreadId, conversations]);
-  const listId = useId();
-  const visible = conversations.filter((conversation) => {
-    const info = threadInfo[conversation.threadId];
-    return info && (showArchivedThreads || info.archivedAt === null);
-  });
-  return <div className="direct-bot-group">
-    <div className="direct-bot-nav-row">
-      <div className="direct-bot-heading">
-        <span className="channel-nav-name">{bot.name}</span>
-        <button type="button" className="direct-bot-toggle"
-          aria-label={`${expanded ? "Collapse" : "Expand"} ${bot.name} threads`}
-          aria-expanded={expanded} aria-controls={listId}
-          onClick={() => setExpanded(!expanded)}>
-          <Icon name="ChevronRight" aria-hidden="true" />
-        </button>
-        {bot.retired && <span className="channel-nav-archived">Archived</span>}
-      </div>
-      {!bot.retired && <button type="button" className="direct-thread-options"
-        aria-label={`New thread with ${bot.name}`} onClick={onNewThread}>
-        <Icon name="Plus" />
-      </button>}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button type="button" className="direct-thread-options"
-            aria-label={`${bot.name} options`}>
-            <Icon name="MoreHorizontal" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" aria-label={`${bot.name} options`}>
-          {!bot.retired && <>
-            <DropdownMenuItem onSelect={onNewThread}>
-              <Icon name="Plus" /> New thread
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>}
-          {([
-            ["profile", "View profile", "UserRound"],
-            ["mission", "View mission", "Target"],
-            ["memory", "View memory", "Brain"],
-            ["activity", "View activity", "Activity"],
-          ] as const).map(([tab, label, icon]) =>
-            <DropdownMenuItem key={tab} onSelect={() => {
-              navigate.toPluginPanel("bots", { subPath: `${bot.id}/${tab}` });
-              onNavigate();
-            }}>
-              <Icon name={icon} /> {label}
-            </DropdownMenuItem>)}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-    <div id={listId} hidden={!expanded} className="direct-bot-threads">
-      {visible.map((conversation) => <DirectSidebarThread key={conversation.threadId}
-        conversation={conversation}
-        info={threadInfo[conversation.threadId]!}
-        status={conversation.archivedAt ? undefined : currentStatus}
-        onNavigate={onNavigate} onChanged={onChanged}
-        selected={activeThreadId === conversation.threadId} />)}
-    </div>
-  </div>;
 }

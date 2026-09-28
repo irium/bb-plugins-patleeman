@@ -518,7 +518,7 @@ export class Store {
       );
     })();
   }
-  putRoom(room: Room) {
+  putRoom({ threadId: _listedOnly, ...room }: Room) {
     this.db
       .prepare(
         "INSERT INTO rooms VALUES (?,?) ON CONFLICT(id) DO UPDATE SET json=excluded.json",

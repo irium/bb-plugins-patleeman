@@ -174,6 +174,8 @@ export const directThreadInfoSchema = z.object({
   pinned: z.boolean(),
   unread: z.boolean(),
   sectionId: z.string().nullable(),
+  /** Last activity, for sorting the flat Direct messages list. */
+  updatedAt: z.number().default(0),
 });
 export type DirectThreadInfo = z.infer<typeof directThreadInfoSchema>;
 export const attachmentSchema = z.object({
@@ -278,6 +280,8 @@ export const roomSchema = z.object({
   paused: z.boolean(),
   createdAt: z.number(),
   updatedAt: z.number(),
+  /** The channel's BB thread, when one exists. Filled in when listing; never stored. */
+  threadId: z.string().optional(),
 });
 export type Room = z.infer<typeof roomSchema>;
 export const attentionReason = z.enum(["decision", "blocker", "update"]);
@@ -459,6 +463,11 @@ export const rpcContract = defineRpcContract({
       before: z.number().optional(),
     }),
     output: z.array(revisionSchema),
+  },
+  /** The channel's own BB thread, created on first open. */
+  openChannelThread: {
+    input: z.object({ id: z.string().uuid() }),
+    output: z.object({ threadId: z.string() }),
   },
   channelThreads: {
     input: z.object({ id: z.string().uuid() }),

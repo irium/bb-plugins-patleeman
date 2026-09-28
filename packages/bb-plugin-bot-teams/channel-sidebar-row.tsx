@@ -111,8 +111,8 @@ export function ChannelSidebarRow({
             {rename.editor}
           </span> : <a
             ref={rowLink}
-            href={`/plugins/bot-teams/channels/${room.id}`}
-            className={`channel-nav-row ${unread ? "is-unread" : ""}`}
+            href={room.threadId ? `/threads/${room.threadId}` : `/plugins/bot-teams/channels/${room.id}`}
+            className="channel-nav-row"
             aria-current={selected ? "page" : undefined}
             onClick={(event) => {
               if (event.metaKey || event.ctrlKey) return;

@@ -74,7 +74,7 @@ import { ChannelApprovalDeck } from "./channel-approvals";
 import { ChannelSearch } from "./channel-search";
 import { ChannelAttentionBanner, MessageAttention } from "./attention-view";
 import { ChannelSidebarRow } from "./channel-sidebar-row";
-import { DirectSidebarBot } from "./direct-sidebar-row";
+import { DirectSidebarThread } from "./direct-sidebar-row";
 import { ChannelHeaderStatus } from "./channel-status-view";
 import {
   BotDirectMessageHeader,
@@ -815,8 +815,14 @@ export function ChannelsSidebar({
   }, [activeThreadId, rpc]);
   const open = (id: string) => {
     setSelected(id);
-    navigate.toPluginPanel("channels", { subPath: id });
-    onNavigate();
+    setFailure(null);
+    void rpc.call("openChannelThread", { id }).then(
+      ({ threadId }) => {
+        navigate.toThread(threadId);
+        onNavigate();
+      },
+      (e) => setFailure(message(e)),
+    );
   };
   const openDirectMessage = (id: string) => {
     setSelected(`dm:${id}`);
@@ -825,18 +831,17 @@ export function ChannelsSidebar({
   };
   const channelQuery = channelSearch.trim().toLowerCase();
   const directQuery = directSearch.trim().toLowerCase();
-  const directBots = bots
-    .filter((bot) => `${bot.name} @${bot.handle}`.toLowerCase().includes(directQuery))
-    .filter((bot) => (directConversations[bot.id] ?? []).some((conversation) => {
-      const thread = directThreadInfo[conversation.threadId];
-      return thread && (showArchivedDirectThreads || !thread.archivedAt);
+  // One flat list: every visible direct thread, newest activity first, with its bot on the row.
+  const directRows = bots
+    .filter((bot) => showArchivedBots || !bot.retired)
+    .flatMap((bot) => (directConversations[bot.id] ?? []).flatMap((conversation) => {
+      const info = directThreadInfo[conversation.threadId];
+      if (!info || (!showArchivedDirectThreads && info.archivedAt)) return [];
+      const haystack = `${info.title} ${bot.name} @${bot.handle}`.toLowerCase();
+      return haystack.includes(directQuery) ? [{ bot, conversation, info }] : [];
     }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const activeDirectBots = directBots.filter((bot) => !bot.retired);
-  const archivedDirectBots = directBots.filter((bot) => bot.retired);
-  const visibleDirectBots = showArchivedBots
-    ? [...activeDirectBots, ...archivedDirectBots]
-    : activeDirectBots;
+    .sort((a, b) => b.info.updatedAt - a.info.updatedAt ||
+      a.info.title.localeCompare(b.info.title));
   const startDirectThread = async (bot: Bot) => {
     setPending(true);
     setFailure(null);
@@ -850,14 +855,6 @@ export function ChannelsSidebar({
       setPending(false);
     }
   };
-  const directBotRow = (bot: Bot) => (
-    <DirectSidebarBot key={bot.id} bot={bot}
-      conversations={directConversations[bot.id] ?? []}
-      threadInfo={directThreadInfo} currentStatus={directThreads[bot.id]}
-      showArchivedThreads={showArchivedDirectThreads}
-      activeThreadId={activeThreadId ?? undefined} onNavigate={onNavigate}
-      onNewThread={() => void startDirectThread(bot)} onChanged={load} />
-  );
   const list = rooms
     .filter(
       (r) =>
@@ -1135,9 +1132,15 @@ export function ChannelsSidebar({
             placeholder="Search direct messages…" value={directSearch}
             onChange={(event) => setDirectSearch(event.target.value)} />
         )}
-        {activeDirectBots.map(directBotRow)}
-        {showArchivedBots && archivedDirectBots.map(directBotRow)}
-        {!visibleDirectBots.length && <p className="channel-menu-label">
+        {directRows.map(({ bot, conversation, info }) => (
+          <DirectSidebarThread key={conversation.threadId} bot={bot}
+            conversation={conversation} info={info}
+            status={directThreads[bot.id]?.threadId === conversation.threadId
+              ? directThreads[bot.id] : undefined}
+            onNavigate={onNavigate} onNewThread={() => void startDirectThread(bot)}
+            onChanged={load} selected={activeThreadId === conversation.threadId} />
+        ))}
+        {!directRows.length && <p className="channel-menu-label">
           {directQuery ? "No matching direct messages" : "No direct messages yet"}
         </p>}
         </div>
@@ -1691,22 +1694,18 @@ function ChannelHeader({ subPath }: PluginNavPanelProps) {
 function CreateChannel() {
   const rpc = useRpc<typeof rpcContract>(),
     navigate = useBbNavigate();
-  const opening = useRef<Promise<Room> | null>(null);
+  const opening = useRef<Promise<{ threadId: string }> | null>(null);
   const [attempt, setAttempt] = useState(0),
     [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     // Reuse the request if React replays the effect while mounting.
-    opening.current ??= rpc.call("createRoom", {
-      memberIds: [],
-    });
+    opening.current ??= rpc
+      .call("createRoom", { memberIds: [] })
+      .then((room) => rpc.call("openChannelThread", { id: room.id }));
     opening.current.then(
-      (room) => {
-        if (active)
-          navigate.toPluginPanel("channels", {
-            subPath: room.id,
-            replace: true,
-          });
+      ({ threadId }) => {
+        if (active) navigate.toThread(threadId);
       },
       (e) => {
         if (active) setError(message(e));

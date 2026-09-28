@@ -211,8 +211,11 @@ export class Runtime {
     this.data = new ChannelData(store);
     this.delegations = new Delegations(store);
   }
+  /** Called after every change; channel threads deliver new messages from here. */
+  readonly onChanged = new Set<() => void>();
   changed() {
     this.bb.realtime.publish("changed", { revision: randomUUID() });
+    for (const listener of this.onChanged) listener();
   }
   /** Modes a provider offers on one machine. Cached: dispatch runs per turn. */
   private providerModes = new Map<

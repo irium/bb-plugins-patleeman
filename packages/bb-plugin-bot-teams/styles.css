@@ -231,8 +231,6 @@
 }
 .direct-messages-sidebar { margin-top: 0; }
 .direct-message-nav-row + .direct-message-nav-row { margin-top: 2px; }
-.direct-bot-group + .direct-bot-group { margin-top: 2px; }
-.direct-bot-nav-row,
 .direct-thread-nav-row {
   display: flex;
   align-items: center;
@@ -246,8 +244,26 @@
 .direct-thread-nav-row .channel-nav-row {
   min-width: 0;
   flex: 1;
-  padding-left: 28px;
 }
+/* The avatar sits where a channel row shows its #, so both lists line up. */
+.direct-thread-avatar {
+  display: inline-flex;
+  justify-content: center;
+  flex: 0 0 16px;
+  font-size: 13px;
+  line-height: 1;
+}
+.direct-thread-bot {
+  flex: 0 0 auto;
+  margin-left: auto;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.direct-thread-nav-row:where(:hover, :focus-within) .direct-thread-bot { display: none; }
 .direct-thread-nav-row:where(:hover, :focus-within, :has([aria-current])) {
   background: var(--sidebar-accent);
 }
@@ -258,27 +274,6 @@
 .direct-thread-nav-row:where(:hover, :focus-within) .channel-nav-row {
   padding-right: 64px;
 }
-.direct-bot-heading {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-  height: var(--bb-sidebar-row-height, 28px);
-  gap: 0;
-  padding: 0 8px;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  font-weight: 400;
-}
-.direct-bot-heading .channel-nav-name {
-  flex: 0 1 auto;
-  color: var(--subtle-foreground, var(--muted-foreground));
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
-}
-.direct-bot-toggle,
 .direct-thread-options {
   display: inline-flex;
   align-items: center;
@@ -289,9 +284,6 @@
   border-radius: calc(var(--radius, 8px) - 2px);
   color: var(--muted-foreground);
 }
-.direct-bot-toggle [data-icon-root] { width: 12px; height: 12px; transition: transform 150ms; }
-.direct-bot-toggle[aria-expanded="true"] [data-icon-root] { transform: rotate(90deg); }
-.direct-bot-nav-row .direct-thread-options [data-icon-root] { width: 13px; height: 13px; }
 .direct-thread-nav-row .direct-thread-options {
   position: absolute;
   right: 0;
@@ -308,19 +300,11 @@
   width: 16px;
   height: 16px;
 }
-.direct-bot-toggle,
 .direct-thread-options { opacity: 0; }
-.direct-bot-nav-row:hover .direct-bot-toggle,
-.direct-bot-nav-row:focus-within .direct-bot-toggle,
-.direct-bot-nav-row:hover .direct-thread-options,
 .direct-thread-nav-row:hover .direct-thread-options,
-.direct-bot-nav-row:focus-within .direct-thread-options,
 .direct-thread-nav-row:focus-within .direct-thread-options { opacity: 1; }
-.direct-bot-toggle:hover,
 .direct-thread-options:hover { background: var(--state-hover); }
-.direct-bot-toggle:focus-visible,
 .direct-thread-options:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
-.direct-bot-threads { padding-left: 0; }
 .sidebar-inline-rename {
   position: relative;
   z-index: 50;
@@ -364,7 +348,6 @@
   white-space: normal;
 }
 @media (hover: none), (pointer: coarse) {
-  .direct-bot-toggle,
   .direct-thread-options { opacity: 1; }
 }
 .bot-direct-chat [data-bot-direct-native-picker] {
@@ -1263,6 +1246,8 @@
   padding: 4px 8px;
   font-size: var(--text-sm);
 }
+/* Matches BB's native sidebar thread row (text-sm, regular weight, sidebar
+   foreground), so channels, direct messages, and threads read as one list. */
 .channel-nav-row {
   display: flex;
   align-items: center;
@@ -1270,6 +1255,9 @@
   width: 100%;
   height: var(--bb-sidebar-row-height, 28px);
   padding: 0 8px;
+  color: var(--sidebar-foreground);
+  font-size: var(--text-sm);
+  font-weight: 400;
   line-height: var(--text-sm--line-height, 1.4285714);
   border-radius: calc(var(--radius, 8px) - 2px);
   text-align: left;
@@ -1298,9 +1286,6 @@
 .channel-menu-row:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
-}
-.channel-nav-row.is-unread {
-  font-weight: 600;
 }
 .channel-unread-dot {
   margin-left: auto;
@@ -1921,7 +1906,7 @@
   font-size: inherit;
   font-weight: 400;
   line-height: 1;
-  color: var(--muted-foreground);
+  color: var(--subtle-foreground, var(--muted-foreground));
 }
 .channel-react-icon {
   font-size: 19px;
