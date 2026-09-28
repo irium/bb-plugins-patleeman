@@ -8,11 +8,6 @@ type Interaction = Awaited<
   ReturnType<BbPluginApi["sdk"]["threads"]["interactions"]["get"]>
 >;
 
-/** Legacy Bot Teams attention prompts are not resolved through channel approvals. */
-export const ownQuestion = (interaction: Pick<Interaction, "origin">) =>
-  interaction.origin?.kind === "plugin" &&
-  interaction.origin.pluginId === "bot-teams";
-
 /** Reads as a predicate after the bot's name: "Designer wants to run …". */
 function approvalTitle(subject: Extract<Interaction["payload"], { kind: "approval" }>["subject"]) {
   switch (subject.kind) {
@@ -170,8 +165,7 @@ export class ChannelApprovals {
             throw cause;
           });
         for (const interaction of pending) {
-          if (interaction.status !== "pending" || ownQuestion(interaction))
-            continue;
+          if (interaction.status !== "pending") continue;
           const view = approvalView(interaction, {
             roomId: target.roomId,
             botId: job.botId,
@@ -213,8 +207,6 @@ export class ChannelApprovals {
       threadId: input.threadId,
       interactionId: input.interactionId,
     });
-    if (ownQuestion(interaction))
-      throw new Error("Use the channel message to respond to this attention request.");
     if (interaction.status !== "pending")
       throw new Error("This request was already answered.");
     const payload = interaction.payload;

@@ -183,36 +183,6 @@ test("persistent channel turns receive only new messages", async () => {
   }
 });
 
-test("legacy bot thread titles are renamed without changing custom titles", async () => {
-  const x = setup();
-  try {
-    for (const [id, kind] of [["group", "group"], ["fork", "group"], ["admin", "admin"], ["custom", "group"]] as const)
-      x.store.putConversation({
-        id, botId: x.a.id, key: id, threadId: `thr_${id}`,
-        title: "Legacy", kind, createdAt: 1,
-      });
-    const titles: Record<string, string> = {
-      thr_group: "DM with Atlas · #Research",
-      thr_fork: "DM with Atlas · #Research · Fork",
-      thr_admin: "DM with Atlas",
-      thr_custom: "My custom work title",
-    };
-    x.harness.inspection.sdk.stub("threads.get", async ({ threadId }) =>
-      makeThreadResponse({ id: threadId, title: titles[threadId]!, status: "idle" }));
-    await x.runtime.renameLegacyWorkThreads();
-    assert.deepEqual(
-      x.harness.inspection.sdk.callsTo("threads.update").map(([input]) => input),
-      [
-        { threadId: "thr_admin", title: "Atlas thread" },
-        { threadId: "thr_fork", title: "Atlas work · #Research · Fork" },
-        { threadId: "thr_group", title: "Atlas work · #Research" },
-      ],
-    );
-  } finally {
-    await x.close();
-  }
-});
-
 test("channel turns keep more than forty intervening messages and page an exact overflow range", async () => {
   const x = setup();
   try {
@@ -2338,7 +2308,8 @@ test("changing a model or provider starts new bot sessions and retains their his
   await plugin(x.bb);
   try {
     const direct = await x.harness.behavior.callRpc("conversation", { id: x.a.id }) as Conversation;
-    const group = await x.runtime.conversation(x.a, `group:${x.room.id}`, "group", x.room.name);
+    // Channel work always starts with its task as the prompt.
+    const group = await x.runtime.conversation(x.a, `group:${x.room.id}`, "group", x.room.name, "Review the plan");
     const updated = await x.harness.behavior.callRpc("update", {
       id: x.a.id,
       providerId: "pi",
@@ -3682,60 +3653,6 @@ test("general file publication becomes visible only when its response posts", as
   }
 });
 
-test("message edits preserve retry identity and original queued tasks", async () => {
-  const x = setup();
-  await plugin(x.bb);
-  try {
-    const requestId = randomUUID(),
-      text = "@atlas Original request";
-    const m = x.runtime.send(x.room, text, requestId);
-    await x.harness.behavior.callRpc("editMessage", {
-      id: x.room.id,
-      messageId: m.id,
-      text: "Corrected transcript",
-      expectedText: text,
-    });
-    assert.equal(x.runtime.send(x.room, text, requestId).id, m.id);
-    assert.equal(x.store.requestJobs(m.id).length, 1);
-    await x.runtime.drive(x.a);
-    assert.match(
-      x.store.requestJobs(m.id)[0]!.text,
-      /Consider this message from You:\n@atlas Original request/,
-    );
-    await assert.rejects(
-      x.harness.behavior.callRpc("editMessage", {
-        id: x.room.id,
-        messageId: m.id,
-        text: "stale",
-        expectedText: text,
-      }),
-      /changed/,
-    );
-    await x.harness.behavior.callRpc("saveMessage", {
-      id: x.room.id,
-      messageId: m.id,
-      saved: true,
-    });
-    const saved = (await x.harness.behavior.callRpc("savedMessages", {
-      id: x.room.id,
-    })) as { text: string }[];
-    assert.equal(saved[0]?.text, "Corrected transcript");
-    x.runtime.complete(x.store.requestJobs(m.id)[0]!.threadId!, "Bot reply");
-    await x.runtime.driveRoom(x.room);
-    await assert.rejects(
-      x.harness.behavior.callRpc("editMessage", {
-        id: x.room.id,
-        messageId: x.store.requestJobs(m.id)[0]!.id,
-        text: "Forged",
-        expectedText: "Bot reply",
-      }),
-      /Only your own/,
-    );
-  } finally {
-    await x.close();
-  }
-});
-
 test("saved usage limits survive reload and enforce channel turn capacity", async () => {
   const x = setup();
   await plugin(x.bb);
@@ -3846,10 +3763,7 @@ test("transcript pages bound messages, seek directly, and refresh historical win
     assert.equal(latest.parents[0]!.id, "return:fixture:0");
     assert.equal(latest.hasOlder, true);
     assert.equal(latest.hasNewer, false);
-    const around = (await x.harness.behavior.callRpc("transcript", {
-      id: x.room.id,
-      around: "return:fixture:100",
-    })) as ReturnType<Store["transcript"]>;
+    const around = x.store.transcript(x.room.id, { around: "return:fixture:100" });
     assert.equal(around.messages.length, 50);
     assert(around.messages.some((m) => m.id === "return:fixture:100"));
     assert.equal(around.hasOlder, true);
@@ -3875,29 +3789,10 @@ test("transcript pages bound messages, seek directly, and refresh historical win
     assert.equal(refreshed.hasNewer, true);
     const other = { ...x.room, id: randomUUID() };
     x.store.putRoom(other);
-    await assert.rejects(
-      x.harness.behavior.callRpc("transcript", {
-        id: other.id,
-        around: "return:fixture:100",
-      }),
-      /not found/,
-    );
-    await assert.rejects(
-      x.harness.behavior.callRpc("transcript", {
-        id: x.room.id,
-        around: "missing",
-      }),
-      /not found/,
-    );
+    assert.throws(() => x.store.transcript(other.id, { around: "return:fixture:100" }), /not found/);
+    assert.throws(() => x.store.transcript(x.room.id, { around: "missing" }), /not found/);
     await assert.rejects(
       x.harness.behavior.callRpc("room", { id: x.room.id, limit: 151 }),
-    );
-    await assert.rejects(
-      x.harness.behavior.callRpc("transcript", {
-        id: x.room.id,
-        before: "return:fixture:100",
-        after: "return:fixture:100",
-      }),
     );
     const first = x.store.transcript(x.room.id, { around: "return:fixture:0" });
     assert.equal(first.hasOlder, false);

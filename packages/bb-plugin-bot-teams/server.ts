@@ -23,7 +23,7 @@ import {
 } from "./contract";
 import { Store, newId, document, saveDocument } from "./store";
 import { liveChannelDms } from "./channel-dms";
-import { usePersonalProject } from "./bot-project";
+import { personalProjectId } from "./bot-project";
 import { ChannelThreads } from "./channel-thread-link";
 import { registerChannelMentions } from "./channel-mentions";
 import {
@@ -37,7 +37,6 @@ import {
 import {
   Runtime,
   jobPrompt,
-  legacyBotStartMessage,
   missingThread,
   primaryLane,
   roomTitleThreadPrefix,
@@ -90,30 +89,14 @@ export default async function plugin(bb: BbPluginApi) {
   const activeConversations = (id: string) =>
     store.conversations(id).filter((c) =>
       !c.archivedAt && !isForkConversation(c.key));
-  const removeLegacyDirectStart = async (conversation: Conversation, queued: Awaited<
-    ReturnType<typeof bb.sdk.threads.queuedMessages.list>
-  >) => {
-    if (conversation.key !== "admin") return queued;
-    const legacy = queued.filter((item) =>
-      item.originPluginId === "bot-teams" &&
-      item.content.length === 1 &&
-      item.content[0]?.type === "text" &&
-      item.content[0].text === legacyBotStartMessage);
-    for (const item of legacy)
-      await bb.sdk.threads.queuedMessages.delete({
-        threadId: conversation.threadId,
-        queuedMessageId: item.id,
-      });
-    return queued.filter((item) => !legacy.includes(item));
-  };
   const assertConversationIdle = async (conversation: Conversation) => {
     try {
       const thread = await bb.sdk.threads.get({ threadId: conversation.threadId });
       if (thread.status === "active")
         throw new Error("Wait for this bot's current response before starting a new thread.");
-      const queued = await removeLegacyDirectStart(conversation, await bb.sdk.threads.queuedMessages.list({
+      const queued = await bb.sdk.threads.queuedMessages.list({
         threadId: conversation.threadId,
-      }));
+      });
       if (queued.length)
         throw new Error("Wait for this bot's queued messages before starting a new thread.");
     } catch (cause) {
@@ -126,9 +109,6 @@ export default async function plugin(bb: BbPluginApi) {
     if (current) {
       try {
         await bb.sdk.threads.get({ threadId: current.threadId });
-        await removeLegacyDirectStart(current, await bb.sdk.threads.queuedMessages.list({
-          threadId: current.threadId,
-        }));
         return current;
       } catch (cause) {
         if (!missingThread(cause)) throw cause;
@@ -333,18 +313,9 @@ export default async function plugin(bb: BbPluginApi) {
         .run(group.roomId, started, Date.now() - started);
     }
   };
-  async function project() {
-    return runtime.locked("project", () =>
-      usePersonalProject(bb, store, (from, to) =>
-        automations.migrateProject(from, to),
-      ),
-    );
-  }
+  const project = () => personalProjectId(bb);
   const channelThreads = new ChannelThreads(bb, store, project);
   runtime.onChanged.add(() => channelThreads.syncAll());
-  // Repair saved bot profiles before handlers or background work can dispatch.
-  // A lookup failure must fail loading, never create another deletable project.
-  if (store.all().length) await project();
   async function create(
     input: z.infer<typeof profileInput> & { mission: string; roomId?: string },
     requestId?: string,
@@ -727,13 +698,11 @@ export default async function plugin(bb: BbPluginApi) {
       runtime.changed();
       return value;
     },
-    attentionDiscardReply: ({ id }) => replies.discardReply(id),
     documentHistory: async ({ id, file, before }) => {
       const latest = await document(store.get(id).home, file);
       runtime.data.snapshot(`${id}:${file}`, latest.text, "Observed file");
       return runtime.data.revisions(`${id}:${file}`, before);
     },
-    linkedChannel: ({ threadId }) => channelThreads.roomForThread(threadId)?.id ?? null,
     channelSurface: async ({ threadId }) => {
       const room = channelThreads.roomForThread(threadId);
       if (!room) return null;
@@ -818,58 +787,6 @@ export default async function plugin(bb: BbPluginApi) {
           kind === "bot" ? id : undefined,
         );
       }),
-    editMessage: ({ id, messageId, text, expectedText }) =>
-      runtime.locked(`room:${id}`, async () => {
-        const m = store.message(messageId);
-        if (
-          !m ||
-          m.roomId !== id ||
-          m.botId ||
-          m.sourceThreadId ||
-          m.automationId ||
-          m.system
-        )
-          throw new Error("Only your own messages can be edited.");
-        if (store.room(id).archived)
-          throw new Error("Restore this channel before editing messages.");
-        if (m.text !== expectedText)
-          throw new Error("This message changed. Reload before editing.");
-        const next = {
-          ...m,
-          sentText: m.sentText ?? m.text,
-          text,
-          editedAt: Date.now(),
-        };
-        store.db
-          .prepare("UPDATE room_messages SET json=? WHERE id=?")
-          .run(JSON.stringify(next), m.id);
-        runtime.changed();
-        return next;
-      }),
-    saveMessage: ({ id, messageId, saved }) => {
-      store.room(id);
-      const m = store.message(messageId);
-      if (!m || m.roomId !== id || m.system || (m.automationId && !m.botId))
-        throw new Error("Message not found.");
-      const next = { ...m, saved };
-      store.db
-        .prepare("UPDATE room_messages SET json=? WHERE id=?")
-        .run(JSON.stringify(next), m.id);
-      runtime.changed();
-      return next;
-    },
-    savedMessages: ({ id, before }) => {
-      store.room(id);
-      return (
-        store.db
-          .prepare(
-            `SELECT json FROM room_messages WHERE room_id=? AND json_extract(json,'$.saved')=1
-        AND (? IS NULL OR rowid < (SELECT rowid FROM room_messages WHERE id=? AND room_id=?)) ORDER BY rowid DESC LIMIT 50`,
-          )
-          .all(id, before ?? null, before ?? null, id) as { json: string }[]
-      ).map((r) => JSON.parse(r.json));
-    },
-
     automationCreate: (input) => automations.create(input),
     automationList: (input) => automations.list(input),
     automationUpdate: (input) => automations.update(input),
@@ -1011,7 +928,6 @@ export default async function plugin(bb: BbPluginApi) {
       after
         ? store.historyAfter(id, after, through, limit)
         : store.history(id, before, query, limit),
-    transcript: ({ id, ...options }) => store.transcript(id, options),
     get: ({ id }) => ({
       bot: store.get(id),
       conversations: store.conversations(id),
@@ -1181,10 +1097,6 @@ export default async function plugin(bb: BbPluginApi) {
         approvals: approvals.list(id),
       };
     },
-    resolveApproval: (input) => approvals.resolve(input),
-    composer: async () => ({
-      voiceEnabled: (await bb.sdk.system.config()).voiceTranscriptionEnabled,
-    }),
     upload: ({ id, name, mimeType, data }) =>
       runtime.locked(`room:${id}`, async () => {
         store.room(id);
@@ -1306,17 +1218,6 @@ export default async function plugin(bb: BbPluginApi) {
       }),
     stopRoom: ({ id }) =>
       runtime.locked(`room:${id}`, () => runtime.stopRoom(store.room(id))),
-    resumeRoom: ({ id }) =>
-      runtime.locked(`room:${id}`, async () => {
-        const room = {
-          ...store.room(id),
-          paused: false,
-          updatedAt: Date.now(),
-        };
-        store.putRoom(room);
-        runtime.changed();
-        return room;
-      }),
     cancelJob: ({ id }) =>
       runtime.locked("cancel", async () => {
         const initial = store.job(id);
@@ -1794,7 +1695,6 @@ export default async function plugin(bb: BbPluginApi) {
   });
   bb.background.service("rooms", {
     async start(signal) {
-      await runtime.renameLegacyWorkThreads();
       await runtime.recoverRoomTitles();
       await recoverRoutingSessions(bb, store);
       await recoverApprovedBotCreates(signal);

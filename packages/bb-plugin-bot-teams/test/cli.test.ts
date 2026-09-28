@@ -660,7 +660,7 @@ test("CLI deletion requires confirmation, removes archived channels, and preserv
   }
 });
 
-test("CLI messages, replies, retries, reactions, and history pages share UI rules", async () => {
+test("CLI messages, retries, and history pages share UI rules", async () => {
   const x = await setup();
   try {
     const room = roomSchema.parse(await x.ok(["channel", "create", "Notes"]));

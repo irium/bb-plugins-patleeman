@@ -429,10 +429,6 @@ export const rpcContract = defineRpcContract({
       "Supply minutes only when snoozing."),
     output: attentionView,
   },
-  attentionDiscardReply: {
-    input: z.object({ id: z.string().uuid() }),
-    output: z.object({ ok: z.literal(true) }),
-  },
   documentHistory: {
     input: z.object({
       id: idSchema,
@@ -440,11 +436,6 @@ export const rpcContract = defineRpcContract({
       before: z.number().optional(),
     }),
     output: z.array(revisionSchema),
-  },
-  /** The channel a channel thread belongs to; null for every other thread. */
-  linkedChannel: {
-    input: z.object({ threadId: z.string() }),
-    output: z.string().nullable(),
   },
   /** Everything the channel thread's header, composer, and panel show; null for other threads. */
   channelSurface: {
@@ -502,27 +493,6 @@ export const rpcContract = defineRpcContract({
       limits: usageLimits,
     }),
     output: usageSummary,
-  },
-  editMessage: {
-    input: z.object({
-      id: z.string().uuid(),
-      messageId: z.string(),
-      text: z.string().trim().min(1).max(16000),
-      expectedText: z.string(),
-    }),
-    output: messageSchema,
-  },
-  saveMessage: {
-    input: z.object({
-      id: z.string().uuid(),
-      messageId: z.string(),
-      saved: z.boolean(),
-    }),
-    output: messageSchema,
-  },
-  savedMessages: {
-    input: z.object({ id: z.string().uuid(), before: z.string().optional() }),
-    output: z.array(messageSchema),
   },
 
   automationRuns: {
@@ -605,23 +575,6 @@ export const rpcContract = defineRpcContract({
       nextBefore: z.string().nullable(),
       nextAfter: z.string().nullable(),
     }),
-  },
-  transcript: {
-    input: z
-      .object({
-        id: z.string().uuid(),
-        before: z.string().optional(),
-        after: z.string().optional(),
-        around: z.string().optional(),
-      })
-      .refine(
-        (input) =>
-          [input.before, input.after, input.around].filter(
-            (v) => v !== undefined,
-          ).length <= 1,
-        "Choose one transcript cursor.",
-      ),
-    output: transcriptPageSchema,
   },
   get: {
     input: z.object({ id: idSchema }),
@@ -707,10 +660,6 @@ export const rpcContract = defineRpcContract({
     }),
     output: attachmentSchema,
   },
-  composer: {
-    input: z.null(),
-    output: z.object({ voiceEnabled: z.boolean() }),
-  },
   discardAttachment: {
     input: z.object({ id: z.string().uuid(), attachmentId: z.string().uuid() }),
     output: z.object({ ok: z.literal(true) }),
@@ -760,31 +709,6 @@ export const rpcContract = defineRpcContract({
     output: z.object({ ok: z.literal(true) }),
   },
   stopRoom: { input: z.object({ id: z.string().uuid() }), output: roomSchema },
-  resumeRoom: {
-    input: z.object({ id: z.string().uuid() }),
-    output: roomSchema,
-  },
-  resolveApproval: {
-    input: z
-      .object({
-        id: z.string().uuid(),
-        threadId: z.string().min(1).max(200),
-        interactionId: z.string().min(1).max(200),
-        decision: approvalDecision.optional(),
-        answers: z.record(
-          z.string().min(1).max(200),
-          z.object({
-            selected: z.array(z.string().max(500)).max(32),
-            freeText: z.string().max(4000).optional(),
-          }),
-        ).optional(),
-      })
-      .refine(
-        (v) => (v.decision === undefined) !== (v.answers === undefined),
-        "Send either a decision or answers.",
-      ),
-    output: z.object({ resolved: z.literal(true) }),
-  },
   cancelJob: {
     input: z.object({ id: z.string() }),
     output: z.object({ cancelled: z.boolean() }),

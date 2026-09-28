@@ -742,8 +742,8 @@ function DeleteChannel({ room, onClose }: { room: Room; onClose: () => void }) {
     >
       <div className="bot-form">
         <p className="text-sm leading-5">
-          Permanently delete <strong>{room.name}</strong> and its messages,
-          reactions, and channel activity? This stops unfinished responses. Your
+          Permanently delete <strong>{room.name}</strong>, its thread, messages,
+          and channel activity? This stops unfinished responses. Your
           bots and their workspaces are kept. This cannot be undone.
         </p>
         <ErrorMessage error={error} />

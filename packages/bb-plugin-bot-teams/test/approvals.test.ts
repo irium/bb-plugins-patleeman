@@ -137,21 +137,6 @@ test("a bot's pending approval reaches the channel that started the work", async
   assert.equal(x.changes(), 1);
 });
 
-test("channel questions Bot Teams opened itself are not forwarded as approvals", async () => {
-  const x = setup([
-    interaction({
-      origin: {
-        kind: "plugin",
-        pluginId: "bot-teams",
-        rendererId: "channel-question",
-      },
-      payload: { kind: "plugin", title: "Which release date?", data: null },
-    }),
-  ]);
-  await x.approvals.tick();
-  assert.deepEqual(x.approvals.list(x.room.id), []);
-});
-
 test("finished work stops forwarding its requests", async () => {
   const x = setup();
   await x.approvals.tick();

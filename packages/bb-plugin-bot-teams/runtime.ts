@@ -74,8 +74,6 @@ export const jobPrompt = (job: Job) => {
     .filter(Boolean)
     .join("\n\n");
 };
-export const legacyBotStartMessage =
-  "Read MISSION.md and MEMORY.md. Introduce yourself in one short sentence based on your mission. Then wait for a message.";
 
 const jobInput = (job: Job) => [
   { type: "text" as const, text: jobPrompt(job), mentions: [] },
@@ -293,7 +291,7 @@ export class Runtime {
       }] : [
         {
           type: "text",
-          text: prompt ?? legacyBotStartMessage,
+          text: prompt ?? "",
           mentions: [],
         },
         ...attachments.map((a) =>
@@ -366,23 +364,6 @@ export class Runtime {
     if (bot.error) this.store.put({ ...this.store.get(bot.id), error: null });
     this.changed();
     return c;
-  }
-  async renameLegacyWorkThreads() {
-    for (const bot of this.store.all())
-      for (const conversation of this.store.conversations(bot.id)) {
-        if (conversation.kind === "mission") continue;
-        try {
-          const thread = await this.bb.sdk.threads.get({ threadId: conversation.threadId });
-          const previous = thread.title ?? "";
-          const title = conversation.kind === "group"
-            ? previous.replace(/^DM with (.*) · (#.*)$/, "$1 work · $2")
-            : previous.replace(/^DM with (.*)$/, "$1 thread");
-          if (title !== previous)
-            await this.bb.sdk.threads.update({ threadId: conversation.threadId, title });
-        } catch (cause) {
-          this.bb.log.debug(`Could not rename bot work thread: ${errorText(cause)}`);
-        }
-      }
   }
   private async forkConversation(
     bot: Bot,

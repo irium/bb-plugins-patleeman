@@ -325,35 +325,9 @@ can review the requested profile and mission and approve or deny it. The
 workspace and profile are created only after approval; denying, cancelling, or
 letting the request expire leaves no partial bot behind.
 
-### Migrate from Council
-
-On the BB server machine, with Bots installed:
-
-```sh
-node scripts/migrate-council-to-bots.mjs --data-dir /absolute/path/to/BB/data
-node scripts/migrate-council-to-bots.mjs --data-dir /absolute/path/to/BB/data --apply
-```
-
-The first command previews the migration. Apply backs up the complete Council
-SQLite database and settings under `plugins/bot-teams/imports/council-v1`, disables
-Council, imports every member’s exact persona and configured provider/model/
-reasoning, and creates Council and preset channels. Chief advisors retain a
-synthesis role in their mission; disabled members are archived. Schedules remain
-off. Imported IDs are recorded for safe reruns; conflicting profiles are never
-overwritten. Private personas and session history are not committed to Git.
-
-Finish running Council sessions first. If a member inherits execution settings,
-set its effective provider, model, and reasoning explicitly in Council before
-migrating; the script refuses to guess. It also verifies the CLI connects to the
-specified data directory. After verifying the new bots and channel, run
-`bb plugin remove council`. Existing legacy sessions remain in the private backup;
-they are not converted into new conversations or rerun.
-
-## Rename an existing Bots installation
+## Plugin ID and command names
 
 Bot Teams uses the unique plugin ID `bot-teams`, separate from the community plugin named Bots. Existing `bb bots` commands, `bots_*` tools, and the `bots` skill keep their names for saved automations. If another plugin also registers the command, use `bb plugin run bot-teams …`.
-
-See [the migration guide](docs/MIGRATION.md) before replacing an existing installation. New installations need no migration.
 
 ## Install and develop
 

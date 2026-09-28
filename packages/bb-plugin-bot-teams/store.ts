@@ -45,7 +45,6 @@ export class Store {
       CREATE TABLE IF NOT EXISTS routing_sessions (thread_id TEXT PRIMARY KEY, request_id TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS bot_create_requests (id TEXT PRIMARY KEY, status TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, json TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS pending_bot_create_requests ON bot_create_requests(status,created_at);
-      CREATE TABLE IF NOT EXISTS reactions (message_id TEXT NOT NULL, emoji TEXT NOT NULL, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(message_id,emoji,actor_id));
       CREATE TABLE IF NOT EXISTS channel_notifications (id TEXT PRIMARY KEY,room_id TEXT NOT NULL,kind TEXT NOT NULL,subject_id TEXT NOT NULL,created_at INTEGER NOT NULL,dispatched_at INTEGER);
       CREATE INDEX IF NOT EXISTS pending_channel_notifications ON channel_notifications(dispatched_at,created_at);
       CREATE TABLE IF NOT EXISTS room_runs (id TEXT PRIMARY KEY, room_id TEXT NOT NULL, json TEXT NOT NULL);
@@ -63,12 +62,6 @@ export class Store {
       CREATE INDEX IF NOT EXISTS messages_by_source_job ON room_messages(room_id,json_extract(json,'$.sourceJobId'));
       CREATE INDEX IF NOT EXISTS messages_by_source ON room_messages(json_extract(json,'$.sourceThreadId'));
       CREATE INDEX IF NOT EXISTS attachments_by_room ON attachments(json_extract(json,'$.roomId'));`);
-    // Bots no longer pause. A paused bot keeps its schedule off rather than
-    // starting scheduled work it was never running.
-    db.exec(`UPDATE bots SET json=json_remove(
-        CASE WHEN json_extract(json,'$.paused') THEN json_set(json,'$.intervalMinutes',0) ELSE json END,
-        '$.paused')
-      WHERE json_extract(json,'$.paused') IS NOT NULL`);
     this.attention = new AttentionStore(this);
   }
   all(): Bot[] {
@@ -487,11 +480,6 @@ export class Store {
   deleteRoom(id: string) {
     // Runtime holds the channel and bot locks and stops work before this commit.
     return this.db.transaction(() => {
-      this.db
-        .prepare(
-          "DELETE FROM reactions WHERE message_id IN (SELECT id FROM room_messages WHERE room_id=?)",
-        )
-        .run(id);
       this.db
         .prepare(
           "DELETE FROM draft_uploads WHERE id IN (SELECT id FROM attachments WHERE json_extract(json,'$.roomId')=?)",

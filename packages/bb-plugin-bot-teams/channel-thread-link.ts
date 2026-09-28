@@ -263,8 +263,7 @@ export class ChannelThreads {
     const room = this.store.findRoom(roomId);
     if (!link || !room) return;
     // The picker shows the channel's mode and permissions; follow changes made
-    // elsewhere (Channel details, the CLI) and move older threads off the
-    // retired "channel" model.
+    // elsewhere (Channel details, the CLI).
     const selection = selectionKey(room);
     if (this.selections.get(roomId) !== selection) {
       await this.bb.sdk.threads.update({
