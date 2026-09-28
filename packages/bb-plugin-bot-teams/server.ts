@@ -27,7 +27,9 @@ import { liveChannelDms } from "./channel-dms";
 import { usePersonalProject } from "./bot-project";
 import { ChannelThreads } from "./channel-thread-link";
 import {
-  channelModel,
+  channelModels,
+  channelPermissionLevels,
+  permissionForLevel,
   channelPostInput,
   channelMentionProviderId,
   channelPostTool,
@@ -1484,9 +1486,21 @@ export default async function plugin(bb: BbPluginApi) {
       icon: { glyph: "Send" },
       suppress: true,
     },
-    async execute({ text, attachments }, context) {
+    async execute({ text, attachments, mode, permissionLevel }, context) {
       const room = channelThreads.roomForThread(context.threadId);
       if (!room) throw new Error("This thread is not linked to a channel.");
+      // The composer's picker chose this message's chat mode and bot permissions;
+      // keep the channel in step so Channel details and the CLI agree.
+      const permission = permissionLevel === undefined ? undefined : permissionForLevel(permissionLevel);
+      const modeChanged = mode !== undefined && mode !== (room.responseBehavior ?? "everyone");
+      const permissionChanged = permission !== undefined && permission !== (room.permissionMode ?? null);
+      if (modeChanged || permissionChanged)
+        await handlers.channelState({
+          id: room.id,
+          ...(modeChanged ? { responseBehavior: mode, rememberDefault: true } : {}),
+          ...(permissionChanged ? { permissionMode: permission } : {}),
+        });
+      channelThreads.noteSelection(store.room(room.id));
       const projectId = await project();
       const attachmentIds: string[] = [];
       for (const file of attachments) {
@@ -1543,8 +1557,8 @@ export default async function plugin(bb: BbPluginApi) {
   });
   bb.providers.register({
     id: channelProviderId,
-    displayName: "Channel",
-    icon: "Hash",
+    displayName: "Bot Teams",
+    icon: "Bot",
     strings: {
       signInHint: "Channel threads need no sign-in.",
       expiredHint: "Channel threads never expire.",
@@ -1562,11 +1576,13 @@ export default async function plugin(bb: BbPluginApi) {
       supportsThreadArchive: false,
       supportsThreadRename: false,
       permissionModes: ["full"],
-      reasoningLevels: ["none"],
+      reasoningLevels: channelPermissionLevels.map((level) => level.id),
     },
+    // The picker's "reasoning" is who may do what: bot permissions.
+    reasoningLevels: channelPermissionLevels.map(({ id, label, description }) => ({ id, label, description })),
     completedTurnDisplay: "flat",
     composerActions: [],
-    models: { scope: "host", fallback: [channelModel] },
+    models: { scope: "host", fallback: channelModels },
   });
   const channelTools = [
     ...registerChannelTools(bb, store, handlers, sendMessage),

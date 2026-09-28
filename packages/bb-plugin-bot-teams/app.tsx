@@ -44,7 +44,6 @@ import {
 import "./styles.css";
 import { botTeamsIcons } from "./icons";
 import {
-  ChannelComposerControls,
   ChannelDetailsPanel,
   ChannelHandoffPrefill,
   ChannelThreadHeader,
@@ -346,7 +345,6 @@ export default definePluginApp((app) => {
     id: "channel-thread",
     scopes: ["thread"],
     actions: [
-      { id: "channel-controls", component: ChannelComposerControls },
       { id: "channel-handoff-prefill", component: ChannelHandoffPrefill },
     ],
   });

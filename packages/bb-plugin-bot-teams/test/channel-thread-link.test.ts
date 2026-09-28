@@ -7,6 +7,8 @@ import { Store } from "../store";
 import { botSchema, roomSchema, type RoomMessage } from "../contract";
 import { ChannelThreads } from "../channel-thread-link";
 import {
+  levelForPermission,
+  permissionForLevel,
   channelDeliverPrefix,
   channelDeliverySchema,
   channelProviderId,
@@ -43,6 +45,7 @@ function setup() {
   const spawned: Record<string, unknown>[] = [];
   const sent: { threadId: string; text: string }[] = [];
   const titles: string[] = [];
+  const selections: string[] = [];
   const deleted: string[] = [];
   const missing = new Set<string>();
   const bb = {
@@ -63,8 +66,9 @@ function setup() {
           if (missing.has(threadId)) throw new Error("HTTP 404: thread not found");
           return { id: threadId, status: "idle" };
         },
-        update: async ({ title }: { title: string }) => {
-          titles.push(title);
+        update: async (args: { title?: string; model?: string; reasoningLevel?: string }) => {
+          if (args.title) titles.push(args.title);
+          if (args.model) selections.push(`${args.model}:${args.reasoningLevel}`);
         },
         delete: async ({ threadId }: { threadId: string }) => {
           deleted.push(threadId);
@@ -92,7 +96,7 @@ function setup() {
   };
   const deliveries = () =>
     sent.map((s) => channelDeliverySchema.parse(JSON.parse(s.text.slice(channelDeliverPrefix.length))));
-  return { store, bot, room, links, post, spawned, sent, titles, deleted, missing, deliveries };
+  return { store, bot, room, links, post, spawned, sent, titles, selections, deleted, missing, deliveries };
 }
 
 test("a new channel gets a hidden thread on the channel provider", async () => {
@@ -191,4 +195,25 @@ test("a bot reply leads with the bot's name, since assistant messages have no au
       "![chart.png](</api/v1/plugins/bot-teams/http/attachment?id=a&inline=1>)\n\n" +
       "- [draft.md](</api/v1/plugins/bot-teams/http/attachment?id=b>)",
   );
+});
+
+test("the composer's picker carries the chat mode and bot permissions", async () => {
+  for (const permission of [null, "accept-edits", "auto", "full"] as const)
+    assert.equal(permissionForLevel(levelForPermission(permission)), permission);
+  const x = setup();
+  x.store.putRoom({ ...x.room, responseBehavior: "directed", permissionMode: "auto" });
+  await x.links.ensure(x.store.room(x.room.id));
+  const spawn = x.spawned[0] as { model: string; reasoningLevel: string };
+  assert.deepEqual([spawn.model, spawn.reasoningLevel], ["directed", "medium"]);
+  // A change made outside the thread (Channel details, the CLI) reaches the picker once.
+  x.store.putRoom({ ...x.store.room(x.room.id), responseBehavior: "smart", permissionMode: null });
+  await x.links.sync(x.room.id);
+  await x.links.sync(x.room.id);
+  assert.deepEqual(x.selections.slice(-1), ["smart:none"]);
+  // A selection the thread just applied is not pushed back to it.
+  x.store.putRoom({ ...x.store.room(x.room.id), responseBehavior: "everyone" });
+  x.links.noteSelection(x.store.room(x.room.id));
+  const before = x.selections.length;
+  await x.links.sync(x.room.id);
+  assert.equal(x.selections.length, before);
 });

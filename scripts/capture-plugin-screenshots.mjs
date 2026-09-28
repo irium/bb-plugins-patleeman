@@ -634,9 +634,10 @@ const captures = [
       await client.waitForAriaButton("Search channel");
       await client.waitForAriaButton("Channel details");
       await client.evaluate(`(() => {
-        const controls = document.querySelector('.channel-composer-controls');
-        if (!controls?.checkVisibility() || !controls.innerText.includes('Directed') || !controls.innerText.includes('Bot permissions'))
-          throw new Error('The chat mode and bot permission pickers must sit beside the composer');
+        const picker = [...document.querySelectorAll('[data-app-composer] button')]
+          .find((b) => (b.getAttribute('aria-label') ?? '').startsWith('Provider, model and reasoning'));
+        if (!picker?.innerText.includes('Directed') || !picker.innerText.includes("Each bot's own"))
+          throw new Error("The composer's picker must show the chat mode and bot permissions");
         if (!document.querySelector('a[href^="/plugins/bot-teams/mention/"]'))
           throw new Error("A bot's @mention must render as a link");
         if (document.body.innerText.includes('bots_channel_thread_post'))

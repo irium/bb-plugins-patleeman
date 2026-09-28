@@ -24,8 +24,8 @@ import { z } from "zod";
 import {
   channelDeliverPrefix,
   channelDeliverySchema,
-  channelModel,
-  channelModelId,
+  channelModels,
+  isChannelMode,
   channelPostTool,
   channelStartPrefix,
   deliveryMarkdown,
@@ -132,10 +132,26 @@ const postPresentation = {
 };
 
 /** A user's message: hand it to Bot Teams, which routes it like any channel message. */
-function post(session: Session, input: readonly PromptInput[], clientRequestId?: ClientTurnRequestId) {
+/** The composer's picker: its model is the chat mode, its reasoning level the bot permissions. */
+interface Selection {
+  model?: string;
+  reasoningLevel?: string;
+}
+
+function post(
+  session: Session,
+  input: readonly PromptInput[],
+  selection: Selection,
+  clientRequestId?: ClientTurnRequestId,
+) {
   session.turns += 1;
   const callId = `post-${session.providerThreadId}-${session.turns}`;
-  const args = { text: ownerText(input), attachments: promptAttachments(input) };
+  const args = {
+    text: ownerText(input),
+    attachments: promptAttachments(input),
+    ...(selection.model && isChannelMode(selection.model) ? { mode: selection.model } : {}),
+    ...(selection.reasoningLevel ? { permissionLevel: selection.reasoningLevel } : {}),
+  };
   emit(session.threadId, [
     ...accepted(clientRequestId),
     { kind: "turn.open" },
@@ -165,7 +181,12 @@ function post(session: Session, input: readonly PromptInput[], clientRequestId?:
   });
 }
 
-function runTurn(session: Session, input: readonly PromptInput[], clientRequestId?: ClientTurnRequestId) {
+function runTurn(
+  session: Session,
+  input: readonly PromptInput[],
+  selection: Selection,
+  clientRequestId?: ClientTurnRequestId,
+) {
   const text = promptText(input);
   if (text.startsWith(channelDeliverPrefix))
     return deliver(session, text.slice(channelDeliverPrefix.length), clientRequestId);
@@ -174,7 +195,7 @@ function runTurn(session: Session, input: readonly PromptInput[], clientRequestI
       ...accepted(clientRequestId),
       { kind: "turn.boundary", status: "completed", claimIfIdle: true },
     ]);
-  post(session, input, clientRequestId);
+  post(session, input, selection, clientRequestId);
 }
 
 function openSession(threadId: string, providerThreadId: string) {
@@ -209,7 +230,10 @@ const handlers: Record<string, (id: JsonRpcId, params: unknown) => void> = {
       },
     }),
   [BRIDGE_REQUEST_METHODS.modelList]: (id) =>
-    io.sendResult(id, { models: [{ ...channelModel, model: channelModelId }], selectedOnlyModels: [] }),
+    io.sendResult(id, {
+      models: channelModels.map((model) => ({ ...model, model: model.id })),
+      selectedOnlyModels: [],
+    }),
   // "Not installed" keeps the provider out of the model picker; Bot Teams creates channel threads by ID.
   [BRIDGE_REQUEST_METHODS.providerHealth]: (id) =>
     io.sendResult(id, {
@@ -232,7 +256,7 @@ const handlers: Record<string, (id: JsonRpcId, params: unknown) => void> = {
     const providerThreadId = `channel_${randomUUID()}`;
     const session = openSession(parsed.data.threadId, providerThreadId);
     io.sendResult(id, { providerThreadId, sessionRestorable: true });
-    if (parsed.data.input?.length) runTurn(session, parsed.data.input);
+    if (parsed.data.input?.length) runTurn(session, parsed.data.input, parsed.data.options);
   },
   [BRIDGE_REQUEST_METHODS.threadResume]: (id, params) => {
     const parsed = threadResumeParamsSchema.safeParse(params);
@@ -247,7 +271,7 @@ const handlers: Record<string, (id: JsonRpcId, params: unknown) => void> = {
     if (!session)
       return io.sendError(id, BRIDGE_JSON_RPC_ERRORS.INVALID_PARAMS, `No session for thread ${parsed.data.threadId}`);
     io.sendResult(id, {});
-    runTurn(session, parsed.data.input, parsed.data.clientRequestId);
+    runTurn(session, parsed.data.input, parsed.data.options, parsed.data.clientRequestId);
   },
   [BRIDGE_REQUEST_METHODS.turnSteer]: (id) =>
     io.sendError(id, BRIDGE_JSON_RPC_ERRORS.NO_ACTIVE_TURN, "Channel messages queue; they cannot steer."),

@@ -2,7 +2,6 @@ import { z } from "zod";
 
 /** A channel is a BB thread on this provider. Bot Teams creates these threads; the model picker never lists it. */
 export const channelProviderId = "bot-teams-channel";
-export const channelModelId = "channel";
 export const channelPostTool = "bots_channel_thread_post";
 /** Mention provider for bots in a channel thread's composer. */
 export const channelMentionProviderId = "bots";
@@ -12,14 +11,49 @@ export const channelDeliverPrefix = "[bot-teams:channel-deliver]";
 /** Hidden thread input: wakes a new channel thread without a visible message. */
 export const channelStartPrefix = "[bot-teams:channel-start]";
 
-export const channelModel = {
-  id: channelModelId,
-  displayName: "Channel",
-  description: "Routes messages to the channel's bots.",
-  supportedReasoningEfforts: [{ reasoningEffort: "none", description: "None" }],
-  defaultReasoningEffort: "none",
-  isDefault: true,
-} as const;
+/**
+ * The composer's native model picker drives a channel: its "models" are the
+ * chat modes, and its "reasoning levels" are the bot permissions. BB fixes
+ * the level ids; the labels are ours.
+ */
+export const channelModes = ["smart", "directed", "everyone"] as const;
+export type ChannelMode = (typeof channelModes)[number];
+
+export const channelPermissionLevels = [
+  { id: "none", label: "Each bot's own", description: "Use the mode set in every bot's profile", permission: null },
+  { id: "low", label: "Accept Edits", description: "Sandboxed, and asks you to approve anything beyond it", permission: "accept-edits" },
+  { id: "medium", label: "Auto", description: "Sandboxed, and the provider reviews on its own", permission: "auto" },
+  { id: "high", label: "Full Access", description: "No sandbox and no approvals", permission: "full" },
+] as const;
+export type ChannelPermissionLevel = (typeof channelPermissionLevels)[number]["id"];
+
+export function permissionForLevel(level: string) {
+  return channelPermissionLevels.find((entry) => entry.id === level)?.permission ?? null;
+}
+
+export function levelForPermission(permission: "accept-edits" | "auto" | "full" | null | undefined): ChannelPermissionLevel {
+  return channelPermissionLevels.find((entry) => entry.permission === (permission ?? null))!.id;
+}
+
+const modeDetails: Record<ChannelMode, { displayName: string; description: string }> = {
+  smart: { displayName: "Smart", description: "A coordinator picks collaborators, work order, and busy-bot actions" },
+  directed: { displayName: "Directed", description: "Only the bots you mention answer" },
+  everyone: { displayName: "Everyone", description: "Every bot in the channel can answer" },
+};
+
+export const channelModels = channelModes.map((id) => ({
+  id,
+  ...modeDetails[id],
+  supportedReasoningEfforts: channelPermissionLevels.map((level) => ({
+    reasoningEffort: level.id,
+    description: level.description,
+  })),
+  defaultReasoningEffort: "none" as const,
+  isDefault: id === "smart",
+}));
+
+export const isChannelMode = (value: string): value is ChannelMode =>
+  (channelModes as readonly string[]).includes(value);
 
 export const channelDeliverySchema = z.object({
   messageId: z.string(),
@@ -36,6 +70,9 @@ export type ChannelDelivery = z.infer<typeof channelDeliverySchema>;
 
 export const channelPostInput = z.object({
   text: z.string().max(16000),
+  /** The composer's model (chat mode) and reasoning level (bot permissions) for this message. */
+  mode: z.enum(channelModes).optional(),
+  permissionLevel: z.enum(["none", "low", "medium", "high"]).optional(),
   attachments: z
     .array(
       z.object({

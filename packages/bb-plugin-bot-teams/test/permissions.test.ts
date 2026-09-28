@@ -7,7 +7,6 @@ import {
 } from "@get-bb/plugin-sdk/testing";
 import { Store } from "../store";
 import { Runtime } from "../runtime";
-import { permissionSummary } from "../permission-mode";
 import { profileInput, type Bot, type Room } from "../contract";
 
 const makeBot = (
@@ -173,29 +172,4 @@ test("the resolved mode reaches the first spawn and every later turn", async () 
   } finally {
     await x.close();
   }
-});
-
-test("the footer label reports the channel setting, agreement, or a mix", () => {
-  const room: Room = {
-    id: randomUUID(),
-    name: "Research",
-    memberIds: ["bot_0123456789abcdef", "bot_1123456789abcdef"],
-    paused: false,
-    createdAt: 1,
-    updatedAt: 1,
-  };
-  const atlas = makeBot("bot_0123456789abcdef", "Atlas");
-  const scribe = makeBot("bot_1123456789abcdef", "Scribe", {
-    permissionMode: "accept-edits",
-  });
-  assert.equal(permissionSummary(room, [atlas, scribe]), "Mixed");
-  assert.equal(
-    permissionSummary(room, [atlas, { ...scribe, permissionMode: "auto" }]),
-    "Auto",
-  );
-  assert.equal(
-    permissionSummary({ ...room, permissionMode: "full" }, [atlas, scribe]),
-    "Full Access",
-  );
-  assert.equal(permissionSummary(room, []), "Each bot's own");
 });

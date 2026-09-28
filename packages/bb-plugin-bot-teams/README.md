@@ -34,7 +34,7 @@ Hover a channel for quick **Archive** and **⋯** actions, like regular threads.
 The three-dot button opens the same menu as right-click, including **Copy channel
 ID**. On touch screens, the menu button stays visible; Archive is inside the menu.
 
-The **Chat mode** selector beneath the message box has three choices:
+The composer's model picker sets the chat mode and bot permissions. Channel threads run on the **Bot Teams** provider: its three "models" are the chat modes, and its "reasoning" levels are the bot permissions (**Each bot's own**, **Accept Edits**, **Auto**, **Full Access**). The picker reads, for example, **Smart · Auto**. Sending a message applies the picked mode and permissions to the channel, and a change made in Channel details or the CLI updates the picker. The chat modes:
 
 - **Smart** chooses one coordinator, records collaborators, and decides whether they work in sequence or in parallel. Mentions are candidates for that decision. Smart also chooses steer, follow-up, or fork for a busy bot. New channels start here.
 - **Directed** calls bots you mention. A channel with just one eligible bot always routes to that bot, in every chat mode.
@@ -67,14 +67,14 @@ The sidebar lists channels. Bot work threads stay available from channel message
 
 ## Channels are threads
 
-Each channel is a hidden BB thread on the **Channel** provider, so it looks and behaves like any other thread: the same transcript, composer, links, file previews, splits, search, and unread state. The provider runs no model and never appears in the model picker. Bot Teams creates channel threads by name.
+Each channel is a hidden BB thread on the **Bot Teams** provider, so it looks and behaves like any other thread: the same transcript, composer, links, file previews, splits, search, and unread state. The provider runs no model of its own and is not offered for new threads; Bot Teams creates channel threads by name. In a channel thread, the picker shows its chat modes and bot permissions.
 
 - **Your messages** go to the channel's router exactly as before: Smart, Directed, and Everyone modes, mentions, delegation, and bot work threads are unchanged. Images and files attached in the composer go with the message.
 - **Bot replies** arrive when each bot finishes, as assistant messages that start with the bot's avatar and name. Replies can arrive while the thread is idle; each one is its own short turn.
 - **Messages from elsewhere**, such as `bb bots channel send` or automations, also appear in the thread, marked as sent outside it.
 - Renaming a channel renames its thread. Deleting a channel deletes its thread. If the thread is deleted on its own, opening the channel creates a new one.
 
-The **Chat mode** (Smart, Directed, Everyone) and **Bot permissions** pickers sit beside the thread's composer; they hide when the composer collapses to one line. The thread header holds the member list, **Search channel**, and **Channel details**, which opens the channel rail in the thread panel. Old channel and message links (`/plugins/bot-teams/channels/…`, including those in notifications) open the channel's thread; a message link opens the channel rather than scrolling to that message. Past messages cannot be edited in a channel thread; send a correction instead.
+The composer's model picker holds the chat mode and bot permissions. The thread header holds the member list, **Search channel**, and **Channel details**, which opens the channel rail in the thread panel. Old channel and message links (`/plugins/bot-teams/channels/…`, including those in notifications) open the channel's thread; a message link opens the channel rather than scrolling to that message. Past messages cannot be edited in a channel thread; send a correction instead.
 
 ## Channel workspace
 
@@ -367,8 +367,8 @@ collapsed so no real threads or projects appear.
 **Launch room** open as a BB thread. You share the ORBIT-42 brief with both
 bots and each replies under its own name; Atlas hands the release check to
 `@scribe`, which renders as a link. The header shows the member avatars,
-**Search channel**, and **Channel details**. The **Directed** chat mode and
-**Bot permissions** pickers sit beside the composer.
+**Search channel**, and **Channel details**. The composer's model picker shows
+the **Directed** chat mode with **Each bot's own** permissions.
 
 ![Bots in the composer's @ menu](assets/channel-mentions.png)
 

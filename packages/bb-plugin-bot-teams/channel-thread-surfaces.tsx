@@ -3,7 +3,6 @@ import {
   experimental_Icon as Icon,
   useBbNavigate,
   useComposer,
-  useComposerView,
   useRealtime,
   useRpc,
   type PluginThreadHeaderActionProps,
@@ -13,8 +12,6 @@ import type { z } from "zod";
 import type { rpcContract } from "./contract";
 import { Button } from "./components/ui/button";
 import { ChannelMembersMenu } from "./channel-members";
-import { ChannelModePicker } from "./channel-mode-picker";
-import { ChannelPermissionPicker } from "./channel-permissions";
 import { ChannelRail } from "./channel-rail-view";
 import { ChannelAutomationsView } from "./channel-automations-view";
 import { ChannelSearch } from "./channel-search";
@@ -28,9 +25,10 @@ import { channelHandoffText, takeChannelThreadHandoff } from "./handoff-draft";
 
 /**
  * A channel is a BB thread. These surfaces add what a channel has that a
- * thread does not: its members in the header, its chat mode and permissions
- * beside the composer, and its live work in the thread panel. Each renders
- * nothing on ordinary threads.
+ * thread does not: its members in the header and its live work in the
+ * thread panel. The chat mode and bot permissions are the composer's own
+ * model picker (see channel-provider.ts). Each renders nothing on ordinary
+ * threads.
  */
 export const channelDetailsPanelId = "channel-details";
 /** Roomier channel views that open as their own thread panel tabs. */
@@ -84,42 +82,6 @@ export function ChannelThreadHeader({ threadId }: PluginThreadHeaderActionProps)
         <Icon name="ListView" />
       </Button>
     </div>
-  );
-}
-
-/**
- * Whether BB is drawing the prompt box as a single line. The composer view's
- * layout does not always follow it, so read BB's own marker on the form.
- */
-function usePromptBoxCompact() {
-  const [node, setNode] = useState<HTMLElement | null>(null);
-  const [compact, setCompact] = useState(false);
-  useEffect(() => {
-    const form = node?.closest("[data-promptbox]");
-    if (!form) return;
-    const read = () => setCompact(form.hasAttribute("data-promptbox-compact"));
-    read();
-    const observer = new MutationObserver(read);
-    observer.observe(form, { attributes: true, attributeFilter: ["data-promptbox-compact"] });
-    return () => observer.disconnect();
-  }, [node]);
-  return { ref: setNode, compact };
-}
-
-/** Beside the composer: who answers (Smart / Directed / Everyone) and what bots may do. */
-export function ChannelComposerControls() {
-  const view = useComposerView();
-  const threadId = view.scope.kind === "thread" ? view.scope.threadId : null;
-  const { surface, load } = useChannelSurface(threadId);
-  const promptBox = usePromptBoxCompact();
-  if (!surface) return null;
-  // A one-line prompt box has no room: the pickers would cover the prompt.
-  const hidden = promptBox.compact || view.layout === "compact";
-  return (
-    <span ref={promptBox.ref} className="channel-composer-controls" hidden={hidden}>
-      <ChannelModePicker room={surface.room} onChanged={load} />
-      <ChannelPermissionPicker room={surface.room} bots={surface.bots} onChanged={load} />
-    </span>
   );
 }
 

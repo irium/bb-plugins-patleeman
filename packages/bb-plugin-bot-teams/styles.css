@@ -2230,13 +2230,9 @@
 
 /* Mentions read as chips, the way Slack and Discord render them. */
 
-.channel-thread-header,
-.channel-composer-controls {
+.channel-thread-header {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
-}
-.channel-composer-controls[hidden] {
-  display: none;
 }
