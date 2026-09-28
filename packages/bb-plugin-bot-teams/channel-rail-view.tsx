@@ -378,6 +378,7 @@ export function ChannelRail({
   messageIds,
   onChanged,
   onClose,
+  embedded = false,
 }: {
   automationsTab: PluginFixedTabRegistration;
   room: Room;
@@ -387,7 +388,9 @@ export function ChannelRail({
   approvals: ChannelApproval[];
   messageIds: string[];
   onChanged: () => void;
-  onClose: () => void;
+  onClose?: () => void;
+  /** Laid out inside a thread panel tab instead of floating over a transcript. */
+  embedded?: boolean;
 }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
@@ -444,7 +447,7 @@ export function ChannelRail({
 
   useEffect(() => {
     const host = card.current?.parentElement;
-    if (!host) return;
+    if (!host || embedded) return;
     const observer = new ResizeObserver(([entry]) =>
       setOverlay(entry!.contentRect.width < overlayBelow),
     );
@@ -454,7 +457,7 @@ export function ChannelRail({
   useEffect(() => {
     if (!overlay) return;
     const dismiss = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onClose?.();
     };
     window.addEventListener("keydown", dismiss);
     return () => window.removeEventListener("keydown", dismiss);
@@ -480,11 +483,11 @@ export function ChannelRail({
   return (
     <aside
       ref={card}
-      className="channel-rail"
+      className={embedded ? "channel-rail channel-rail-embedded" : "channel-rail"}
       data-overlay={overlay ? "" : undefined}
       aria-label={`#${room.name} details`}
     >
-      <div className="channel-rail-header">
+      {onClose && <div className="channel-rail-header">
         <Button
           variant="ghost"
           size="sm"
@@ -494,7 +497,7 @@ export function ChannelRail({
         >
           <Icon name="X" />
         </Button>
-      </div>
+      </div>}
       <div className="channel-rail-scroll">
         {error && (
           <p role="alert" className="channel-rail-error">

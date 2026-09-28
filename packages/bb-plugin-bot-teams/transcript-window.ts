@@ -1,11 +1,10 @@
-import type { Reaction, RoomMessage } from "./contract";
+import type { RoomMessage } from "./contract";
 
 export const TRANSCRIPT_PAGE_SIZE = 50;
 export const TRANSCRIPT_WINDOW_SIZE = 150;
 export type TranscriptPage = {
   messages: RoomMessage[];
   parents: RoomMessage[];
-  reactions: Reaction[];
   hasOlder: boolean;
   hasNewer: boolean;
 };
@@ -25,9 +24,7 @@ export function extendTranscript(
     direction === "older"
       ? unique.slice(0, TRANSCRIPT_WINDOW_SIZE)
       : unique.slice(-TRANSCRIPT_WINDOW_SIZE);
-  const ids = new Set(messages.map((m) => m.id));
   const parentIds = new Set(messages.map((m) => m.replyTo));
-  const refreshed = new Set(page.messages.map((m) => m.id));
   return {
     messages,
     parents: [
@@ -35,10 +32,6 @@ export function extendTranscript(
         [...current.parents, ...page.parents].map((m) => [m.id, m]),
       ).values(),
     ].filter((m) => parentIds.has(m.id)),
-    reactions: [
-      ...current.reactions.filter((r) => !refreshed.has(r.messageId)),
-      ...page.reactions,
-    ].filter((r) => ids.has(r.messageId)),
     hasOlder:
       direction === "older"
         ? page.hasOlder

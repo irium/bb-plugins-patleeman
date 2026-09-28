@@ -14,7 +14,7 @@ const modes = [
   {
     value: "directed",
     label: "Directed",
-    description: "Only mentions and replies",
+    description: "Only the bots you mention",
   },
   { value: "everyone", label: "Everyone", description: "All bots can respond" },
 ] as const;

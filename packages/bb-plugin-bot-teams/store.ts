@@ -24,7 +24,6 @@ import type {
   Room,
   RoomMessage,
   RoomRun,
-  Reaction,
 } from "./contract";
 
 export function newId() {
@@ -743,10 +742,6 @@ export class Store {
     return {
       messages,
       parents: this.parents(messages),
-      reactions: this.reactions(
-        roomId,
-        messages.map((m) => m.id),
-      ),
       hasOlder: boundary("<", rows[0]?.rowid ?? cursor?.rowid),
       hasNewer: boundary(">", rows.at(-1)?.rowid ?? cursor?.rowid),
     };
@@ -799,40 +794,6 @@ export class Store {
     if (!current) return;
     this.db.prepare("UPDATE room_messages SET json=? WHERE id=?")
       .run(JSON.stringify({ ...current, classifierPlan: plan }), messageId);
-  }
-  reactions(roomId: string, messageIds?: string[]): Reaction[] {
-    if (messageIds && !messageIds.length) return [];
-    return this.db
-      .prepare(
-        `SELECT r.message_id AS messageId, r.emoji, r.actor_id AS actorId,
-      r.actor_name AS actorName, r.created_at AS createdAt FROM reactions r
-      JOIN room_messages m ON m.id=r.message_id WHERE m.room_id=?
-      ${messageIds ? `AND r.message_id IN (${messageIds.map(() => "?").join(",")})` : ""}
-      ORDER BY r.created_at`,
-      )
-      .all(roomId, ...(messageIds ?? [])) as Reaction[];
-  }
-  react(
-    roomId: string,
-    messageId: string,
-    emoji: string,
-    actorId: string,
-    actorName: string,
-    active: boolean,
-  ) {
-    if (this.message(messageId)?.roomId !== roomId)
-      throw new Error("Message not found in this channel.");
-    if (active)
-      this.db
-        .prepare("INSERT OR IGNORE INTO reactions VALUES (?,?,?,?,?)")
-        .run(messageId, emoji, actorId, actorName, Date.now());
-    else
-      this.db
-        .prepare(
-          "DELETE FROM reactions WHERE message_id=? AND emoji=? AND actor_id=?",
-        )
-        .run(messageId, emoji, actorId);
-    return this.reactions(roomId, [messageId]);
   }
   runs(roomId: string, limit = -1, activeOnly = false): RoomRun[] {
     return (

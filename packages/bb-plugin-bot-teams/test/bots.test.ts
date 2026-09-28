@@ -1225,8 +1225,6 @@ test("channel deletion clears all history and uploads, preserves other rooms and
     // More than the UI's 100-job and 200-message windows.
     for (let i = 0; i < 205; i++)
       x.runtime.send(x.room, `Message ${i}`, randomUUID());
-    const first = x.store.messages(x.room.id)[0]!;
-    x.store.react(x.room.id, first.id, "👍", "user", "You", true);
     const draftId = randomUUID();
     x.store.stageAttachment(
       {
@@ -1262,7 +1260,6 @@ test("channel deletion clears all history and uploads, preserves other rooms and
     assert.equal(x.store.messages(x.room.id).length, 0);
     assert.equal(x.store.roomJobs(x.room.id, -1).length, 0);
     assert.equal(x.store.runs(x.room.id).length, 0);
-    assert.equal(x.store.reactions(x.room.id).length, 0);
     assert.equal(x.store.stagedAttachment(draftId), null);
     assert.throws(() => x.store.attachment(draftId), /not found/);
     assert.equal(x.store.byThread(job.threadId), null);
@@ -1813,83 +1810,6 @@ test("failed invitations do not alter history or membership", async () => {
     );
     assert.deepEqual(x.store.room(room.id).memberIds, room.memberIds);
     assert.equal(x.store.messages(room.id).length, 0);
-  } finally {
-    await x.close();
-  }
-});
-
-test("reaction set operations persist, deduplicate and remain scoped to a channel", async () => {
-  const x = setup();
-  try {
-    await plugin(x.bb);
-    const m = x.runtime.send(x.room, "Please review", randomUUID());
-    const args = { id: x.room.id, messageId: m.id, emoji: "👍", active: true };
-    await x.harness.behavior.callRpc("reaction", args);
-    await x.harness.behavior.callRpc("reaction", args);
-    assert.equal(
-      new Store(x.bb.storage.database()).reactions(x.room.id).length,
-      1,
-    );
-    x.store.react(x.room.id, m.id, "👍", x.a.id, x.a.name, true);
-    assert.equal(x.store.reactions(x.room.id).length, 2);
-    await x.harness.behavior.callRpc("reaction", { ...args, active: false });
-    assert.equal(x.store.reactions(x.room.id)[0]?.actorId, x.a.id);
-    await assert.rejects(
-      x.harness.behavior.callRpc("reaction", { ...args, id: randomUUID() }),
-      /not found/,
-    );
-    await assert.rejects(
-      x.harness.behavior.callRpc("reaction", {
-        ...args,
-        emoji: "not an emoji",
-      }),
-    );
-    assert.equal(
-      x.store.work(x.a.id).length,
-      1,
-      "reactions must not schedule more work",
-    );
-  } finally {
-    await x.close();
-  }
-});
-
-test("bot reactions derive identity from a running channel job and reject outside messages", async () => {
-  const x = setup();
-  try {
-    await plugin(x.bb);
-    const m = x.runtime.send(x.room, "Review", randomUUID());
-    await x.runtime.drive(x.a);
-    const job = x.store.work(x.a.id)[0]!;
-    const args = { messageId: m.id, emoji: "👀", active: true };
-    await x.harness.behavior.callAgentTool("bots_react", args, {
-      threadId: job.threadId!,
-    });
-    assert.equal(x.store.reactions(x.room.id)[0]?.actorId, x.a.id);
-    await assert.rejects(
-      x.harness.behavior.callAgentTool("bots_react", args, {
-        threadId: "unrelated",
-      }),
-      /only available/,
-    );
-    const other = { ...x.room, id: randomUUID() };
-    x.store.putRoom(other);
-    const otherMessage = x.runtime.send(other, "Private", randomUUID());
-    await assert.rejects(
-      x.harness.behavior.callAgentTool(
-        "bots_react",
-        { ...args, messageId: otherMessage.id },
-        { threadId: job.threadId! },
-      ),
-      /not found/,
-    );
-    x.store.putRoom({ ...x.room, memberIds: [] });
-    await assert.rejects(
-      x.harness.behavior.callAgentTool("bots_react", args, {
-        threadId: job.threadId!,
-      }),
-      /not active/,
-    );
   } finally {
     await x.close();
   }
@@ -3411,15 +3331,6 @@ test("bot tools require target membership and auto-join channels they create", a
         { id: privateRoom.id, text: "Hello", requestId: randomUUID() },
       ],
       ["bots_channel_invite", { channelId: privateRoom.id, botId: x.a.id }],
-      [
-        "bots_channel_react",
-        {
-          id: privateRoom.id,
-          messageId: request.id,
-          emoji: "✅",
-          active: true,
-        },
-      ],
     ] as const)
       await assert.rejects(call(name, input), /invited|Join/);
     const catalog = JSON.parse((await call("bots_channels", {})) as string);
@@ -3441,13 +3352,6 @@ test("bot tools require target membership and auto-join channels they create", a
     );
     assert.equal(m.botId, x.a.id);
     assert.equal(m.speaker, x.a.name);
-    await call("bots_channel_react", {
-      id: own.id,
-      messageId: m.id,
-      emoji: "✅",
-      active: true,
-    });
-    assert.equal(x.store.reactions(own.id)[0]?.actorId, x.a.id);
   } finally {
     await x.close();
   }
@@ -3869,11 +3773,6 @@ test("dispatching responses can use channel tools while scheduled recursion rema
     x.store.putJob({ ...job, status: "dispatching" });
     assert.equal(agentAuthor(x.store, job.threadId!).botId, x.a.id);
     await x.harness.behavior.callAgentTool(
-      "bots_react",
-      { messageId: m.id, emoji: "👍", active: true },
-      { threadId: job.threadId! },
-    );
-    await x.harness.behavior.callAgentTool(
       "bots_channel_read",
       { id: x.room.id },
       { threadId: job.threadId! },
@@ -4067,7 +3966,7 @@ test("current uploads survive a full set of earlier channel files", async () => 
   }
 });
 
-test("transcript pages bound messages and reactions, seek directly, and refresh historical windows", async () => {
+test("transcript pages bound messages, seek directly, and refresh historical windows", async () => {
   const x = setup();
   await plugin(x.bb);
   try {
@@ -4083,14 +3982,6 @@ test("transcript pages bound messages and reactions, seek directly, and refresh 
         attachments: [],
         createdAt: 1,
       });
-      x.store.react(
-        x.room.id,
-        `return:fixture:${i}`,
-        "👍",
-        "user",
-        "You",
-        true,
-      );
     }
     const latest = (await x.harness.behavior.callRpc("room", {
       id: x.room.id,
@@ -4098,7 +3989,6 @@ test("transcript pages bound messages and reactions, seek directly, and refresh 
     assert.equal(latest.messages.length, 50);
     assert.equal(latest.messages[0]!.id, "return:fixture:950");
     assert.equal(latest.parents[0]!.id, "return:fixture:0");
-    assert.equal(latest.reactions.length, 50);
     assert.equal(latest.hasOlder, true);
     assert.equal(latest.hasNewer, false);
     const around = (await x.harness.behavior.callRpc("transcript", {
@@ -4107,7 +3997,6 @@ test("transcript pages bound messages and reactions, seek directly, and refresh 
     })) as ReturnType<Store["transcript"]>;
     assert.equal(around.messages.length, 50);
     assert(around.messages.some((m) => m.id === "return:fixture:100"));
-    assert.equal(around.reactions.length, 50);
     assert.equal(around.hasOlder, true);
     assert.equal(around.hasNewer, true);
     const older = x.store.transcript(x.room.id, {
@@ -4122,21 +4011,12 @@ test("transcript pages bound messages and reactions, seek directly, and refresh 
       id: "new-arrival",
       replyTo: null,
     });
-    x.store.react(
-      x.room.id,
-      around.messages[0]!.id,
-      "👍",
-      "user",
-      "You",
-      false,
-    );
     const refreshed = (await x.harness.behavior.callRpc("room", {
       id: x.room.id,
       start: around.messages[0]!.id,
       limit: 50,
     })) as ReturnType<Store["transcript"]>;
     assert.deepEqual(refreshed.messages, around.messages);
-    assert.equal(refreshed.reactions.length, 49);
     assert.equal(refreshed.hasNewer, true);
     const other = { ...x.room, id: randomUUID() };
     x.store.putRoom(other);

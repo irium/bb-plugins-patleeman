@@ -1810,67 +1810,6 @@
   box-shadow: 0 4px 12px #0003;
   font-size: var(--text-xs);
 }
-.channel-emoji-picker {
-  width: 352px;
-  max-width: calc(100vw - 16px);
-  height: min(420px, var(--radix-popover-content-available-height, 420px));
-  padding: 0;
-  overflow: hidden;
-}
-.channel-emoji-picker .EmojiPickerReact {
-  --epr-bg-color: var(--popover);
-  --epr-text-color: var(--foreground);
-  --epr-picker-border-color: transparent;
-  --epr-picker-border-radius: calc(var(--radius, 8px) - 2px);
-  --epr-highlight-color: var(--ring);
-  --epr-hover-bg-color: var(--state-hover);
-  --epr-hover-bg-color-reduced-opacity: var(--state-hover);
-  --epr-focus-bg-color: var(--state-active);
-  --epr-horizontal-padding: 8px;
-  --epr-header-padding: 8px var(--epr-horizontal-padding);
-  --epr-search-input-bg-color: var(--background);
-  --epr-search-input-bg-color-active: var(--background);
-  --epr-search-input-text-color: var(--foreground);
-  --epr-search-input-placeholder-color: var(--muted-foreground);
-  --epr-search-border-color: var(--input);
-  --epr-search-border-color-active: var(--ring);
-  --epr-search-input-border-radius: calc(var(--radius, 8px) - 2px);
-  --epr-search-input-height: 32px;
-  --epr-category-label-bg-color: var(--popover);
-  --epr-category-label-text-color: var(--muted-foreground);
-  --epr-category-navigation-button-size: 28px;
-  --epr-category-icon-active-color: var(--foreground);
-  --epr-category-icon-inactive-color: var(--muted-foreground);
-  --epr-emoji-size: 24px;
-  --epr-emoji-padding: 4px;
-  --epr-preview-height: 52px;
-  --epr-preview-text-size: var(--text-xs);
-  --epr-preview-text-color: var(--foreground);
-  --epr-skin-tone-picker-menu-color: var(--popover);
-  --epr-skin-tone-outer-border-color: var(--border);
-  --epr-emoji-variation-picker-bg-color: var(--popover);
-  --epr-emoji-variation-indicator-color: var(--muted-foreground);
-  font-size: var(--text-sm);
-}
-.channel-emoji-picker .EmojiPickerReact * {
-  font-family: inherit;
-}
-.channel-emoji-picker .EmojiPickerReact input {
-  font-size: var(--text-sm);
-}
-.channel-emoji-picker .EmojiPickerReact .epr-emoji-category-label {
-  /* Keep the library's 40px label height: its keyboard search skips hidden
-     category labels using that fallback when finding the first result. */
-  font-size: var(--text-xs);
-  font-weight: 500;
-}
-@media (prefers-reduced-motion: reduce) {
-  .channel-emoji-picker .EmojiPickerReact,
-  .channel-emoji-picker .EmojiPickerReact * {
-    transition: none;
-    scroll-behavior: auto;
-  }
-}
 .channel-stopped {
   display: flex;
   gap: 12px;
@@ -2565,6 +2504,19 @@
   line-height: 1.4;
   overflow: hidden;
 }
+/* In a thread panel tab the rail is the tab's content, not a floating card. */
+.channel-rail.channel-rail-embedded {
+  position: static;
+  width: auto;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  font-size: var(--text-sm);
+  overflow: visible;
+}
 .bot-room-layout {
   position: relative;
 }
@@ -2975,4 +2927,11 @@
 .bot-message-markdown a[href^="/projects/"][href*="/threads/"]:focus-visible {
   background: var(--state-hover, transparent);
   text-decoration: none;
+}
+.channel-thread-header,
+.channel-composer-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }

@@ -17,7 +17,6 @@ const message = (n: number): RoomMessage => ({
 const page = (start: number, end: number): TranscriptPage => ({
   messages: Array.from({ length: end - start }, (_, i) => message(start + i)),
   parents: [],
-  reactions: [],
   hasOlder: start > 0,
   hasNewer: end < 1000,
 });
@@ -42,31 +41,16 @@ test("scrolling through a long transcript keeps a contiguous window in both dire
   assert.equal(window.hasOlder, true);
 });
 
-test("eviction also bounds reply parents and reactions; refreshed pages remove stale reactions", () => {
+test("eviction also bounds reply parents", () => {
   const current = page(100, 250);
   current.messages[0]!.replyTo = "m:1";
   current.messages.at(-1)!.replyTo = "m:2";
   current.parents = [message(1), message(2)];
-  current.reactions = [100, 249].map((n) => ({
-    messageId: `m:${n}`,
-    emoji: "👍",
-    actorId: "user",
-    actorName: "You",
-    createdAt: 1,
-  }));
   const older = extendTranscript(current, page(50, 100), "older");
   assert.deepEqual(
     older.parents.map((m) => m.id),
     ["m:1"],
   );
-  assert.deepEqual(
-    older.reactions.map((r) => r.messageId),
-    ["m:100"],
-  );
   const refreshed = extendTranscript(current, page(200, 250), "newer");
-  assert.deepEqual(
-    refreshed.reactions.map((r) => r.messageId),
-    ["m:100"],
-  );
   assert.equal(new Set(refreshed.messages.map((m) => m.id)).size, 150);
 });

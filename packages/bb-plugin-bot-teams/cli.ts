@@ -18,7 +18,6 @@ import {
   channelAutomationAction,
 } from "./automation-contract";
 import {
-  channelReaction,
   requestStatus,
   creatorMembers,
   authorizeChannel,
@@ -176,18 +175,13 @@ const commands = [
   ["channel read", "Mark current channel messages as read", "<channel>"],
   [
     "channel messages",
-    "Read messages and reactions, newest page first",
+    "Read messages, newest page first",
     "<channel> [--limit N] [--offset N]",
   ],
   [
     "channel send",
-    "Send a message or reply; mentions invite bots",
-    "<channel> [--text TEXT | --file PATH] [--mode auto|steer|followup|fork] [--attach PATH ...] [--attachment ID ...] [--reply-to ID] [--request-id UUID]",
-  ],
-  [
-    "channel react",
-    "Add or remove your emoji reaction",
-    "<channel> <message-id> <emoji> [--remove]",
+    "Send a message; mentions invite bots",
+    "<channel> [--text TEXT | --file PATH] [--mode auto|steer|followup|fork] [--attach PATH ...] [--attachment ID ...] [--request-id UUID]",
   ],
   [
     "channel attach",
@@ -1031,13 +1025,9 @@ export function registerCli(
             [selector] = a.positional(1),
             room = channel(selector!, ctx.threadId);
           const { limit, offset } = a.page(),
-            messages = store.visibleMessages(room.id, limit, offset),
-            ids = new Set(messages.map((m) => m.id));
+            messages = store.visibleMessages(room.id, limit, offset);
           return emit({
             messages,
-            reactions: store
-              .reactions(room.id)
-              .filter((r) => ids.has(r.messageId)),
             offset,
             nextOffset: messages.length === limit ? offset + limit : null,
           });
@@ -1049,7 +1039,6 @@ export function registerCli(
               "text",
               "file",
               "machine",
-              "reply-to",
               "request-id",
               "mime-type",
               "mode",
@@ -1081,7 +1070,6 @@ export function registerCli(
                   text,
                   requestId,
                   attachmentIds,
-                  replyTo: a.text("reply-to"),
                   sendMode: a.text("mode"),
                 }),
                 ctx.threadId,
@@ -1092,22 +1080,6 @@ export function registerCli(
               `${(e as Error).message}\nRequest ID: ${requestId}. Reuse --request-id with identical content to retry safely.`,
             );
           }
-        }
-        if (command === "channel react") {
-          const a = argumentsFor(rest, [], ["remove"]),
-            [selector, messageId, emoji] = a.positional(3),
-            id = channel(selector!, ctx.threadId).id;
-          const input = rpcContract.reaction.input.parse({
-            id,
-            messageId,
-            emoji,
-            active: !a.flag("remove"),
-          });
-          if (ctx.threadId) {
-            channelReaction(store, ctx.threadId, input);
-            bb.realtime.publish("changed", {});
-          } else await call("reaction", input);
-          return emit({ messageId, emoji, active: !a.flag("remove") });
         }
         if (command === "channel attach") {
           const a = argumentsFor(rest, ["machine", "mime-type"]),

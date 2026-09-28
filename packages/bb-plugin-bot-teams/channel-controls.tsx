@@ -2,12 +2,6 @@ import { useState, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import EmojiPicker, {
-  Categories,
-  EmojiStyle,
-  SuggestionMode,
-} from "emoji-picker-react";
-import { emojiCatalog } from "./emoji-catalog";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
 import type { Bot, Room } from "./contract";
 import { channelSlug, matchingChannels } from "./channel-references";
@@ -302,81 +296,5 @@ export function InvitePicker({
         onCreate={onCreate}
       />
     </>
-  );
-}
-const emojiCategories = [
-  { category: Categories.SUGGESTED, name: "Recently Used" },
-  { category: Categories.SMILEYS_PEOPLE, name: "Smileys & People" },
-  { category: Categories.ANIMALS_NATURE, name: "Animals & Nature" },
-  { category: Categories.FOOD_DRINK, name: "Food & Drink" },
-  { category: Categories.TRAVEL_PLACES, name: "Travel & Places" },
-  { category: Categories.ACTIVITIES, name: "Activities" },
-  { category: Categories.OBJECTS, name: "Objects" },
-  { category: Categories.SYMBOLS, name: "Symbols" },
-  { category: Categories.FLAGS, name: "Flags" },
-];
-export function ReactionPicker({
-  onReact,
-  label = "Add reaction",
-  open,
-  onOpenChange,
-  triggerClassName,
-}: {
-  onReact: (emoji: string) => void;
-  label?: string;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  /** Renders a bare trigger with these classes, as in a message action row. */
-  triggerClassName?: string;
-}) {
-  const [internalOpen, setInternalOpen] = useState(false);
-  const visible = open ?? internalOpen;
-  const setVisible = (next: boolean) => {
-    onOpenChange?.(next);
-    if (open === undefined) setInternalOpen(next);
-  };
-  const select = (emoji: string) => {
-    onReact(emoji);
-    setVisible(false);
-  };
-  return (
-    <Menu
-      label="Choose a reaction"
-      open={visible}
-      onOpenChange={setVisible}
-      className="channel-emoji-picker"
-      tooltip={label}
-      trigger={
-        triggerClassName ? (
-          <button type="button" className={triggerClassName} aria-label={label}>
-            <span className="text-[13px] leading-none" aria-hidden>
-              ☺
-            </span>
-          </button>
-        ) : (
-          <Button variant="ghost" size="icon" aria-label={label}>
-            <span className="channel-react-icon" aria-hidden>
-              ☺<sup>+</sup>
-            </span>
-          </Button>
-        )
-      }
-    >
-      <EmojiPicker
-        emojiData={emojiCatalog}
-        categories={emojiCategories}
-        emojiStyle={EmojiStyle.NATIVE}
-        suggestedEmojisMode={SuggestionMode.RECENT}
-        searchPlaceholder="Search emoji…"
-        autoFocusSearch
-        width="100%"
-        height="100%"
-        previewConfig={{
-          defaultCaption: "Choose a reaction",
-          defaultEmoji: "1f44d",
-        }}
-        onEmojiClick={({ emoji }) => select(emoji)}
-      />
-    </Menu>
   );
 }

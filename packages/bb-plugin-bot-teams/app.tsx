@@ -38,6 +38,13 @@ import {
 } from "./channel-handoff";
 import "./styles.css";
 import { botTeamsIcons } from "./icons";
+import {
+  ChannelComposerControls,
+  ChannelDetailsPanel,
+  ChannelHandoffPrefill,
+  ChannelThreadHeader,
+  channelDetailsPanelId,
+} from "./channel-thread-surfaces";
 const tabs = ["profile", "mission", "memory", "activity", "usage"] as const;
 
 function BotDetail({ id, tab }: { id: string; tab: string }) {
@@ -307,6 +314,25 @@ export default definePluginApp((app) => {
             requestChannelHandoff(view.scope.threadId);
         },
       },
+    ],
+  });
+  app.slots.experimental_threadHeaderAction({
+    id: "channel-members",
+    title: "Channel",
+    component: ChannelThreadHeader,
+  });
+  app.slots.threadPanelAction({
+    id: channelDetailsPanelId,
+    title: "Channel details",
+    icon: "ListView",
+    component: ChannelDetailsPanel,
+  });
+  app.composer.customize({
+    id: "channel-thread",
+    scopes: ["thread"],
+    actions: [
+      { id: "channel-controls", component: ChannelComposerControls },
+      { id: "channel-handoff-prefill", component: ChannelHandoffPrefill },
     ],
   });
   app.slots.navPanel({

@@ -15,7 +15,6 @@ import {
   rpcContract,
   profileInput,
   botSchema,
-  emojiSchema,
   responseBehavior,
   type Bot,
   type BotCreateRequest,
@@ -200,7 +199,7 @@ export default async function plugin(bb: BbPluginApi) {
       options: ["smart", "directed", "everyone"],
       default: "smart",
       description:
-        "Smart chooses a coordinator, collaborators, work order, and busy-bot action. Directed responds to mentions and replies. Everyone invites all members.",
+        "Smart chooses a coordinator, collaborators, work order, and busy-bot action. Directed responds to mentions. Everyone invites all members.",
     },
     routingEngine: {
       type: "select",
@@ -738,6 +737,18 @@ export default async function plugin(bb: BbPluginApi) {
       const latest = await document(store.get(id).home, file);
       runtime.data.snapshot(`${id}:${file}`, latest.text, "Observed file");
       return runtime.data.revisions(`${id}:${file}`, before);
+    },
+    linkedChannel: ({ threadId }) => channelThreads.roomForThread(threadId)?.id ?? null,
+    channelSurface: async ({ threadId }) => {
+      const room = channelThreads.roomForThread(threadId);
+      if (!room) return null;
+      return {
+        room: { ...room, threadId },
+        bots: store.all(),
+        jobs: await runtime.roomJobsWithActivity(room.id),
+        runs: store.runs(room.id, 50),
+        approvals: approvals.list(room.id),
+      };
     },
     openChannelThread: async ({ id }) => {
       const room = store.room(id);
@@ -1293,18 +1304,6 @@ export default async function plugin(bb: BbPluginApi) {
         runtime.changed();
         return next;
       }),
-    reaction: ({ id, messageId, emoji, active }) => {
-      const reactions = store.react(
-        id,
-        messageId,
-        emoji,
-        "user",
-        "You",
-        active,
-      );
-      runtime.changed();
-      return reactions;
-    },
     retryRouting: ({ id, requestId }) =>
       runtime.locked(`room:${id}`, async () => {
         runtime.retryRouting(id, requestId);
@@ -1473,33 +1472,6 @@ export default async function plugin(bb: BbPluginApi) {
       return JSON.stringify(await publishImage(context.threadId, path, alt));
     },
   });
-  bb.agents.registerTool({
-    name: "bots_react",
-    description:
-      "Add or remove your emoji reaction to a message in your current channel. Does not wake other bots.",
-    parameters: z.object({
-      messageId: z.string(),
-      emoji: emojiSchema,
-      active: z.boolean().default(true),
-    }),
-    execute({ messageId, emoji, active }, context) {
-      const conversation = store.byThread(context.threadId);
-      const job =
-        conversation &&
-        store
-          .work(conversation.botId)
-          .find((j) => j.threadId === context.threadId && isExecuting(j));
-      if (!conversation || !job?.roomId)
-        throw new Error("Reactions are only available during channel work.");
-      const room = store.room(job.roomId),
-        bot = store.get(conversation.botId);
-      if (room.archived || !room.memberIds.includes(bot.id))
-        throw new Error("This bot is not active in the channel.");
-      store.react(room.id, messageId, emoji, bot.id, bot.name, active);
-      runtime.changed();
-      return JSON.stringify({ ok: true });
-    },
-  });
   // A message typed in a channel thread enters the room like one sent from the
   // channel page, so routing, delegation, and history behave the same.
   bb.agents.registerTool({
@@ -1588,7 +1560,7 @@ export default async function plugin(bb: BbPluginApi) {
       tools: [
         ...channelTools,
         ...(c.kind === "group"
-          ? ["bots_react", "bots_publish_image", "bots_publish_file"]
+          ? ["bots_publish_image", "bots_publish_file"]
           : []),
       ],
       skills: ["bots"],

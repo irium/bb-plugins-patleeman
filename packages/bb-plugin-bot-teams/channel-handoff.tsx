@@ -2,8 +2,7 @@ import { useEffect, useRef } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import type { rpcContract } from "./contract";
-import { emptyDraft } from "./draft";
-import { notifyChannelDraftChanged } from "./channel-draft-state";
+import { saveChannelThreadHandoff } from "./handoff-draft";
 
 const eventName = "bb:bots:handoff-to-channel";
 
@@ -24,21 +23,10 @@ export function ChannelHandoffController() {
       try {
         const source = await rpc.call("handoffSource", { threadId });
         const room = await rpc.call("createRoom", { memberIds: [] });
-        const key = `bb:bots:draft:${room.id}`;
-        try {
-          localStorage.setItem(
-            key,
-            JSON.stringify({
-              ...emptyDraft(),
-              handoffSource: source,
-            }),
-          );
-          notifyChannelDraftChanged(room.id);
-        } catch {
-          await rpc.call("deleteRoom", { id: room.id }).catch(() => {});
-          throw new Error("Could not save the channel handoff draft.");
-        }
-        navigate.toPluginPanel("channels", { subPath: room.id });
+        const channel = await rpc.call("openChannelThread", { id: room.id });
+        // The new channel thread's composer picks this up and pre-fills its draft.
+        saveChannelThreadHandoff(channel.threadId, source);
+        navigate.toThread(channel.threadId);
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : "Could not open a channel.",

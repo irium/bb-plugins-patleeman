@@ -6,10 +6,10 @@ Persistent bots with their own files, mission, and memory, and Slack-style chann
 
 1. Choose **New channel** in the sidebar. Bot Teams creates the channel and opens it as a regular BB thread, with BB's own transcript and composer. Mention a bot with `@handle` in your message to invite it. Opening an existing channel the first time creates its thread and adds one **Earlier in this channel** message with the last 30 messages. See [Channels are threads](#channels-are-threads).
 2. Type `@` to find a bot or choose `@all` / `@channel` to address everyone in the channel. Sending a mention invites that bot into the channel. The picker also includes **Create new bot…**, which opens a new thread with bot setup instructions prefilled. Describe what you need in chat; the agent creates the bot and invites it to this channel. Your channel draft stays saved.
-3. Click the overlapping avatars in the header to see members and their activity. **Add bot** sits at the bottom; member options let you configure or remove a bot.
+3. Click the overlapping avatars in the channel thread's header to see members and their activity. **Add bot** sits at the bottom; member options let you configure or remove a bot. The **Channel details** button beside them opens live work, requests that need you, members, and output in BB's thread panel.
 4. Under **Direct messages**, each row is one private thread with a bot: the bot's avatar, the thread title, and the bot's name in muted text. A bot can have many threads. The list is flat and sorted by recent activity, and new direct threads open on BB's regular thread page and get a title from the first message. Each row's menu starts a new thread with that bot and links to its profile, mission, memory, and activity. Open **Bot Teams** to manage profiles, edit `MISSION.md` and `MEMORY.md`, or inspect activity. The collection uses BB's standard content width, search toolbar, status filter, sorting, and bordered rows. Shared conversations live in Channels. Each bot also has a work thread you can open from its channel activity.
 
-In a thread, choose **Handoff to new channel** from the composer’s **+** menu, or **Start channel from thread** from the thread’s sidebar menu. Bot Teams opens a new channel with a removable source thread chip above the editable message. Add bots and your request, then send it. The sent message keeps the thread reference as a link.
+In a thread, choose **Handoff to new channel** from the composer’s **+** menu, or **Start channel from thread** from the thread’s sidebar menu. Bot Teams opens a new channel thread with the source thread already linked at the top of the draft. Mention bots, add your request, then send it. The sent message keeps the thread reference as a link.
 
 **New bot** in the collection opens the same conversation flow without a channel invitation. Send the prefilled instructions, or add your bot’s purpose first. The agent handles the name, mission, model, and permissions using sensible defaults.
 
@@ -28,8 +28,8 @@ Your channel messages appear in right-aligned bubbles, like regular threads.
 Bot and BB agent messages stay left-aligned with their names and avatars.
 
 Channels open with the latest 50 messages. Scrolling toward either end loads
-another page while preserving your reading position. At most 150 messages and
-their reactions stay mounted; the rest remain available in history. Message
+another page while preserving your reading position. At most 150 messages
+stay mounted; the rest remain available in history. Message
 links and search results load a page around the target directly. **Jump to
 latest** returns from older history, and sending a message brings your new post
 into view.
@@ -43,14 +43,14 @@ ID**. On touch screens, the menu button stays visible; Archive is inside the men
 The **Chat mode** selector beneath the message box has three choices:
 
 - **Smart** chooses one coordinator, records collaborators, and decides whether they work in sequence or in parallel. Mentions are candidates for that decision. Smart also chooses steer, follow-up, or fork for a busy bot. New channels start here.
-- **Directed** calls bots you mention or reply to. A channel with just one eligible bot always routes to that bot, in every chat mode.
+- **Directed** calls bots you mention. A channel with just one eligible bot always routes to that bot, in every chat mode.
 - **Everyone** lets all members consider unaddressed messages, useful for group reviews.
 
 `@handle` and replies to a bot address that bot in Directed mode; in Smart mode they identify candidates. These are channel messages. `@all` and `@channel` request every current member (`@everyone` is also supported). Choosing a mode in the UI or owner CLI remembers it for future channels. Existing channels keep Everyone until changed. Smart helpers return their results through the coordinator, who posts the final answer. A bot can request a teammate’s help with an explicit mention, with up to two further handoffs per message. `[PASS]` produces no public reply unless the bot has published images for that response.
 
 Channels do not need to be started or resumed. A working bot appears at the bottom of the transcript with its latest safe one-line activity and a muted **Stop** control for its current response. Stopping a response leaves the channel open. Each bot has a primary session per channel. Each session handles one task at a time, and the same bot can work in separate channels concurrently. Forks answer separate requests concurrently, with their own activity and Stop controls. Mentions choose the recipient; they do not imply an interruption.
 
-Hover or focus a message on desktop for **React**, **Reply**, **Copy**, and a link to its bot work thread or source thread when available. Right-click, use Shift+F10, or long-press to open the unified message menu with **Reply**, **Add selected text to chat**, **Emoji**, **Copy**, and that same link. The full emoji picker supports text search, category browsing, skin tones, recently used emoji, and keyboard selection. It uses [Emoji Picker React](https://github.com/ealush/emoji-picker-react) with native emoji and BB’s theme colors. Emoji reactions persist, show who reacted, and toggle when clicked. Bots can use `bots_react` to acknowledge a message without writing another response. Reactions do not start more work. Replies link back to their original message.
+Channel messages have no reactions and no replies to a specific message. Mention a bot with `@handle` to address it.
 
 Bots receive standing guidance to write brief, conversational replies, use Markdown when it improves scanning, avoid dense walls of text and assistant boilerplate, and stay silent when they have nothing useful to add. Channel messages use BB’s native Markdown renderer, including short paragraphs, bullets, numbered steps, inline code, fenced code blocks, and links. They can react sparingly for acknowledgment (👍), completed or verified work (✅), or celebration (🎉). Questions and assignments addressed to a bot in the channel still need an answer, action, or blocker.
 
@@ -82,7 +82,7 @@ Each channel is a hidden BB thread on the **Channel** provider, so it looks and 
 - **Messages from elsewhere**, such as `bb bots channel send`, automations, or the older channel page, also appear in the thread, marked as sent outside it.
 - Renaming a channel renames its thread. Deleting a channel deletes its thread. If the thread is deleted on its own, opening the channel creates a new one.
 
-Not yet in the thread view: reactions, replying to a specific message, the channel rail, and the Chat mode and permission pickers. They remain on the older channel page at `/plugins/bot-teams/channels/<id>` for now, as does **Handoff to new channel**.
+The **Chat mode** (Smart, Directed, Everyone) and **Bot permissions** pickers sit beside the thread's composer; they hide when the composer is in its narrow one-line layout. The member list is in the thread header, and the channel rail opens as a **Channel details** tab in the thread panel. The older channel page at `/plugins/bot-teams/channels/<id>` still exists for search, message links, and editing past messages.
 
 ## Channel workspace
 
@@ -183,8 +183,7 @@ visible; choosing **Auto** in either control returns the message to the
 classifier, and sending clears it. Smart still decides whether multiple mentioned bots work together or in parallel; the explicit mode controls the busy-session action.
 
 A fork’s answer appears in the channel, linked to the question and labeled
-**Fork**. Reply to that answer to continue the same fork. Ordinary channel
-messages continue the primary session. The primary picks up public fork answers
+**Fork**. Ordinary channel messages continue the primary session. The primary picks up public fork answers
 through later channel context; private provider histories are not merged.
 
 Forks require an existing session and a provider that supports native forks.
@@ -259,16 +258,16 @@ Each bot lives at `<BB data directory>/plugins/bot-teams/homes/<bot-id>/`:
 - `AGENTS.md`: workspace instructions.
 - `files/`: working files.
 
-**Profile → Workspace** shows the exact path. Document saves detect stale editor versions. Profiles, channel history, reactions, membership, work, and draft uploads live in the plugin’s SQLite database. Sent attachments use BB’s project attachment storage. Back up `plugins/bot-teams` along with BB’s conversation and attachment storage. Migrated installations also retain `plugins/bots/homes`; the new homes path links to it so saved workspace paths stay valid.
+**Profile → Workspace** shows the exact path. Document saves detect stale editor versions. Profiles, channel history, membership, work, and draft uploads live in the plugin’s SQLite database. Sent attachments use BB’s project attachment storage. Back up `plugins/bot-teams` along with BB’s conversation and attachment storage. Migrated installations also retain `plugins/bots/homes`; the new homes path links to it so saved workspace paths stay valid.
 
 Each bot has a hidden BB work thread for each channel. Channel tasks run in that thread, but requests and answers belong in the channel. The first turn receives bounded channel history and saved context. Later turns receive the new request and channel messages since the previous channel snapshot. When that gap exceeds the prompt budget, the bot gets exact start and end message IDs and can read the omitted range forward in pages. Previously delivered files are not attached again. Forks have separate work threads and reply histories. **Open work thread** shows the native execution record with its messages, tools, approvals, and failures. Typing a direct request there is rejected with a link to its channel. Existing group conversations appear as Channels without losing history; old group links redirect to their channel. Existing work sessions remain stored and accessible through BB. The Bot Teams page holds bot configuration; direct chats live below Channels in the sidebar.
 
-Channels initially load 200 messages. **Load earlier messages** pages through the retained transcript. **Search channel** searches all stored message text and names; selecting a result or an older reply reference loads and focuses its message. This is a single-owner local feature. Bots use BB’s configured providers, credentials, tools, and skills on the primary machine. Separate directories provide persistent storage, not separate accounts. Shared `MEMORY.md` should contain only information appropriate for every channel the bot joins.
+Channels initially load 200 messages. **Load earlier messages** pages through the retained transcript. **Search channel** searches all stored message text and names; selecting a result loads and focuses its message. This is a single-owner local feature. Bots use BB’s configured providers, credentials, tools, and skills on the primary machine. Separate directories provide persistent storage, not separate accounts. Shared `MEMORY.md` should contain only information appropriate for every channel the bot joins.
 
 ## CLI
 
 The `bb bots` CLI covers profiles, mission and memory, channel membership and
-settings, messages and replies, emoji reactions, attachments, transcription,
+settings, messages, attachments, transcription,
 activity, and stopping individual responses. It uses the same operations and
 validation as the UI.
 
@@ -304,10 +303,10 @@ and command metadata directly.
 ## Agent consultations
 
 Channels replace the Council plugin. Any BB agent can discover advisors, create a
-channel, invite bots, post a brief, collect replies and failures, ask follow-ups,
-and react through native tools: `bots_channels`, `bots_channel_create`,
+channel, invite bots, post a brief, collect replies and failures, and ask follow-ups
+through native tools: `bots_channels`, `bots_channel_create`,
 `bots_channel_invite`, `bots_channel_send`, `bots_channel_read`,
-`bots_channel_request`, `bots_channel_react`, `bots_channel_behavior`, and `bots_channel_retry_routing`. Channel bots also receive `bots_react`, `bots_publish_image`, and `bots_publish_file`. The bundled skill teaches this
+`bots_channel_request`, `bots_channel_behavior`, and `bots_channel_retry_routing`. Channel bots also receive `bots_publish_image` and `bots_publish_file`. The bundled skill teaches this
 workflow, including requests to “ask the council.”
 
 Messages sent from BB threads show the calling bot or **BB agent**, with a link
@@ -437,13 +436,10 @@ agreements and next steps in the Markdown editor.
 
 ![Bot Markdown editor in BB](assets/bot-markdown-editor.jpg)
 
-The running BB application with Atlas and Scribe in **Launch room**, including real readiness replies and answers about a shared brief. The capture verifies the clickable channel title at the left of the header, sidebar Channels, bot identities, the shared file, reactions, the avatar member menu, and BB-style composer controls.
+The running BB application with Atlas and Scribe in **Launch room**, including real readiness replies and answers about a shared brief. The capture verifies the clickable channel title at the left of the header, sidebar Channels, bot identities, the shared file, the avatar member menu, and BB-style composer controls.
 
 ![Channels and the member menu in the running BB application](assets/staged-preview.png)
 
-The full reaction picker, captured after verifying category coverage and keyboard search for an emoji outside the old palette.
-
-![Full searchable emoji picker in BB](assets/emoji-picker.png)
 
 ```sh
 BB_CAPTURE_ONLY=bots,bots-emoji,bots-collection,bots-profile,bots-memory \

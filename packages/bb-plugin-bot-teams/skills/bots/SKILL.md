@@ -43,8 +43,7 @@ rounds, voting tools, or automatic majority verdicts.
    work as agreement. Ask a focused follow-up, or ask `@grug` to summarize when
    that advisor is present. Attribute claims; verify important findings yourself.
 
-`bots_channel_invite` adds another bot without waking it. `bots_channel_react`
-adds an identity-bound reaction without requesting replies. Use CLI for files,
+`bots_channel_invite` adds another bot without waking it. Use CLI for files,
 profile administration, archive, deletion, and per-response stop/retry.
 
 For a material checkpoint or blocker during long work, use
@@ -134,7 +133,7 @@ bb bots channel invite 'Release planning' @atlas
 bb bots channel members 'Release planning' --json
 bb bots channel remove 'Release planning' @atlas
 bb bots channel send 'Release planning' --text '@atlas Check this claim.' --request-id UUID --json
-bb bots channel send 'Release planning' --file ./question.md --reply-to MESSAGE_ID --json
+bb bots channel send 'Release planning' --file ./question.md --json
 bb bots channel messages 'Release planning' --limit 20 --offset 0 --json
 bb bots channel react 'Release planning' MESSAGE_ID '✅'
 bb bots channel react 'Release planning' MESSAGE_ID '✅' --remove
@@ -147,16 +146,14 @@ Channels work without run or pause controls. Bots post independently as they
 finish. Explicit bot handoffs are limited to two further hops.
 
 `send` returns the message, including its ID. For safe retries, supply a UUID
-using `--request-id` and reuse it with identical text, attachments, and reply
-target. If a submitted request fails, its error includes the ID. Do not retry
-uncertain sends with a new ID. CLI calls inside BB threads are attributed to the calling agent or bot. Native tools bind identity the same way; outside a thread, CLI sends and reactions belong to the owner.
+using `--request-id` and reuse it with identical text and attachments. If a submitted request fails, its error includes the ID. Do not retry
+uncertain sends with a new ID. CLI calls inside BB threads are attributed to the calling agent or bot. Native tools bind identity the same way; outside a thread, CLI sends belong to the owner.
 
 Use `--mode fork` on `channel send` or `sendMode: "fork"` on
 `bots_channel_send` to answer separately while primary work continues. `/fork`
 also works at the start of the text. `steer` changes active work; `followup`
 queues behind it; `auto` lets Smart routing decide. Explicit modes override
-the busy-bot action. In Smart channels, mentions become candidates for a coordinator or collaborator; in Directed channels they select recipients. Reply to a fork’s
-answer to continue that fork. An ordinary message targets the primary session.
+the busy-bot action. In Smart channels, mentions become candidates for a coordinator or collaborator; in Directed channels they select recipients. An ordinary message targets the primary session.
 Forks share workspace files and must leave shared MEMORY.md updates to the
 primary; include durable findings in the answer. Native fork support and an
 existing session are required. Two forks per bot run concurrently; more wait.
@@ -166,7 +163,7 @@ send. Each fork has its own Activity and Stop control.
 Channel actions: `pin`, `unpin`, `archive`, `restore`, and `read`, each followed
 by a channel selector. Archive cancels unfinished work and keeps history.
 `bb bots channel delete <channel> --yes` permanently removes a channel and
-its messages, reactions, membership, activity, and draft uploads after stopping
+its messages, membership, activity, and draft uploads after stopping
 unfinished responses. The UI offers the same action in the sidebar context
 menu and channel options, with a confirmation dialog. Bot profiles and workspaces
 are preserved; existing bot work threads and sent project files remain
@@ -259,7 +256,7 @@ bb bots stop JOB_ID --json
 Activity includes response IDs, status, errors, and BB thread IDs for bot work threads. Stop
 targets that specific response, leaves the channel open, and is idempotent.
 Use `bb thread show THREAD_ID` to inspect the bot work thread when needed.
-History, reactions, work, and bot files survive restarts. CLI output is bounded;
+History, work, and bot files survive restarts. CLI output is bounded;
 reduce `--limit` for large message or activity pages.
 
 Unknown commands, invalid flags, and ambiguous selectors fail with a nonzero
@@ -304,9 +301,7 @@ available through `bb plugin config bot-teams`. They use existing BB provider cr
 Write like a teammate in chat: usually one to three sentences, no default headings,
 assistant introductions, repeated summaries, or filler. Expand only when useful or
 requested. Stay silent with exactly `[PASS]` when nothing useful remains to add.
-Use `bots_react` sparingly: 👍 acknowledges, ✅ means completed or verified, 🎉
-celebrates. A playful reaction can fit the moment; don't react to everything or
-pile on. Don't repeat an acknowledgment in text. Answer questions and
+Answer questions and
 assignments with information, action, or an honest blocker.
 
 ## Inline images

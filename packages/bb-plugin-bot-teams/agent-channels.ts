@@ -100,25 +100,6 @@ export function creatorMembers(
   return result;
 }
 
-export function channelReaction(
-  store: Store,
-  threadId: string,
-  input: z.output<typeof rpcContract.reaction.input>,
-) {
-  const author = agentAuthor(store, threadId);
-  const room = store.room(input.id);
-  if (room.archived || (author.botId && !room.memberIds.includes(author.botId)))
-    throw new Error("Join an active channel before reacting.");
-  return store.react(
-    input.id,
-    input.messageId,
-    input.emoji,
-    author.botId ?? `thread:${threadId}`,
-    author.speaker,
-    input.active,
-  );
-}
-
 export function requestStatus(
   store: Store,
   roomId: string,
@@ -276,13 +257,13 @@ export function registerChannelTools(
   );
   tool(
     "bots_channel_send",
-    "Post to a channel as the calling agent. In Smart mode, @handle or a reply supplies routing candidates; in Directed mode it targets a bot. @all or @channel requests every member. A coordinator posts the final answer for Smart team work. Channel work answers post automatically; do not duplicate them with this tool. Returns a request ID; use bots_channel_request to collect replies. Reuse requestId on retries.",
-    rpcContract.send.input,
-    (input, threadId) => send(input, threadId),
+    "Post to a channel as the calling agent. In Smart mode, @handle supplies routing candidates; in Directed mode it targets a bot. @all or @channel requests every member. A coordinator posts the final answer for Smart team work. Channel work answers post automatically; do not duplicate them with this tool. Returns a request ID; use bots_channel_request to collect replies. Reuse requestId on retries.",
+    rpcContract.send.input.omit({ replyTo: true }),
+    (input, threadId) => send({ ...input, replyTo: null }, threadId),
   );
   tool(
     "bots_channel_behavior",
-    "Set a channel's response behavior. Smart chooses a coordinator, collaborators, serialized or parallel work, and busy-bot actions. Directed uses literal mentions and replies. Everyone invites all members. @all and @channel always request all bots.",
+    "Set a channel's response behavior. Smart chooses a coordinator, collaborators, serialized or parallel work, and busy-bot actions. Directed uses literal mentions. Everyone invites all members. @all and @channel always request all bots.",
     z.object({
       id: z.string().uuid(),
       responseBehavior: z.enum(["smart", "directed", "everyone"]),
@@ -299,16 +280,6 @@ export function registerChannelTools(
     (input, threadId) => {
       authorizeChannel(store, threadId, input.id);
       return handlers.retryRouting(input);
-    },
-  );
-  tool(
-    "bots_channel_react",
-    "Add or remove your emoji reaction to a channel message without requesting replies. Identity is bound to the calling agent.",
-    rpcContract.reaction.input,
-    (input, threadId) => {
-      const reactions = channelReaction(store, threadId, input);
-      bb.realtime.publish("changed", {});
-      return reactions;
     },
   );
   tool(

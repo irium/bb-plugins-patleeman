@@ -243,28 +243,6 @@ export const jobSchema = z.object({
   outputAttachments: z.array(attachmentSchema).default([]),
 });
 export type Job = z.infer<typeof jobSchema>;
-export const emojiSchema = z
-  .string()
-  .min(1)
-  .max(32)
-  .refine(
-    (value) =>
-      Array.from(
-        new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(
-          value,
-        ),
-      ).length === 1 &&
-      /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20e3/u.test(value),
-    "Choose one emoji.",
-  );
-export const reactionSchema = z.object({
-  messageId: z.string(),
-  emoji: emojiSchema,
-  actorId: z.string(),
-  actorName: z.string(),
-  createdAt: z.number(),
-});
-export type Reaction = z.infer<typeof reactionSchema>;
 export const responseBehavior = z.enum(["smart", "directed", "everyone"]);
 export const roomSchema = z.object({
   limits: usageLimits.optional(),
@@ -416,7 +394,6 @@ export type RoomRun = z.infer<typeof runSchema>;
 const transcriptPageSchema = z.object({
   messages: z.array(messageSchema),
   parents: z.array(messageSchema),
-  reactions: z.array(reactionSchema),
   hasOlder: z.boolean(),
   hasNewer: z.boolean(),
 });
@@ -463,6 +440,24 @@ export const rpcContract = defineRpcContract({
       before: z.number().optional(),
     }),
     output: z.array(revisionSchema),
+  },
+  /** The channel a channel thread belongs to; null for every other thread. */
+  linkedChannel: {
+    input: z.object({ threadId: z.string() }),
+    output: z.string().nullable(),
+  },
+  /** Everything the channel thread's header, composer, and panel show; null for other threads. */
+  channelSurface: {
+    input: z.object({ threadId: z.string() }),
+    output: z
+      .object({
+        room: roomSchema,
+        bots: z.array(botSchema),
+        jobs: z.array(jobSchema),
+        runs: z.array(runSchema),
+        approvals: z.array(approvalSchema),
+      })
+      .nullable(),
   },
   /** The channel's own BB thread, created on first open. */
   openChannelThread: {
@@ -759,15 +754,6 @@ export const rpcContract = defineRpcContract({
       permissionMode: permissionModeSchema.nullable().optional(),
     }),
     output: roomSchema,
-  },
-  reaction: {
-    input: z.object({
-      id: z.string().uuid(),
-      messageId: z.string(),
-      emoji: emojiSchema,
-      active: z.boolean(),
-    }),
-    output: z.array(reactionSchema),
   },
   retryRouting: {
     input: z.object({ id: z.string().uuid(), requestId: z.string().uuid() }),

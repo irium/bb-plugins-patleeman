@@ -700,21 +700,7 @@ test("CLI messages, replies, retries, reactions, and history pages share UI rule
       ).exitCode,
       0,
     );
-    const second = messageSchema.parse(
-      await x.ok([
-        "channel",
-        "send",
-        "Notes",
-        "--text",
-        "Second",
-        "--reply-to",
-        first.id,
-      ]),
-    );
-    assert.equal(second.replyTo, first.id);
-    await x.ok(["channel", "react", "Notes", first.id, "✅"]);
-    await x.ok(["channel", "react", "Notes", first.id, "✅"]);
-    assert.equal(x.store.reactions(room.id).length, 1);
+    await x.ok(["channel", "send", "Notes", "--text", "Second"]);
     const older = (await x.ok([
       "channel",
       "messages",
@@ -723,34 +709,18 @@ test("CLI messages, replies, retries, reactions, and history pages share UI rule
       "1",
       "--offset",
       "1",
-    ])) as { messages: unknown[]; reactions: unknown[] };
+    ])) as { messages: unknown[] };
     assert.equal(messageSchema.parse(older.messages[0]).text, "First");
-    assert.equal(older.reactions.length, 1);
-    await x.ok(["channel", "react", "Notes", first.id, "✅", "--remove"]);
-    assert.equal(x.store.reactions(room.id).length, 0);
+    // Reactions and replies to a specific message were removed.
+    assert.notEqual((await x.run(["channel", "react", "Notes", "x", "✅"])).exitCode, 0);
+    assert.notEqual(
+      (await x.run(["channel", "send", "Notes", "--text", "Reply", "--reply-to", "x"])).exitCode,
+      0,
+    );
     await x.ok(["channel", "read", "Notes"]);
     assert.equal(
       x.store.room(room.id).lastReadAt,
       x.store.room(room.id).updatedAt,
-    );
-    const other = roomSchema.parse(await x.ok(["channel", "create", "Other"]));
-    assert.notEqual(
-      (await x.run(["channel", "react", other.id, first.id, "👍"])).exitCode,
-      0,
-    );
-    assert.notEqual(
-      (
-        await x.run([
-          "channel",
-          "send",
-          other.id,
-          "--text",
-          "Wrong reply",
-          "--reply-to",
-          first.id,
-        ])
-      ).exitCode,
-      0,
     );
     const b = await x.create();
     await x.ok(["channel", "send", "Notes", "--text", "@atlas please review"]);

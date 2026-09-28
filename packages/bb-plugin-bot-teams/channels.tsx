@@ -74,6 +74,7 @@ import { ChannelApprovalDeck } from "./channel-approvals";
 import { ChannelSearch } from "./channel-search";
 import { ChannelAttentionBanner, MessageAttention } from "./attention-view";
 import { ChannelSidebarRow } from "./channel-sidebar-row";
+import { ChannelMembersMenu } from "./channel-members";
 import { DirectSidebarThread } from "./direct-sidebar-row";
 import { ChannelHeaderStatus } from "./channel-status-view";
 import {
@@ -119,8 +120,6 @@ import {
   IconActionTooltip,
   Menu,
   Modal,
-  InvitePicker,
-  ReactionPicker,
 } from "./channel-controls";
 import { isForkConversation, type SendMode } from "./send-mode";
 import { linkifyMentions, mentionBotId } from "./mentions";
@@ -305,35 +304,17 @@ function MessageActionButtons({
   message,
   job,
   copied,
-  onReact,
-  onReply,
   onCopy,
   onView,
 }: {
   message: RoomMessage;
   job?: Job;
   copied: string | null;
-  onReact: (emoji: string) => void;
-  onReply: () => void;
   onCopy: () => void;
   onView: () => void;
 }) {
   return (
     <>
-      <ReactionPicker
-        label={`Add reaction to ${message.speaker}'s message`}
-        onReact={onReact}
-      />
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={`Reply to ${message.speaker}`}
-        onClick={onReply}
-      >
-        <IconActionTooltip label="Reply">
-          <Icon name="CornerDownRight" />
-        </IconActionTooltip>
-      </Button>
       <Button
         variant="ghost"
         size="icon"
@@ -366,9 +347,7 @@ function MessageContextActions({
   hasWork,
   onFork,
   selectedText,
-  onReply,
   onAddSelected,
-  onEmoji,
   onCopy,
   onView,
   viewLabel,
@@ -378,19 +357,13 @@ function MessageContextActions({
   hasWork: boolean;
   onFork?: () => void;
   selectedText: string;
-  onReply: () => void;
   onAddSelected: () => void;
-  onEmoji: () => void;
   onCopy: () => void;
   onView: () => void;
   viewLabel: string;
 }) {
   return (
     <>
-      <ContextMenuItem onSelect={onReply}>
-        <Icon name="CornerDownRight" />
-        Reply
-      </ContextMenuItem>
       {onFork && (
         <ContextMenuItem onSelect={onFork}>
           <Icon name="Fork" />
@@ -403,10 +376,6 @@ function MessageContextActions({
           Add selected text to chat
         </ContextMenuItem>
       )}
-      <ContextMenuItem onSelect={onEmoji}>
-        <Icon name="Plus" />
-        Emoji…
-      </ContextMenuItem>
       <ContextMenuItem onSelect={onCopy}>
         <Icon name="Copy" />
         Copy
@@ -1268,16 +1237,6 @@ function RenameChannel({ room, onClose }: { room: Room; onClose: () => void }) {
     </Modal>
   );
 }
-function stateFor(bot: Bot, data: ChannelData) {
-  const job = channelWork(data.jobs).find((j) => j.botId === bot.id);
-  return job?.status === "running" && job.startedAt
-    ? "Working"
-    : job
-      ? "Waiting"
-      : bot.error
-        ? "Needs attention"
-        : "Idle";
-}
 // BB owns tab selection, persistence, resizing, splits, and the compact drawer.
 export const channelWorkbenchTabs: PluginFixedTabRegistration[] = (
   ["activity", "automations", "usage"] as const
@@ -1359,14 +1318,11 @@ function ChannelHeader({ subPath }: PluginNavPanelProps) {
   const id = channelId(subPath),
     { data, error, load } = useChannel(id, false),
     { bots, roomThreads, roomWork, activeRoomIds, attentionCounts, approvalCounts } = useRoster(true);
-  const rpc = useRpc<typeof rpcContract>(),
-    navigate = useBbNavigate();
+  const rpc = useRpc<typeof rpcContract>();
   const [searchOpen, setSearchOpen] = useState(false);
   const rail = useChannelRail();
   const [optionsOpen, setOptionsOpen] = useState(false);
-  const [membersOpen, setMembersOpen] = useState(false),
-    [inviteOpen, setInviteOpen] = useState(false),
-    [deleteOpen, setDeleteOpen] = useState(false),
+  const [deleteOpen, setDeleteOpen] = useState(false),
     [settingsOpen, setSettingsOpen] = useState(false);
   const [failure, setFailure] = useState<string | null>(null),
     [pending, setPending] = useState(false);
@@ -1381,16 +1337,13 @@ function ChannelHeader({ subPath }: PluginNavPanelProps) {
     );
   }, []);
   useEffect(() => {
-    setMembersOpen(false);
-    setInviteOpen(false);
     setOptionsOpen(false);
     setDeleteOpen(false);
     setSettingsOpen(false);
     setFailure(null);
   }, [id]);
   if (!data) return error ? <span role="alert">{error}</span> : null;
-  const { room } = data,
-    members = bots.filter((b) => room.memberIds.includes(b.id));
+  const { room } = data;
   const act = async (fn: () => Promise<unknown>) => {
     setPending(true);
     setFailure(null);
@@ -1403,15 +1356,6 @@ function ChannelHeader({ subPath }: PluginNavPanelProps) {
       setPending(false);
     }
   };
-  const removeBot = (botId: string) =>
-    void act(async () => {
-      await rpc.call("member", {
-        id: room.id,
-        botId,
-        present: false,
-      });
-      setMembersOpen(false);
-    });
   const heading = (
     <div className="channel-heading">
       <span
@@ -1462,120 +1406,7 @@ function ChannelHeader({ subPath }: PluginNavPanelProps) {
   return (
     <div className="channel-header" ref={attachHeader}>
       {titleHost ? createPortal(heading, titleHost) : heading}
-      <Menu
-        label="Channel members"
-        open={membersOpen}
-        onOpenChange={setMembersOpen}
-        trigger={
-          <Button
-            variant="ghost"
-            className="channel-avatar-stack"
-            aria-label={`Channel members: ${members.length} ${members.length === 1 ? "bot" : "bots"}`}
-          >
-            {members.length ? (
-              members.slice(0, 4).map((b) => (
-                <span
-                  className="channel-avatar"
-                  key={b.id}
-                  title={`${b.name}: ${stateFor(b, data)}`}
-                >
-                  {b.avatar}
-                  <i
-                    className={`bot-presence-dot state-${stateFor(b, data).toLowerCase().replaceAll(" ", "-")}`}
-                  />
-                </span>
-              ))
-            ) : (
-              <Icon name="UserRoundPlus" />
-            )}
-            {members.length > 4 && (
-              <span className="channel-avatar channel-overflow">
-                +{members.length - 4}
-              </span>
-            )}
-            <span className="channel-member-summary" aria-hidden>
-              <Icon name="Bot" />
-              {members.length}
-            </span>
-          </Button>
-        }
-      >
-        <div className="channel-member-list">
-          {members.map((b) => (
-            <div className="channel-member-row" key={b.id}>
-              <span className="channel-avatar" aria-hidden>
-                {b.avatar}
-              </span>
-              <span className="channel-bot-name">
-                {b.name}
-                <small>@{b.handle}</small>
-              </span>
-              <small>
-                <i
-                  className={`bot-presence-dot state-${stateFor(b, data).toLowerCase()}`}
-                />{" "}
-                {stateFor(b, data)}
-              </small>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="channel-member-remove text-destructive"
-                aria-label={`Remove ${b.name} from channel`}
-                disabled={pending || !!room.archived}
-                onClick={() => removeBot(b.id)}
-              >
-                <Icon name="X" />
-              </Button>
-              <Menu
-                label={`${b.name} options`}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`${b.name} options`}
-                  >
-                    <Icon name="MoreHorizontal" />
-                  </Button>
-                }
-              >
-                <button
-                  className="channel-menu-row"
-                  onClick={() =>
-                    navigate.toPluginPanel("bots", {
-                      subPath: `${b.id}/profile`,
-                    })
-                  }
-                >
-                  Configure bot
-                </button>
-
-                <button
-                  className="channel-menu-row"
-                  disabled={pending || !!room.archived}
-                  onClick={() => removeBot(b.id)}
-                >
-                  Remove from channel
-                </button>
-              </Menu>
-            </div>
-          ))}
-        </div>
-        {!members.length && (
-          <p className="channel-menu-label">No bots in this channel yet.</p>
-        )}
-        <button
-          className="channel-menu-row channel-menu-footer"
-          disabled={!!room.archived}
-          onClick={() => {
-            setMembersOpen(false);
-            setInviteOpen(true);
-          }}
-        >
-          <Icon name="Plus" />
-          Add bot
-        </button>
-        <ErrorMessage error={failure} />
-      </Menu>
+      <ChannelMembersMenu room={room} bots={bots} jobs={data.jobs} onChanged={load} />
       <Button
         variant="ghost"
         size="icon"
@@ -1657,27 +1488,6 @@ function ChannelHeader({ subPath }: PluginNavPanelProps) {
         </button>
         <ErrorMessage error={failure} />
       </Menu>
-      <Modal title="Add a bot" open={inviteOpen} onOpenChange={setInviteOpen}>
-        <InvitePicker
-          bots={bots}
-          memberIds={room.memberIds}
-          onSelect={(b) =>
-            void act(async () => {
-              await rpc.call("member", {
-                id: room.id,
-                botId: b.id,
-                present: true,
-              });
-              setInviteOpen(false);
-            })
-          }
-          onCreate={() => {
-            setInviteOpen(false);
-            navigate.toPluginPanel("bots", { subPath: `new/${room.id}` });
-          }}
-        />
-        <ErrorMessage error={failure} />
-      </Modal>
       {settingsOpen && (
         <RenameChannel
           key={room.id}
@@ -2012,22 +1822,7 @@ function ChannelChat({ id, messageId, replyToMessage }: { id: string; messageId?
         {!error && <p role="status">Loading channel…</p>}
       </div>
     );
-  const { room, messages, reactions, jobs } = data;
-  const react = async (m: RoomMessage, emoji: string) => {
-    try {
-      await rpc.call("reaction", {
-        id,
-        messageId: m.id,
-        emoji,
-        active: !reactions.some(
-          (r) =>
-            r.messageId === m.id && r.emoji === emoji && r.actorId === "user",
-        ),
-      });
-    } catch (e) {
-      setFailure(message(e));
-    }
-  };
+  const { room, messages, jobs } = data;
   const copy = async (m: RoomMessage) => {
     try {
       await navigator.clipboard.writeText(m.text);
@@ -2194,13 +1989,6 @@ function ChannelChat({ id, messageId, replyToMessage }: { id: string; messageId?
                 m.classifierPlan,
                 m.sendMode,
               );
-              const grouped = [
-                ...new Set(
-                  reactions
-                    .filter((r) => r.messageId === m.id)
-                    .map((r) => r.emoji),
-                ),
-              ];
               if (m.system === "bot_joined" || m.system === "bot_timeout" || m.system === "bot_dm") {
                 const timedOut = m.system === "bot_timeout";
                 const directMessage = m.system === "bot_dm";
@@ -2238,11 +2026,6 @@ function ChannelChat({ id, messageId, replyToMessage }: { id: string; messageId?
                   </div>
                 );
               }
-              const replyToMessage = () => {
-                setReply(m);
-                if (bot)
-                  setInsertion({ text: `@${bot.handle} `, nonce: Date.now() });
-              };
               const workThreadId = job?.threadId ?? m.sourceThreadId;
               const workLabel =
                 job?.threadId || m.botId ? "Open work thread" : "Open source thread";
@@ -2306,64 +2089,11 @@ function ChannelChat({ id, messageId, replyToMessage }: { id: string; messageId?
                   )}
                 />
               );
-              const reactionRow = grouped.length ? (
-                <div
-                  className={cn(
-                    "channel-reactions mt-1.5 flex flex-wrap gap-1",
-                    isUser && "justify-end",
-                  )}
-                >
-                  {grouped.map((emoji) => {
-                    const people = reactions.filter(
-                        (r) => r.messageId === m.id && r.emoji === emoji,
-                      ),
-                      mine = people.some((r) => r.actorId === "user");
-                    return (
-                      <button
-                        key={emoji}
-                        type="button"
-                        aria-label={`${emoji}: ${people.map((r) => r.actorName).join(", ")}`}
-                        title={people.map((r) => r.actorName).join(", ")}
-                        aria-pressed={mine}
-                        className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-full border border-border bg-surface-recessed px-2 text-sm leading-none hover:bg-state-hover aria-pressed:border-surface-selected-border aria-pressed:bg-state-active"
-                        onClick={() => void react(m, emoji)}
-                      >
-                        {emoji}
-                        <span className="text-xs text-muted-foreground">
-                          {people.length}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  <ReactionPicker
-                    label={`Add reaction to ${m.speaker}'s message`}
-                    onReact={(emoji) => void react(m, emoji)}
-                    triggerClassName="inline-flex h-6 cursor-pointer items-center rounded-full border border-dashed border-border px-2 text-muted-foreground hover:bg-state-hover hover:text-foreground"
-                  />
-                </div>
-              ) : null;
               const actionBar = (
                 <MessageActionBar
                   alignment={isUser ? "end" : "start"}
                   className="bot-message-actions"
-                  leading={
-                    <ReactionPicker
-                      label={`Add reaction to ${m.speaker}'s message`}
-                      onReact={(emoji) => void react(m, emoji)}
-                      triggerClassName={cn(
-                        ACTION_BUTTON_CLASS,
-                        HOVER_REVEAL_CLASS,
-                        "max-md:pointer-coarse:hidden",
-                      )}
-                    />
-                  }
                   actions={[
-                    {
-                      key: "reply",
-                      label: `Reply to ${m.speaker}`,
-                      icon: "CornerDownRight",
-                      onSelect: replyToMessage,
-                    },
                     {
                       key: "copy",
                       label:
@@ -2532,7 +2262,6 @@ function ChannelChat({ id, messageId, replyToMessage }: { id: string; messageId?
                                       onImageLoad={followImage}
                                     />
                                   </div>
-                                  {reactionRow}
                                   {actionBar}
                                 </div>
                               </div>
@@ -2593,7 +2322,6 @@ function ChannelChat({ id, messageId, replyToMessage }: { id: string; messageId?
                                     onImageLoad={followImage}
                                   />
                                 </div>
-                                {reactionRow}
                                 {actionBar}
                               </div>
                             )}
@@ -2650,19 +2378,6 @@ function ChannelChat({ id, messageId, replyToMessage }: { id: string; messageId?
                                 message={m}
                                 job={job}
                                 copied={copied}
-                                onReact={(emoji) => {
-                                  setMobileActionsMessage(null);
-                                  void react(m, emoji);
-                                }}
-                                onReply={() => {
-                                  setMobileActionsMessage(null);
-                                  setReply(m);
-                                  if (bot)
-                                    setInsertion({
-                                      text: `@${bot.handle} `,
-                                      nonce: Date.now(),
-                                    });
-                                }}
                                 onCopy={() => {
                                   setMobileActionsMessage(null);
                                   void copy(m);
@@ -2709,14 +2424,6 @@ function ChannelChat({ id, messageId, replyToMessage }: { id: string; messageId?
                             : undefined
                         }
                         selectedText={contextSelection}
-                        onReply={() => {
-                          setReply(m);
-                          if (bot)
-                            setInsertion({
-                              text: `@${bot.handle} `,
-                              nonce: Date.now(),
-                            });
-                        }}
                         onAddSelected={() => {
                           if (contextSelection)
                             setInsertion({
@@ -2728,10 +2435,6 @@ function ChannelChat({ id, messageId, replyToMessage }: { id: string; messageId?
                               nonce: Date.now(),
                               block: true,
                             });
-                        }}
-                        onEmoji={() => {
-                          mobileActionsOpenedByKeyboard.current = false;
-                          setMobileActionsMessage(m.id);
                         }}
                         onCopy={() => void copy(m)}
                         onView={() =>

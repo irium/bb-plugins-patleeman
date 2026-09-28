@@ -56,3 +56,22 @@ export function displayChannelHandoffText(text: string) {
     "$1",
   );
 }
+
+const threadHandoffKey = (threadId: string) => `bb:bots:thread-handoff:${threadId}`;
+
+/** Remember a handoff until the new channel thread's composer can take it. */
+export function saveChannelThreadHandoff(threadId: string, source: ChannelHandoffSource) {
+  localStorage.setItem(threadHandoffKey(threadId), JSON.stringify(source));
+}
+
+/** Read and forget a saved handoff, so it pre-fills the draft only once. */
+export function takeChannelThreadHandoff(threadId: string): ChannelHandoffSource | null {
+  try {
+    const saved = localStorage.getItem(threadHandoffKey(threadId));
+    if (!saved) return null;
+    localStorage.removeItem(threadHandoffKey(threadId));
+    return JSON.parse(saved) as ChannelHandoffSource;
+  } catch {
+    return null;
+  }
+}
