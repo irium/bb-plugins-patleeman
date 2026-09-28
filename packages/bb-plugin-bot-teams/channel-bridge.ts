@@ -64,10 +64,27 @@ function promptText(input: readonly PromptInput[]) {
     .join("");
 }
 
+/** Markdown for a pill Bot Teams offered: bots, channels, and direct messages. */
+export function pillText(itemId: string, label: string) {
+  const split = itemId.indexOf(":");
+  const provider = itemId.slice(0, split), id = itemId.slice(split + 1);
+  const text = label.replace(/[\\[\]]/gu, "\\$&");
+  switch (provider) {
+    case "bots":
+      return `@${id}`;
+    case "channels":
+      return `[${text}](/plugins/bot-teams/channels/${id})`;
+    case "dms":
+      return `[${text}](/threads/${id})`;
+    default:
+      return null;
+  }
+}
+
 /**
- * The owner's own words, as the channel router expects them: a picked bot
- * pill becomes `@handle` again, and mention context BB adds for the agent is
- * left out because the router reads the handle itself.
+ * The owner's own words, as the channel router expects them: a bot pill
+ * becomes `@handle` again, channel and direct-message pills become links the
+ * bots can follow, and mention context BB adds for the agent is left out.
  */
 function ownerText(input: readonly PromptInput[]) {
   return input
@@ -77,8 +94,8 @@ function ownerText(input: readonly PromptInput[]) {
       for (const mention of [...item.mentions].sort((a, b) => b.start - a.start)) {
         const resource = mention.resource;
         if (resource.kind !== "plugin" || resource.pluginId !== "bot-teams") continue;
-        const handle = resource.itemId.slice(resource.itemId.lastIndexOf(":") + 1);
-        text = `${text.slice(0, mention.start)}@${handle}${text.slice(mention.end)}`;
+        const replacement = pillText(resource.itemId, resource.label);
+        if (replacement) text = `${text.slice(0, mention.start)}${replacement}${text.slice(mention.end)}`;
       }
       return text;
     })

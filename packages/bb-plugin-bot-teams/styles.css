@@ -2171,3 +2171,49 @@
   gap: 4px;
   min-width: 0;
 }
+/* The channel's live work, above the composer like a thread's follow-ups. */
+.channel-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-sm);
+}
+.channel-banner-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 28px;
+}
+.channel-banner-avatar {
+  display: inline-flex;
+  justify-content: center;
+  flex: 0 0 16px;
+}
+.channel-banner-name {
+  flex: 0 0 auto;
+  font-weight: 500;
+  color: var(--foreground);
+}
+.channel-banner-name:not(:disabled):hover { text-decoration: underline; }
+.channel-banner-activity {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+.channel-banner-stop { flex: 0 0 auto; }
+.channel-banner-error { color: var(--destructive); font-size: var(--text-xs); }
+.channel-banner-empty {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.channel-banner-empty kbd {
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+}

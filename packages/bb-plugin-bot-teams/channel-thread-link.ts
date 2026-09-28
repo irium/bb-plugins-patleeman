@@ -182,6 +182,7 @@ export class ChannelThreads {
       kind: "history",
       speaker: "BB",
       avatar: null,
+      workThreadId: null,
       text: `**Earlier in this channel**\n\n${lines.join("\n\n")}`,
       attachments: [],
     };
@@ -204,6 +205,7 @@ export class ChannelThreads {
         kind: "bot",
         speaker: `${bot?.name ?? message.speaker}${message.conversationKey && isForkConversation(message.conversationKey) ? " · separate answer" : ""}`,
         avatar: bot?.avatar ?? null,
+        workThreadId: this.store.job(message.id)?.threadId ?? null,
         // Known @handles render as links that open the bot, like pills in the composer.
         text: linkifyMentions(message.text, (handle) => byHandle.get(handle.toLowerCase()) ?? null),
         attachments,
@@ -214,6 +216,7 @@ export class ChannelThreads {
       kind: message.system ? "system" : "you",
       speaker: message.speaker,
       avatar: null,
+      workThreadId: null,
       text: message.text,
       attachments,
     };

@@ -3,8 +3,6 @@ import { z } from "zod";
 /** A channel is a BB thread on this provider. Bot Teams creates these threads; the model picker never lists it. */
 export const channelProviderId = "bot-teams-channel";
 export const channelPostTool = "bots_channel_thread_post";
-/** Mention provider for bots in a channel thread's composer. */
-export const channelMentionProviderId = "bots";
 
 /** Hidden thread input: Bot Teams hands the bridge a stored channel message to show. */
 export const channelDeliverPrefix = "[bot-teams:channel-deliver]";
@@ -60,6 +58,8 @@ export const channelDeliverySchema = z.object({
   kind: z.enum(["bot", "you", "system", "history"]),
   speaker: z.string(),
   avatar: z.string().nullable(),
+  /** The bot's work thread for this reply; its name links there. */
+  workThreadId: z.string().nullable().default(null),
   text: z.string(),
   /** Bot Teams' own download URL: stored attachment paths are not links. */
   attachments: z
@@ -101,8 +101,11 @@ export function deliveryMarkdown(delivery: ChannelDelivery) {
     .filter(Boolean)
     .join("\n\n");
   switch (delivery.kind) {
-    case "bot":
-      return `**${delivery.avatar ? `${delivery.avatar} ` : ""}${delivery.speaker}**\n\n${body}`;
+    case "bot": {
+      const name = `${delivery.avatar ? `${delivery.avatar} ` : ""}${delivery.speaker}`;
+      const header = delivery.workThreadId ? `[${name}](/threads/${delivery.workThreadId})` : name;
+      return `**${header}**\n\n${body}`;
+    }
     case "you":
       return `**You** · sent outside this thread\n\n${body}`;
     case "system":

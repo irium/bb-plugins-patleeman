@@ -70,11 +70,26 @@ The sidebar lists channels. Bot work threads stay available from channel message
 Each channel is a hidden BB thread on the **Bot Teams** provider, so it looks and behaves like any other thread: the same transcript, composer, links, file previews, splits, search, and unread state. The provider runs no model of its own and is not offered for new threads; Bot Teams creates channel threads by name. In a channel thread, the picker shows its chat modes and bot permissions.
 
 - **Your messages** go to the channel's router exactly as before: Smart, Directed, and Everyone modes, mentions, delegation, and bot work threads are unchanged. Images and files attached in the composer go with the message.
-- **Bot replies** arrive when each bot finishes, as assistant messages that start with the bot's avatar and name. Replies can arrive while the thread is idle; each one is its own short turn.
+- **Bot replies** arrive when each bot finishes, as assistant messages that start with the bot's avatar and name. The name links to the bot's work thread for that reply. Replies can arrive while the thread is idle; each one is its own short turn. Files a bot publishes are listed under its reply; images show inline.
+- **While bots work**, a card above the composer lists each working bot with its latest activity, anything queued behind it, and **Stop**. The channel stays free for new messages. A channel with no bots yet says how to add one.
 - **Messages from elsewhere**, such as `bb bots channel send` or automations, also appear in the thread, marked as sent outside it.
 - Renaming a channel renames its thread. Deleting a channel deletes its thread. If the thread is deleted on its own, opening the channel creates a new one.
 
 The composer's model picker holds the chat mode and bot permissions. The thread header holds the member list, **Search channel**, and **Channel details**, which opens the channel rail in the thread panel. Old channel and message links (`/plugins/bot-teams/channels/…`, including those in notifications) open the channel's thread; a message link opens the channel rather than scrolling to that message. Past messages cannot be edited in a channel thread; send a correction instead.
+
+## Mentions everywhere
+
+Type `@` in any composer, not only in channels:
+
+- **Bots**: in a channel, members come first, plus `@all`. Picking one adds a
+  pill; the channel router receives its `@handle`. Elsewhere, the agent gets a
+  short description of the bot and how to reach it.
+- **Channels**: picking one gives the agent the channel's members and recent
+  messages. In a channel thread it becomes a link the bots can follow.
+- **Direct messages**: picking one gives the agent the DM thread with its bot
+  and latest reply. In a channel thread it becomes a link to that thread.
+
+Known `@handles` in bot replies render as links that open the bot.
 
 ## Channel workspace
 
@@ -88,6 +103,7 @@ from its new-tab launcher or from links in the channel rail.
   when read/saved and after completed bot turns, not on every filesystem write.
 - Files stay in the transcript. Bots can use `bots_publish_file` or
   `bb bots publish-file` to attach reports, CSVs, PDFs, and images from their
+  bot home or, when their permissions sandbox them, their work thread's
   workspace (8 MB each); failed responses do not publish their outputs.
 - Record settled choices in **Context → Decisions**, which every bot in the
   channel reads.

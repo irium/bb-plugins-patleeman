@@ -3,6 +3,7 @@ import {
   experimental_Icon as Icon,
   useBbNavigate,
   useComposer,
+  useComposerView,
   useRealtime,
   useRpc,
   type PluginThreadHeaderActionProps,
@@ -13,6 +14,8 @@ import type { rpcContract } from "./contract";
 import { Button } from "./components/ui/button";
 import { ChannelMembersMenu } from "./channel-members";
 import { ChannelRail } from "./channel-rail-view";
+import { railLive, railRoutingCount } from "./channel-rail";
+import { message } from "./bot-ui";
 import { ChannelAutomationsView } from "./channel-automations-view";
 import { ChannelSearch } from "./channel-search";
 import {
@@ -81,6 +84,91 @@ export function ChannelThreadHeader({ threadId }: PluginThreadHeaderActionProps)
       >
         <Icon name="ListView" />
       </Button>
+    </div>
+  );
+}
+
+/**
+ * Above the composer, like a thread's follow-ups: who is working on what,
+ * with Stop, while the channel stays free for new messages. A channel with
+ * no bots yet says how to add one. Renders nothing otherwise.
+ */
+export function ChannelComposerBanner() {
+  const view = useComposerView();
+  const threadId = view.scope.kind === "thread" ? view.scope.threadId : null;
+  const { surface, load } = useChannelSurface(threadId);
+  const rpc = useRpc<typeof rpcContract>();
+  const navigate = useBbNavigate();
+  const [stopping, setStopping] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (!surface) return null;
+  if (!surface.room.memberIds.length)
+    return (
+      <p className="channel-banner-empty">
+        No bots here yet. Type <kbd>@</kbd> and pick a bot to add it to this channel.
+      </p>
+    );
+  const live = railLive(surface.jobs);
+  const routing = railRoutingCount(surface.runs);
+  if (!live.length && !routing) return null;
+  const stop = async (jobId: string) => {
+    setStopping(jobId);
+    setError(null);
+    try {
+      await rpc.call("cancelJob", { id: jobId });
+      load();
+    } catch (cause) {
+      setError(message(cause));
+    } finally {
+      setStopping(null);
+    }
+  };
+  return (
+    <div className="channel-banner" role="status" aria-label="Channel work">
+      {routing > 0 && !live.length && (
+        <div className="channel-banner-row">
+          <span className="channel-banner-avatar"><Icon name="Loading" /></span>
+          <span className="channel-banner-activity">Choosing who answers…</span>
+        </div>
+      )}
+      {live.map((entry) => {
+        const bot = surface.bots.find((b) => b.id === entry.botId);
+        const name = bot?.name ?? "Bot";
+        return (
+          <div className="channel-banner-row" key={entry.jobId}>
+            <span className="channel-banner-avatar" aria-hidden>{bot?.avatar ?? "🤖"}</span>
+            <button
+              type="button"
+              className="channel-banner-name"
+              disabled={!entry.threadId}
+              title="Open its work thread"
+              onClick={() => entry.threadId && navigate.toThread(entry.threadId)}
+            >
+              {name}
+            </button>
+            <span className="channel-banner-activity">
+              {entry.running ? entry.activity || "Working…" : "Queued"}
+              {entry.queuedBehind > 0 ? ` · ${entry.queuedBehind} waiting` : ""}
+            </span>
+            {entry.running && (
+              <span className="channel-working" role="img" aria-label="Working">
+                <Icon name="Loading" />
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="channel-banner-stop"
+              aria-label={`Stop ${name}`}
+              disabled={!entry.stoppable || stopping === entry.jobId}
+              onClick={() => void stop(entry.jobId)}
+            >
+              <Icon name="Square" />
+            </Button>
+          </div>
+        );
+      })}
+      {error && <p role="alert" className="channel-banner-error">{error}</p>}
     </div>
   );
 }

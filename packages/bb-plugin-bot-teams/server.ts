@@ -25,12 +25,12 @@ import { Store, newId, document, saveDocument } from "./store";
 import { liveChannelDms } from "./channel-dms";
 import { usePersonalProject } from "./bot-project";
 import { ChannelThreads } from "./channel-thread-link";
+import { registerChannelMentions } from "./channel-mentions";
 import {
   channelModels,
   channelPermissionLevels,
   permissionForLevel,
   channelPostInput,
-  channelMentionProviderId,
   channelPostTool,
   channelProviderId,
 } from "./channel-provider";
@@ -1385,19 +1385,23 @@ export default async function plugin(bb: BbPluginApi) {
     if (!isAbsolute(path))
       throw new Error("Provide an absolute file path on your bot's machine.");
     const { job, bot } = current();
-    const localPath = relative(bot.home, path);
-    if (
-      localPath === ".." ||
-      localPath.startsWith("../") ||
-      isAbsolute(localPath)
-    )
+    // A sandboxed bot can only write in its work thread's workspace, so files
+    // from there publish as well as files from its bot home.
+    const thread = await bb.sdk.threads.get({ threadId, include: "environment" });
+    const workspace = "environment" in thread ? thread.environment?.path ?? null : null;
+    const inside = (root: string) => {
+      const local = relative(root, path);
+      return local !== ".." && !local.startsWith("../") && !isAbsolute(local);
+    };
+    const rootPath = [bot.home, workspace].find((root): root is string => !!root && inside(root));
+    if (!rootPath)
       throw new Error(
-        "Save the file inside your bot workspace before publishing it.",
+        "Save the file inside your bot home or this thread's workspace before publishing it.",
       );
     const file = await bb.sdk.files.read({
       hostId: bot.hostId,
       path,
-      rootPath: bot.home,
+      rootPath,
     });
     const bytes = Buffer.from(file.content, file.contentEncoding);
     if (
@@ -1517,36 +1521,7 @@ export default async function plugin(bb: BbPluginApi) {
       return "Sent to the channel.";
     },
   });
-  // `@` in a channel thread's composer offers the channel's bots as pills; the
-  // bridge turns a picked pill back into the @handle the router reads.
-  bb.ui.registerMentionProvider({
-    id: channelMentionProviderId,
-    label: "Bots",
-    search({ query, threadId }) {
-      const room = threadId ? channelThreads.roomForThread(threadId) : null;
-      if (!room) return [];
-      const q = query.toLowerCase();
-      const bots = store
-        .all()
-        .filter((bot) => !bot.retired)
-        .filter((bot) => `${bot.name} ${bot.handle}`.toLowerCase().includes(q))
-        .sort((a, b) =>
-          Number(room.memberIds.includes(b.id)) - Number(room.memberIds.includes(a.id)) ||
-          a.name.localeCompare(b.name),
-        )
-        .map((bot) => ({
-          id: bot.handle,
-          title: `${bot.avatar} ${bot.name}`,
-          subtitle: `@${bot.handle}${room.memberIds.includes(bot.id) ? "" : " · not in this channel yet"}`,
-          icon: "Bot",
-        }));
-      const everyone = "all".startsWith(q) || "channel".startsWith(q)
-        ? [{ id: "all", title: "@all", subtitle: "Everyone in this channel", icon: "Users" }]
-        : [];
-      return [...everyone, ...bots].slice(0, 8);
-    },
-    resolve: (handle) => ({ context: `@${handle}` }),
-  });
+  registerChannelMentions(bb, store, channelThreads);
   bb.providers.register({
     id: channelProviderId,
     displayName: "Bot Teams",
@@ -1604,7 +1579,7 @@ export default async function plugin(bb: BbPluginApi) {
       ],
       skills: ["bots"],
       instructions: [
-        `You are the persistent bot ${JSON.stringify(bot.name)} (@${bot.handle}). Your persistent bot home is ${JSON.stringify(bot.home)}. BB may start this thread in a separate Personal workspace. Read AGENTS.md in this bot home as well as MISSION.md and MEMORY.md. Use this absolute bot home for those documents and files you publish; set the working directory to it for shell commands. Do not assume the initial working directory contains your bot files.`,
+        `You are the persistent bot ${JSON.stringify(bot.name)} (@${bot.handle}). Your persistent bot home is ${JSON.stringify(bot.home)}. BB may start this thread in a separate Personal workspace. Read AGENTS.md in this bot home as well as MISSION.md and MEMORY.md. Use this absolute bot home for those documents and for files you publish; set the working directory to it for shell commands. If your permissions do not let you write there, save files to publish in this thread's initial working directory instead. Do not assume the initial working directory contains your bot files.`,
         isForkConversation(c.key)
           ? "This is a separate fork. Answer only the new request without resuming inherited work. Read MISSION.md and MEMORY.md, but do not edit shared MEMORY.md. Include durable findings in your channel reply for the primary session."
           : "Read MISSION.md and MEMORY.md at the beginning of every turn, including follow-ups. Keep durable memory up to date.",

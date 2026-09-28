@@ -185,13 +185,14 @@ test("a bot reply leads with the bot's name, since assistant messages have no au
       kind: "bot",
       speaker: "Editorial",
       avatar: "✍️",
+      workThreadId: "thr_work",
       text: "Drafted.",
       attachments: [
         { name: "chart.png", url: "/api/v1/plugins/bot-teams/http/attachment?id=a", image: true },
         { name: "draft.md", url: "/api/v1/plugins/bot-teams/http/attachment?id=b", image: false },
       ],
     }),
-    "**✍️ Editorial**\n\nDrafted.\n\n" +
+    "**[✍️ Editorial](/threads/thr_work)**\n\nDrafted.\n\n" +
       "![chart.png](</api/v1/plugins/bot-teams/http/attachment?id=a&inline=1>)\n\n" +
       "- [draft.md](</api/v1/plugins/bot-teams/http/attachment?id=b>)",
   );

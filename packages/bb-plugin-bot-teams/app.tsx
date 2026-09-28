@@ -44,6 +44,7 @@ import {
 import "./styles.css";
 import { botTeamsIcons } from "./icons";
 import {
+  ChannelComposerBanner,
   ChannelDetailsPanel,
   ChannelHandoffPrefill,
   ChannelThreadHeader,
@@ -347,6 +348,7 @@ export default definePluginApp((app) => {
     actions: [
       { id: "channel-handoff-prefill", component: ChannelHandoffPrefill },
     ],
+    banners: [{ id: "channel-work", component: ChannelComposerBanner }],
   });
   app.slots.navPanel({
     id: "bots",
