@@ -9,6 +9,7 @@ import { AgentPluginsStore } from "./src/store.js";
 import { validateManifest, validateMcpEnvelope, validateMcpServer, validateSkillFrontmatter } from "./src/loader.js";
 import { McpGateway, type McpStdioCatalog, type McpStdioHost } from "./src/gateway.js";
 import { mcpHostContract, mcpHostSignals } from "./src/host-contract.js";
+import { DEFAULT_TOOL_SEARCH_LIMIT, MAX_DESCRIBE_TOOLS, MAX_TOOL_SEARCH_LIMIT, describeTools, searchTools } from "./src/tool-search.js";
 import { DeferredOAuthCredentialStore, McpOAuthProvider, type OAuthCredentialRecord } from "./src/oauth.js";
 import { parseSource, fetchSource, probeSource } from "./src/source.js";
 import { materializeSkill, unmaterializeSkill } from "./src/skills-impl.js";
@@ -547,16 +548,29 @@ export default async function plugin(bb: BbPluginApi) {
   // Static bridge
   bb.agents.registerTool({
     name: "agent_plugins_list_tools",
-    description: "List MCP tools exposed by installed Agent Plugins (provider-neutral bridge).",
-    instructions: "Call agent_plugins_list_tools first to discover opaque tool IDs and schemas before calling.",
-    presentation: { label: { pending: "Listing Agent Plugins tools", completed: "Tools listed" } },
-    parameters: z.object({}).strict(),
-    async execute() { return JSON.stringify({ tools: await gateway.listTools() }, null, 2); },
+    description: "Search MCP tools exposed by installed Agent Plugins (provider-neutral bridge). Returns compact entries (opaqueId, server, name, one-line summary) without input schemas, plus per-server tool counts.",
+    instructions: "Search with a query (e.g. {\"query\":\"slack search messages\"}) and/or serverId instead of listing everything; page with offset. Then call agent_plugins_describe_tool for the input schema of the tools you pick before calling them.",
+    presentation: { label: { pending: "Searching Agent Plugins tools", completed: "Tools found" } },
+    parameters: z.object({
+      query: z.string().optional().describe("Words to match against tool name, server, and description. Omit to list in catalog order."),
+      serverId: z.string().optional().describe("Only tools from this MCP server (see `servers` in the result)."),
+      limit: z.number().int().min(1).max(MAX_TOOL_SEARCH_LIMIT).optional().describe(`Max tools to return (default ${DEFAULT_TOOL_SEARCH_LIMIT}).`),
+      offset: z.number().int().min(0).optional().describe("Skip this many matches, for paging."),
+    }).strict(),
+    async execute(input) { return JSON.stringify(searchTools(await gateway.listTools(), input), null, 2); },
+  });
+  bb.agents.registerTool({
+    name: "agent_plugins_describe_tool",
+    description: "Get full definitions, including input schemas, for Agent Plugin MCP tools by opaque ID.",
+    instructions: "Pass opaqueIds returned by agent_plugins_list_tools; read inputSchema before calling agent_plugins_call.",
+    presentation: { label: { pending: "Describing Agent Plugins tools", completed: "Tools described" } },
+    parameters: z.object({ opaqueIds: z.array(z.string().min(1)).min(1).max(MAX_DESCRIBE_TOOLS) }).strict(),
+    async execute(input) { return JSON.stringify(describeTools(await gateway.listTools(), input.opaqueIds), null, 2); },
   });
   bb.agents.registerTool({
     name: "agent_plugins_call",
     description: "Call one Agent Plugin MCP tool by opaque ID through the static bridge.",
-    instructions: "Use opaqueId exactly as returned by agent_plugins_list_tools; do not invent tool names.",
+    instructions: "Use opaqueId exactly as returned by agent_plugins_list_tools or agent_plugins_describe_tool; do not invent tool names.",
     presentation: { label: { pending: "Calling Agent Plugin tool", completed: "Tool completed" } },
     parameters: z.object({ opaqueId: z.string().min(1), args: jsonRecordSchema.default({}) }).strict(),
     async execute(input, ctx) {
@@ -597,9 +611,9 @@ export default async function plugin(bb: BbPluginApi) {
     async execute(input, ctx) { return JSON.stringify(await gateway.readResource(input.opaqueId, ctx.signal), null, 2); },
   });
   bb.agents.configure(() => ({
-    tools: ["agent_plugins_list_tools", "agent_plugins_call", "agent_plugins_list_prompts", "agent_plugins_get_prompt", "agent_plugins_list_resources", "agent_plugins_read_resource"],
+    tools: ["agent_plugins_list_tools", "agent_plugins_describe_tool", "agent_plugins_call", "agent_plugins_list_prompts", "agent_plugins_get_prompt", "agent_plugins_list_resources", "agent_plugins_read_resource"],
     skills: [],
-    instructions: "Agent Plugins bridge ready — use agent_plugins_list_tools to discover MCP tools after plugins are installed.",
+    instructions: "Agent Plugins bridge ready — search MCP tools with agent_plugins_list_tools({query}), get input schemas with agent_plugins_describe_tool, then call with agent_plugins_call.",
   }));
 
   // -------------------------------------------------------------------------
@@ -1163,7 +1177,8 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "outdated", summary: "Check tracked Agent Plugins for updates", usage: "bb agent-plugins outdated [--json]" },
       { name: "update", summary: "Update one installed Agent Plugin", usage: "bb agent-plugins update <id> [--json]" },
       { name: "remove", summary: "Remove a plugin", usage: "bb agent-plugins remove <id> [--purge-data] [--json]" },
-      { name: "tools", summary: "List MCP tools via bridge", usage: "bb agent-plugins tools [--json]" },
+      { name: "tools", summary: "List or search MCP tools via bridge", usage: "bb agent-plugins tools [--query <words>] [--server <serverId>] [--limit <n>] [--offset <n>] [--json]" },
+      { name: "describe", summary: "Show full MCP tool definitions", usage: "bb agent-plugins describe <opaqueId>… [--json]" },
       { name: "call", summary: "Call an MCP tool by opaqueId", usage: "bb agent-plugins call <opaqueId> <json> [--json]" },
       { name: "prompts", summary: "List MCP prompts via bridge", usage: "bb agent-plugins prompts [--json]" },
       { name: "resources", summary: "List MCP resources via bridge", usage: "bb agent-plugins resources [--json]" },
@@ -1246,8 +1261,36 @@ export default async function plugin(bb: BbPluginApi) {
         return { exitCode: deleted ? 0 : 1, stdout: (asJson ? JSON.stringify({ deleted }) : deleted ? `Removed ${id}\n` : `Not found: ${id}\n`) };
       }
       if (cmd === "tools") {
+        const flag = (name: string): string | undefined => {
+          const idx = rest.indexOf(name);
+          return idx >= 0 ? rest[idx + 1] : undefined;
+        };
+        const query = flag("--query"); const serverId = flag("--server");
+        const limit = flag("--limit"); const offset = flag("--offset");
         const tools = await gateway.listTools();
-        return { exitCode: 0, stdout: (asJson ? JSON.stringify({ tools }, null, 2) : tools.map((t: CatalogTool) => `${t.opaqueId} — ${t.description} [${t.serverType}]`).join("\n")) + "\n" };
+        if (query === undefined && serverId === undefined && limit === undefined && offset === undefined) {
+          return { exitCode: 0, stdout: (asJson ? JSON.stringify({ tools }, null, 2) : tools.map((t: CatalogTool) => `${t.opaqueId} — ${t.description} [${t.serverType}]`).join("\n")) + "\n" };
+        }
+        const result = searchTools(tools, {
+          query, serverId,
+          limit: limit === undefined ? undefined : Number(limit),
+          offset: offset === undefined ? undefined : Number(offset),
+        });
+        const text = [
+          `${result.total} match${result.total === 1 ? "" : "es"}${result.partialMatch ? " (partial)" : ""}; showing ${result.tools.length} from offset ${result.offset}`,
+          ...result.tools.map((t) => `${t.opaqueId} — ${t.summary} [${t.serverId}]`),
+        ].join("\n");
+        return { exitCode: 0, stdout: (asJson ? JSON.stringify(result, null, 2) : text) + "\n" };
+      }
+      if (cmd === "describe") {
+        const ids = rest.filter((arg) => arg !== "--json");
+        if (ids.length === 0) return { exitCode: 2, stderr: "Usage: bb agent-plugins describe <opaqueId>… [--json]\n" };
+        const result = describeTools(await gateway.listTools(), ids);
+        const text = [
+          ...result.tools.map((t) => `${t.opaqueId}\n${t.description}\ninputSchema: ${JSON.stringify(t.inputSchema)}`),
+          ...result.notFound.map((id) => `Not found: ${id}`),
+        ].join("\n\n");
+        return { exitCode: result.notFound.length > 0 ? 1 : 0, stdout: (asJson ? JSON.stringify(result, null, 2) : text) + "\n" };
       }
       if (cmd === "call") {
         const opaqueId = rest[0]; const rawArgs = rest[1];
@@ -1291,7 +1334,7 @@ export default async function plugin(bb: BbPluginApi) {
           return { exitCode: 0, stdout: asJson ? JSON.stringify({ url, status }, null, 2) + "\n" : `${status}${url ? ` — authorize at ${url}` : ""}\n` };
         } catch (e) { return { exitCode: 1, stderr: `${errorText(e)}\n` }; }
       }
-      return { exitCode: 2, stderr: "Usage: bb agent-plugins <list|show|install|outdated|update|remove|tools|call|prompts|resources|skills|approve|auth> …\n" };
+      return { exitCode: 2, stderr: "Usage: bb agent-plugins <list|show|install|outdated|update|remove|tools|describe|call|prompts|resources|skills|approve|auth> …\n" };
     },
   });
 

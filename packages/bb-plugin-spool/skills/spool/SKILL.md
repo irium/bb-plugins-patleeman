@@ -31,8 +31,9 @@ read-only.
 
 In BB, the Agent Plugins bridge is the normal MCP path:
 
-1. Call `agent_plugins_list_tools` first. Find the installed Spool server and
-   its `spool_guide` tool. Call `agent_plugins_call` with the exact opaque ID
+1. Call `agent_plugins_list_tools` with `{ "query": "spool" }` first. Find the
+   installed Spool server and its `spool_guide` tool; use
+   `agent_plugins_describe_tool` for its input schema. Call `agent_plugins_call` with the exact opaque ID
    returned by discovery; never invent an opaque ID or substitute a raw tool
    name in that call.
 2. If the bridge is unavailable but a direct MCP client is available, call
