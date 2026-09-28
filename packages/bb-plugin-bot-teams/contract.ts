@@ -27,6 +27,11 @@ export const profileInput = z.object({
   avatar: z.string().max(16).default("🤖"),
   providerId: z.string().max(100).default("codex"),
   model: z.string().max(200).default(""),
+  fallbackProviderId: z.string().max(100).default(""),
+  fallbackModel: z.string().max(200).default(""),
+  fallbackReasoningLevel: z
+    .enum(["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"])
+    .default("medium"),
   reasoningLevel: z
     .enum([
       "none",
@@ -139,6 +144,9 @@ const profilePatch = z.object({
   avatar: profileInput.shape.avatar.removeDefault().optional(),
   providerId: profileInput.shape.providerId.removeDefault().optional(),
   model: profileInput.shape.model.removeDefault().optional(),
+  fallbackProviderId: profileInput.shape.fallbackProviderId.removeDefault().optional(),
+  fallbackModel: profileInput.shape.fallbackModel.removeDefault().optional(),
+  fallbackReasoningLevel: profileInput.shape.fallbackReasoningLevel.removeDefault().optional(),
   reasoningLevel: profileInput.shape.reasoningLevel.removeDefault().optional(),
   permissionMode: profileInput.shape.permissionMode.removeDefault().optional(),
   intervalMinutes: profileInput.shape.intervalMinutes
@@ -196,6 +204,7 @@ export const jobSchema = z.object({
   dispatchAction: z.enum(["steer", "followup", "fork"]).optional(),
   forkSourceThreadId: z.string().optional(),
   requiresPromptMatch: z.boolean().optional(),
+  fallbackAttempted: z.boolean().optional(),
   directMessageRequestIds: z.array(z.string()).optional(),
   pendingSteer: z
     .object({ priorPrompt: z.string(), attemptedAt: z.number().optional() })
@@ -564,6 +573,10 @@ export const rpcContract = defineRpcContract({
       id: idSchema,
       expectedUpdatedAt: z.number().optional(),
     }),
+    output: botSchema,
+  },
+  swapModel: {
+    input: z.object({ id: idSchema, expectedUpdatedAt: z.number().optional() }),
     output: botSchema,
   },
   retire: {

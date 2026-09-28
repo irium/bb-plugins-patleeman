@@ -1,6 +1,8 @@
 const channelPath =
   /^\/plugins\/(?:bot-teams|bots)\/channels\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})(?:\/message\/([^/]+))?\/?$/iu;
 const loopback = new Set(["localhost", "127.0.0.1", "[::1]"]);
+const threadPath =
+  /^\/(?:projects\/proj_[^/]+\/)?threads\/(thr_[^/]+)\/?$/iu;
 
 export function channelMessageReference(
   roomId: string,
@@ -66,6 +68,47 @@ export function channelLinkDestination(
     const messageId = decodeURIComponent(match[2]);
     if (!messageId || /[\u0000-\u001f\u007f]/u.test(messageId)) return null;
     return channelMessageSubPath(id, messageId);
+  } catch {
+    return null;
+  }
+}
+
+/** A BB thread link copied on another local client still belongs in this app. */
+export function channelThreadLinkDestination(href: string, currentOrigin: string) {
+  if (!/^\/(?!\/)|^https?:\/\//iu.test(href)) return null;
+  try {
+    const url = new URL(href, currentOrigin);
+    if (url.username || url.password || url.search || url.hash) return null;
+    if (
+      url.origin !== currentOrigin &&
+      !loopback.has(url.hostname) &&
+      url.hostname !== new URL(currentOrigin).hostname
+    )
+      return null;
+    const match = threadPath.exec(url.pathname);
+    if (!match) return null;
+    const threadId = decodeURIComponent(match[1]!);
+    if (!/^thr_[a-z0-9_-]+$/iu.test(threadId)) return null;
+    return threadId;
+  } catch {
+    return null;
+  }
+}
+
+/** Absolute filesystem paths in bot messages are host files, not web routes. */
+export function channelFileLinkDestination(href: string) {
+  if (!href.startsWith("/") || href.startsWith("//") || /[?#]/u.test(href))
+    return null;
+  try {
+    const path = decodeURIComponent(href);
+    if (
+      !/^\/(?:[^/]+\/)+[^/]+\.[a-z0-9]{1,12}$/iu.test(path) ||
+      /[\u0000-\u001f\u007f]/u.test(path) ||
+      path.split("/").includes("..") ||
+      /^(?:\/threads\/|\/projects\/|\/plugins\/|\/api\/)/iu.test(path)
+    )
+      return null;
+    return path;
   } catch {
     return null;
   }

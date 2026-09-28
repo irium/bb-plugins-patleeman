@@ -89,15 +89,21 @@ finish the current response and let the originating agent collect results.
 bb bots create Atlas --mission 'Verify facts and cite sources.' --model gpt-5.6-luna --reasoning low --json
 bb bots show @atlas --json
 bb bots update @atlas --description 'Research and verification' --interval 0 --json
+bb bots update @atlas --fallback-provider codex --fallback-model gpt-5.6-luna --fallback-reasoning low --json
+bb bots swap @atlas --json
 bb bots channel create 'Launch room' --bot @atlas --json
 bb bots create Scribe --mission 'Record decisions and next steps.' --channel 'Launch room' --json
 ```
 
 Profile flags: `--name`, `--description`, `--avatar`, `--provider`, `--model`,
+`--fallback-provider`, `--fallback-model`, `--fallback-reasoning`,
 `--reasoning`, `--permissions`, `--interval`. Creation takes the name as its
 positional argument and requires `--mission` or `--mission-file`.
-Use `bb provider` to discover available models. An existing bot keeps its
-provider; create a new bot to change provider. Partial updates preserve omitted
+Use `bb provider` to discover available models. A manual swap exchanges the
+primary and fallback selections and starts fresh bot threads. A provider error
+retries a managed, non-fork channel or mission response once with the fallback
+in a new thread. Forks and direct chats use manual swaps. A retry can repeat
+tool actions from the failed thread. Partial updates preserve omitted
 fields. Interval is minutes: `0` disables the schedule, otherwise `5`–`10080`.
 Permissions use BB values `accept-edits`, `auto`, or `full`.
 

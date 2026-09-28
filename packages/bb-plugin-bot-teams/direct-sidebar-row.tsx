@@ -226,6 +226,7 @@ export function DirectSidebarBot({
   onChanged: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const navigate = useBbNavigate();
   useEffect(() => {
     if (conversations.some((conversation) => conversation.threadId === activeThreadId))
       setExpanded(true);
@@ -251,6 +252,34 @@ export function DirectSidebarBot({
         aria-label={`New thread with ${bot.name}`} onClick={onNewThread}>
         <Icon name="Plus" />
       </button>}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className="direct-thread-options"
+            aria-label={`${bot.name} options`}>
+            <Icon name="MoreHorizontal" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" aria-label={`${bot.name} options`}>
+          {!bot.retired && <>
+            <DropdownMenuItem onSelect={onNewThread}>
+              <Icon name="Plus" /> New thread
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>}
+          {([
+            ["profile", "View profile", "UserRound"],
+            ["mission", "View mission", "Target"],
+            ["memory", "View memory", "Brain"],
+            ["activity", "View activity", "Activity"],
+          ] as const).map(([tab, label, icon]) =>
+            <DropdownMenuItem key={tab} onSelect={() => {
+              navigate.toPluginPanel("bots", { subPath: `${bot.id}/${tab}` });
+              onNavigate();
+            }}>
+              <Icon name={icon} /> {label}
+            </DropdownMenuItem>)}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
     <div id={listId} hidden={!expanded} className="direct-bot-threads">
       {visible.map((conversation) => <DirectSidebarThread key={conversation.threadId}

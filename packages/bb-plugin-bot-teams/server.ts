@@ -14,6 +14,7 @@ import { z } from "zod";
 import {
   rpcContract,
   profileInput,
+  botSchema,
   emojiSchema,
   responseBehavior,
   type Bot,
@@ -633,6 +634,75 @@ export default async function plugin(bb: BbPluginApi) {
       rpcContract.send.input.parse(input), undefined, { id: attentionId, revision },
     ), () => runtime.changed(),
     message => bb.log.warn(message));
+  const updateBot = (
+    id: string,
+    expectedUpdatedAt: number | undefined,
+    patch: Partial<Bot>,
+  ) => runtime.locked(id, () => updateBotUnlocked(id, expectedUpdatedAt, patch));
+  const updateBotUnlocked = async (
+    id: string,
+    expectedUpdatedAt: number | undefined,
+    patch: Partial<Bot>,
+  ): Promise<Bot> => {
+    const previous = botSchema.parse(store.get(id));
+    if (
+      expectedUpdatedAt !== undefined &&
+      expectedUpdatedAt !== previous.updatedAt
+    )
+      throw new Error(
+        "This profile changed elsewhere. Reload the latest profile before saving.",
+      );
+    const profile = { ...previous, ...patch };
+    const bot = {
+      ...previous,
+      ...profile,
+      updatedAt: Math.max(Date.now(), previous.updatedAt + 1),
+    };
+    const changedModel = bot.providerId !== previous.providerId ||
+      bot.model !== previous.model ||
+      bot.fallbackProviderId !== previous.fallbackProviderId ||
+      bot.fallbackModel !== previous.fallbackModel ||
+      bot.fallbackReasoningLevel !== previous.fallbackReasoningLevel;
+    if (changedModel) {
+      if (store.work(id).some(isExecuting))
+        throw new Error("Wait for this bot's current work before changing its provider or model.");
+      const conversations = activeConversations(id);
+      for (const conversation of conversations)
+        await assertConversationIdle(conversation);
+      const present = conversations.filter((c) => !!store.byThread(c.threadId));
+      store.db.transaction(() => {
+        for (const conversation of present) store.archiveConversation(conversation);
+        store.put(bot);
+      })();
+      try {
+        if (present.some((c) => c.key === "admin"))
+          await ensureDirectConversation(bot);
+      } catch (cause) {
+        store.db.transaction(() => {
+          store.put(previous);
+          for (const conversation of present)
+            store.restoreConversation(conversation);
+        })();
+        throw cause;
+      }
+    } else {
+      if (bot.reasoningLevel !== previous.reasoningLevel)
+        for (const c of activeConversations(id)) {
+          try {
+            await bb.sdk.threads.update({
+              threadId: c.threadId,
+              reasoningLevel: bot.reasoningLevel,
+            });
+          } catch (cause) {
+            if (!missingThread(cause)) throw cause;
+            store.deleteConversation(c.threadId);
+          }
+        }
+      store.put(bot);
+    }
+    runtime.changed();
+    return bot;
+  };
   const handlers: PluginRpcHandlers<typeof rpcContract> = {
     createBotSetupThread: async (request) => {
       const thread = await bb.sdk.threads.spawn({
@@ -910,62 +980,20 @@ export default async function plugin(bb: BbPluginApi) {
       jobs: store.jobs(id, 50),
     }),
     update: ({ id, expectedUpdatedAt, ...patch }) =>
+      updateBot(id, expectedUpdatedAt, patch),
+    swapModel: ({ id, expectedUpdatedAt }) =>
       runtime.locked(id, async () => {
-        const previous = store.get(id);
-        if (
-          expectedUpdatedAt !== undefined &&
-          expectedUpdatedAt !== previous.updatedAt
-        )
-          throw new Error(
-            "This profile changed elsewhere. Reload the latest profile before saving.",
-          );
-        const profile = { ...previous, ...patch };
-        const bot = {
-          ...previous,
-          ...profile,
-          updatedAt: Math.max(Date.now(), previous.updatedAt + 1),
-        };
-        const changedModel = bot.providerId !== previous.providerId ||
-          bot.model !== previous.model;
-        if (changedModel) {
-          if (store.work(id).some(isExecuting))
-            throw new Error("Wait for this bot's current work before changing its provider or model.");
-          const conversations = activeConversations(id);
-          for (const conversation of conversations)
-            await assertConversationIdle(conversation);
-          const present = conversations.filter((c) => !!store.byThread(c.threadId));
-          store.db.transaction(() => {
-            for (const conversation of present) store.archiveConversation(conversation);
-            store.put(bot);
-          })();
-          try {
-            if (present.some((c) => c.key === "admin"))
-              await ensureDirectConversation(bot);
-          } catch (cause) {
-            store.db.transaction(() => {
-              store.put(previous);
-              for (const conversation of present)
-                store.restoreConversation(conversation);
-            })();
-            throw cause;
-          }
-        } else {
-          if (bot.reasoningLevel !== previous.reasoningLevel)
-            for (const c of activeConversations(id)) {
-              try {
-                await bb.sdk.threads.update({
-                  threadId: c.threadId,
-                  reasoningLevel: bot.reasoningLevel,
-                });
-              } catch (cause) {
-                if (!missingThread(cause)) throw cause;
-                store.deleteConversation(c.threadId);
-              }
-            }
-          store.put(bot);
-        }
-        runtime.changed();
-        return bot;
+        const bot = botSchema.parse(store.get(id));
+        if (!bot.fallbackProviderId)
+          throw new Error("Set a fallback model before swapping.");
+        return updateBotUnlocked(id, expectedUpdatedAt, {
+          providerId: bot.fallbackProviderId,
+          model: bot.fallbackModel,
+          reasoningLevel: bot.fallbackReasoningLevel,
+          fallbackProviderId: bot.providerId,
+          fallbackModel: bot.model,
+          fallbackReasoningLevel: bot.reasoningLevel,
+        });
       }),
     document: async ({ id, file }) => {
       const d = await document(store.get(id).home, file);

@@ -2588,6 +2588,76 @@ test("changing a model or provider starts new bot sessions and retains their his
   }
 });
 
+test("swapping models exchanges both selections and starts fresh sessions", async () => {
+  const x = setup();
+  await plugin(x.bb);
+  try {
+    await x.harness.behavior.callRpc("update", {
+      id: x.a.id,
+      fallbackProviderId: "pi",
+      fallbackModel: "backup-model",
+      fallbackReasoningLevel: "low",
+    });
+    const direct = await x.harness.behavior.callRpc("conversation", { id: x.a.id }) as Conversation;
+    const swapped = await x.harness.behavior.callRpc("swapModel", { id: x.a.id }) as Bot;
+    assert.equal(swapped.providerId, "pi");
+    assert.equal(swapped.model, "backup-model");
+    assert.equal(swapped.reasoningLevel, "low");
+    assert.equal(swapped.fallbackProviderId, "codex");
+    assert.equal(swapped.fallbackModel, "");
+    assert.equal(swapped.fallbackReasoningLevel, "medium");
+    assert.notEqual(x.store.currentDirectConversation(x.a.id)?.threadId, direct.threadId);
+    assert.equal(x.store.byThread(direct.threadId)?.originalKey, "admin");
+    await x.harness.behavior.callRpc("swapModel", { id: x.a.id });
+    assert.equal(x.store.get(x.a.id).providerId, "codex");
+  } finally {
+    await x.close();
+  }
+});
+
+test("a provider failure retries one managed response on the fallback model", async () => {
+  const x = setup();
+  try {
+    x.store.put({ ...x.a, fallbackProviderId: "pi", fallbackModel: "backup-model",
+      fallbackReasoningLevel: "low" });
+    const message = x.runtime.send(x.room, "@atlas Review", randomUUID());
+    await x.runtime.drive(x.store.get(x.a.id));
+    const first = x.store.requestJobs(message.id)[0]!;
+    const firstThreadId = first.threadId!;
+    x.harness.inspection.sdk.stub("threads.get", async ({ threadId }) =>
+      makeThreadResponse({ id: threadId, status: "error" }));
+    x.harness.inspection.sdk.stub("threads.timeline", async () => ({
+      rows: [{ kind: "conversation", role: "user", text: jobPrompt(first) }],
+    }));
+    x.harness.inspection.sdk.stub("threads.events.list", async () => [{
+      id: "provider-failure", scope: { kind: "thread" }, threadId: firstThreadId,
+      seq: 1, createdAt: Date.now(), type: "provider/error",
+      data: { message: "Provider unavailable" },
+    }]);
+    await x.runtime.settleFromEvent(firstThreadId, null, "Provider unavailable");
+    const queued = x.store.job(first.id)!;
+    assert.equal(queued.status, "queued");
+    assert.equal(queued.fallbackAttempted, true);
+    assert.equal(queued.threadId, null);
+    assert.equal(x.store.byThread(firstThreadId)?.originalKey, `group:${x.room.id}`);
+    await x.runtime.drive(x.store.get(x.a.id));
+    const retried = x.store.job(first.id)!;
+    assert.notEqual(retried.threadId, firstThreadId);
+    const spawn = x.harness.inspection.sdk.callsTo("threads.spawn").at(-1)?.[0] as {
+      providerId: string; model: string; reasoningLevel: string;
+    };
+    assert.equal(spawn.providerId, "pi");
+    assert.equal(spawn.model, "backup-model");
+    assert.equal(spawn.reasoningLevel, "low");
+    x.runtime.complete(retried.threadId!, null, "Fallback also unavailable", true);
+    assert.equal(x.store.job(first.id)?.status, "error");
+    assert.equal(x.store.conversations(x.a.id).some((c) => c.key === `group:${x.room.id}`), false);
+    assert.equal(x.store.get(x.a.id).providerId, "codex");
+  } finally {
+    await x.close();
+  }
+});
+
 test("new direct threads and model changes wait for active work", async () => {
   const x = setup();
   await plugin(x.bb);

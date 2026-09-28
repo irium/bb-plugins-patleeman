@@ -152,6 +152,12 @@ test("CLI creates and patches profiles, preserves fields, and exposes its skill"
     const changed = await x.run(["update", b.id, "--provider", "different"]);
     assert.equal(changed.exitCode, 0);
     assert.equal(x.store.get(b.id).providerId, "different");
+    await x.ok(["update", b.id, "--fallback-provider", "codex",
+      "--fallback-model", "backup", "--fallback-reasoning", "high"]);
+    const swapped = botSchema.parse(await x.ok(["swap", b.id]));
+    assert.equal(swapped.providerId, "codex");
+    assert.equal(swapped.model, "backup");
+    assert.equal(swapped.fallbackProviderId, "different");
     const invalid = await x.run(["update", b.id, "--interval", "-1"]);
     assert.equal(invalid.exitCode, 2);
     await x.create("Atlas");
@@ -200,6 +206,9 @@ test("bot CLI creation waits for explicit owner approval", async () => {
       description: "",
       providerId: "codex",
       model: "",
+      fallbackProviderId: "",
+      fallbackModel: "",
+      fallbackReasoningLevel: "medium",
       reasoningLevel: "medium",
       permissionMode: "auto",
       intervalMinutes: 0,
@@ -277,6 +286,9 @@ test("approved bot creation is recovered when the requester has already exited",
         description: "Recovered after approval.",
         providerId: "codex",
         model: "",
+        fallbackProviderId: "",
+        fallbackModel: "",
+        fallbackReasoningLevel: "medium",
         reasoningLevel: "medium",
         permissionMode: "auto",
         intervalMinutes: 0,

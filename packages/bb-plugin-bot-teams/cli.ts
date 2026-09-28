@@ -36,6 +36,9 @@ const profileFlags = [
   "avatar",
   "provider",
   "model",
+  "fallback-provider",
+  "fallback-model",
+  "fallback-reasoning",
   "reasoning",
   "permissions",
   "interval",
@@ -118,6 +121,7 @@ const commands = [
   ],
   ["show", "Show a bot's profile and workspace", "<bot>"],
   ["update", "Update selected profile fields", "<bot> [profile flags]"],
+  ["swap", "Swap a bot's primary and fallback models", "<bot>"],
   [
     "mission",
     "Read or update MISSION.md",
@@ -220,7 +224,7 @@ const help = (prefix = "") =>
       .map((c) => `${c.usage}\n  ${c.summary}`),
     "",
     "Bots accept an ID, @handle, or unique name. Channels accept an ID or name.",
-    "Profile flags: --name --description --avatar --provider --model --reasoning --permissions --interval (minutes, 0 disables schedule).",
+    "Profile flags: --name --description --avatar --provider --model --reasoning --fallback-provider --fallback-model --fallback-reasoning --permissions --interval (minutes, 0 disables schedule).",
     "File flags: --machine HOST_ID selects the file's machine (use an absolute path). Otherwise the invoking thread determines the machine.",
     "--json returns structured output. Document reads include a version; pass --version when saving an edited copy.",
     "Messages and activity default to 20 entries (max 50); --offset continues older pages. List commands default to 50 (max 100).",
@@ -291,6 +295,9 @@ function profile(args: Args): Partial<ProfileInput> {
     avatar: "avatar",
     provider: "providerId",
     model: "model",
+    "fallback-provider": "fallbackProviderId",
+    "fallback-model": "fallbackModel",
+    "fallback-reasoning": "fallbackReasoningLevel",
     reasoning: "reasoningLevel",
     permissions: "permissionMode",
     interval: "intervalMinutes",
@@ -827,6 +834,10 @@ export function registerCli(
           return emit(
             await call("create", input),
           );
+        }
+        if (command === "swap") {
+          const a = argumentsFor(rest), [selector] = a.positional(1);
+          return emit(await call("swapModel", { id: ownBot(selector!).id }));
         }
         if (command === "show" || command === "wake") {
           const a = argumentsFor(rest),

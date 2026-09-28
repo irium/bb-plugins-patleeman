@@ -2045,6 +2045,21 @@ export class Runtime {
     }
     return "Agent turn failed.";
   }
+  private async providerFailed(threadId: string, job: Job): Promise<boolean> {
+    try {
+      const events = await this.bb.sdk.threads.events.list({
+        threadId,
+        types: ["provider/error"],
+        order: "desc",
+        limit: "20",
+      });
+      const startedAt = job.dispatchStartedAt ?? job.createdAt;
+      return events.some((event) => event.createdAt >= startedAt);
+    } catch (cause) {
+      this.bb.log.debug(`Provider failure check unavailable: ${errorText(cause)}`);
+      return false;
+    }
+  }
   async settleFromEvent(
     threadId: string,
     text: string | null,
@@ -2091,9 +2106,10 @@ export class Runtime {
       error === undefined
         ? undefined
         : error?.trim() || (await this.failureFromThread(threadId, job)),
+      error !== undefined && await this.providerFailed(threadId, job),
     );
   }
-  complete(threadId: string, text: string | null, error?: string) {
+  complete(threadId: string, text: string | null, error?: string, providerFailure = false) {
     const c = this.store.byThread(threadId);
     if (!c) return;
     const lane = primaryLane(c.botId, c.key);
@@ -2101,7 +2117,29 @@ export class Runtime {
       this.busy.delete(lane);
     const job = this.activeJobForThread(threadId);
     if (!job) return;
+    const bot = this.store.get(job.botId);
+    if (providerFailure && !text?.trim() && !job.outputAttachments.length &&
+      bot.fallbackProviderId && !job.fallbackAttempted &&
+      (bot.fallbackProviderId !== bot.providerId || bot.fallbackModel !== bot.model ||
+        bot.fallbackReasoningLevel !== bot.reasoningLevel) &&
+      !job.forkSourceThreadId && c.key === job.conversationKey) {
+      // Reuse the same job and prompt, but start a fresh session on the fallback.
+      // The failed thread remains in history for inspection.
+      this.store.archiveConversation(c);
+      job.fallbackAttempted = true;
+      job.threadId = null;
+      job.status = "queued";
+      job.startedAt = null;
+      job.dispatchStartedAt = null;
+      job.requiresPromptMatch = false;
+      job.error = null;
+      this.store.putJob(job);
+      this.changed();
+      return;
+    }
     if (error || (!text?.trim() && !job.outputAttachments.length)) {
+      if (providerFailure && job.fallbackAttempted && c.key === job.conversationKey)
+        this.store.archiveConversation(c);
       job.status = "error";
       job.error =
         error ||
@@ -2737,6 +2775,7 @@ export class Runtime {
             job.threadId,
             null,
             "The agent turn failed. Inspect the conversation.",
+            await this.providerFailed(job.threadId, current),
           );
       } else if (thread.status === "active" || matching) {
         current.status = "running";
@@ -2978,12 +3017,21 @@ export class Runtime {
       // A long-lived bot thread keeps its spawn mode, so every turn carries the
       // channel's current setting. It takes effect on this turn, not the one
       // already running.
-      const permissionMode = await this.permissionMode(bot, job.roomId);
+      const executionBot = job.fallbackAttempted || c?.providerId === bot.fallbackProviderId &&
+        !!bot.fallbackProviderId
+        ? {
+            ...bot,
+            providerId: bot.fallbackProviderId,
+            model: bot.fallbackModel,
+            reasoningLevel: bot.fallbackReasoningLevel,
+          }
+        : bot;
+      const permissionMode = await this.permissionMode(executionBot, job.roomId);
       if (!c)
         c = job.forkSourceThreadId
           ? await this.forkConversation(bot, job, permissionMode)
           : await this.conversation(
-              bot,
+              executionBot,
               job.conversationKey,
               job.roomId ? "group" : "mission",
               job.roomId ? this.store.room(job.roomId).name : "Mission",

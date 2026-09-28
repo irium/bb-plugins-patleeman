@@ -84,8 +84,10 @@ import {
 import { ChannelPermissionPicker } from "./channel-permissions";
 import {
   channelLinkDestination,
+  channelFileLinkDestination,
   channelMessageIdFromSubPath,
   channelMessageReference,
+  channelThreadLinkDestination,
 } from "./channel-links";
 import { ChannelAutomationsView } from "./channel-automations-view";
 import {
@@ -257,8 +259,28 @@ export function ChannelLinkNavigation() {
           ? event.target.closest<HTMLAnchorElement>("a[href]")
           : null;
       if (!anchor || anchor.hasAttribute("download")) return;
+      const href = anchor.getAttribute("href") ?? "";
+      if (anchor.closest(".bot-message-markdown")) {
+        const threadId = channelThreadLinkDestination(href, window.location.origin);
+        if (threadId) {
+          event.preventDefault();
+          event.stopPropagation();
+          navigate.toThread(threadId);
+          return;
+        }
+        const hostId = anchor.closest<HTMLElement>("article[data-bot-host-id]")?.dataset.botHostId;
+        const path = hostId && channelFileLinkDestination(href);
+        if (hostId && path && navigate.experimental_openFilePreview({
+          target: { kind: "host", hostId, path },
+          location: null,
+        })) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+      }
       const destination = channelLinkDestination(
-        anchor.getAttribute("href") ?? "",
+        href,
         window.location.origin,
         knownChannelIds,
       );
@@ -2407,6 +2429,7 @@ function ChannelChat({ id, messageId, replyToMessage }: { id: string; messageId?
                         <Popover.Anchor asChild>
                           <article
                             id={`channel-message-${m.id}`}
+                            data-bot-host-id={bot?.hostId}
                             className={messageClasses}
                             tabIndex={0}
                             aria-haspopup="dialog"

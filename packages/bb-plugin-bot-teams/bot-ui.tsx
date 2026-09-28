@@ -46,6 +46,9 @@ const defaults: ProfileInput = {
   avatar: "🤖",
   providerId: "codex",
   model: "",
+  fallbackProviderId: "",
+  fallbackModel: "",
+  fallbackReasoningLevel: "medium",
   reasoningLevel: "medium",
   permissionMode: "auto",
   intervalMinutes: 0,
@@ -262,6 +265,26 @@ export function ProfileForm({
       setPending(false);
     }
   };
+  const swapModel = async () => {
+    if (pending || dirty || !bot.fallbackProviderId) return;
+    setPending(true);
+    setError(null);
+    try {
+      const result = await rpc.call("swapModel", {
+        id: bot.id,
+        expectedUpdatedAt: bot.updatedAt,
+      });
+      setDraft(result);
+      setBaseline(result);
+      setVersion(result.updatedAt);
+      setSaved(true);
+      await onSaved(result);
+    } catch (cause) {
+      setError(message(cause));
+    } finally {
+      setPending(false);
+    }
+  };
   const schedules = [
     [0, "Only when messaged or woken manually"],
     [15, "Every 15 minutes"],
@@ -310,7 +333,7 @@ export function ProfileForm({
           </FormRow>
         </Section>
         <Section title="Behavior">
-          <FormRow label="Model" hint="Changing the provider or model starts fresh bot threads. Past threads stay in history.">
+          <FormRow label="Primary model" hint="Changing the provider or model starts fresh bot threads. Past threads stay in history.">
             <ProviderModelPicker
               disabled={pending}
               className="profile-picker-control max-w-[360px]"
@@ -326,6 +349,44 @@ export function ProfileForm({
               }}
               routing={{ kind: "host", hostId: bot.hostId }}
             />
+          </FormRow>
+          <FormRow label="Fallback model" hint="If a provider error ends a channel or mission response, the bot retries once with this model in a new thread.">
+            {draft.fallbackProviderId ? <div className="space-y-2">
+              <ProviderModelPicker
+                disabled={pending}
+                className="profile-picker-control max-w-[360px]"
+                allowProviderChange
+                value={{
+                  providerId: draft.fallbackProviderId,
+                  model: draft.fallbackModel,
+                  reasoningLevel: draft.fallbackReasoningLevel,
+                }}
+                onChange={(v) => {
+                  setDraft((d) => ({
+                    ...d,
+                    fallbackProviderId: v.providerId,
+                    fallbackModel: v.model,
+                    fallbackReasoningLevel: v.reasoningLevel,
+                  }));
+                  setSaved(false);
+                }}
+                routing={{ kind: "host", hostId: bot.hostId }}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" disabled={pending || dirty}
+                  onClick={() => void swapModel()}>Use fallback now</Button>
+                <Button type="button" size="sm" variant="ghost" disabled={pending}
+                  onClick={() => {
+                    setDraft((d) => ({ ...d, fallbackProviderId: "", fallbackModel: "" }));
+                    setSaved(false);
+                  }}>Remove fallback</Button>
+              </div>
+            </div> : <Button type="button" size="sm" variant="outline" disabled={pending}
+              onClick={() => {
+                setDraft((d) => ({ ...d, fallbackProviderId: d.providerId,
+                  fallbackModel: "", fallbackReasoningLevel: d.reasoningLevel }));
+                setSaved(false);
+              }}>Add fallback model</Button>}
           </FormRow>
           <FormRow label="Permissions">
             <PermissionModePicker

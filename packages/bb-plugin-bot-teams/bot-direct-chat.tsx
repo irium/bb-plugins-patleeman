@@ -352,6 +352,24 @@ export function BotDirectChat({
       setPending(false);
     }
   };
+  const swapModel = async () => {
+    if (pending || bot.retired || !bot.fallbackProviderId) return;
+    setPending(true);
+    setError(null);
+    try {
+      await rpc.call("swapModel", {
+        id: bot.id,
+        expectedUpdatedAt: bot.updatedAt,
+      });
+      const conversation = await rpc.call("conversation", { id: bot.id });
+      navigate.toThread(conversation.threadId);
+      onChanged();
+    } catch (cause) {
+      setError(message(cause));
+    } finally {
+      setPending(false);
+    }
+  };
   const handleSlashCommand = (event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey ||
         event.metaKey || event.nativeEvent.isComposing || !selected)
@@ -385,7 +403,7 @@ export function BotDirectChat({
         </p>
       )}
       {pickerHost && createPortal(
-        <ProviderModelPicker
+        <div className="flex items-center gap-2"><ProviderModelPicker
           className="bot-direct-model-picker"
           disabled={pending || !!bot.retired}
           value={{
@@ -396,7 +414,10 @@ export function BotDirectChat({
           onChange={changeModel}
           routing={{ kind: "host", hostId: bot.hostId }}
           align="start"
-        />,
+        />{bot.fallbackProviderId && <Button type="button" size="sm" variant="ghost"
+          disabled={pending || !!bot.retired} onClick={() => void swapModel()}>
+          Swap model
+        </Button>}</div>,
         pickerHost,
       )}
     </div>
