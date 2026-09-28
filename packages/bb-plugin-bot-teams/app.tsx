@@ -35,6 +35,7 @@ import {
   ChannelLinkNavigation,
 } from "./channels";
 import { Modal } from "./channel-controls";
+import { setThreadDraft } from "./channel-drafts";
 import { BotCollection } from "./bot-collection";
 import { BotCreationThread } from "./bot-creation-thread";
 import {
@@ -349,6 +350,13 @@ export default definePluginApp((app) => {
       { id: "channel-handoff-prefill", component: ChannelHandoffPrefill },
     ],
     banners: [{ id: "channel-work", component: ChannelComposerBanner }],
+    richText: {
+      onDraftChange: (draft, view) => {
+        if (view.scope.kind === "thread")
+          setThreadDraft(view.scope.threadId,
+            !!draft.text.trim() || view.draft.attachmentCount > 0);
+      },
+    },
   });
   app.slots.navPanel({
     id: "bots",

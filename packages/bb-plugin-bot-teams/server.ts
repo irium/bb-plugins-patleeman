@@ -797,13 +797,19 @@ export default async function plugin(bb: BbPluginApi) {
       const activity = store.botActivitySummary();
       const bots = store.all();
       // A linked channel is read when its thread is: reading happens there now.
+      // BB's own read state decides it. Delivering a message into the thread
+      // moves its lastReadAt past the room's updatedAt, so the room's clock
+      // cannot tell a bot's new reply from one the owner has seen.
       const rooms = await Promise.all(store.rooms().map(async (room) => {
         const threadId = channelThreads.threadId(room.id);
         if (!threadId) return room;
         try {
           const thread = await bb.sdk.threads.get({ threadId });
-          const lastReadAt = Math.max(room.lastReadAt ?? 0, thread.lastReadAt ?? 0);
-          return { ...room, threadId, lastReadAt };
+          const updatedAt = Math.max(room.updatedAt, thread.latestAttentionAt);
+          const lastReadAt = thread.latestAttentionAt > (thread.lastReadAt ?? 0)
+            ? Math.min(thread.lastReadAt ?? 0, updatedAt - 1)
+            : updatedAt;
+          return { ...room, threadId, updatedAt, lastReadAt };
         } catch (cause) {
           if (!missingThread(cause)) throw cause;
           return room;
@@ -1209,6 +1215,11 @@ export default async function plugin(bb: BbPluginApi) {
             : {}),
         };
         store.putRoom(next);
+        const threadId = channelThreads.threadId(id);
+        if (threadId && (patch.lastReadAt !== undefined || markUnread))
+          await (markUnread
+            ? bb.sdk.threads.markUnread({ threadId })
+            : bb.sdk.threads.markRead({ threadId }));
         runtime.changed();
         return next;
       }),

@@ -5,6 +5,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type { RoomWork, ThreadStatusView } from "./contract";
 import { channelStatusPresentation } from "./channel-status";
+import { useThreadDraft } from "./channel-drafts";
 
 export type ChannelStatusInput = {
   roomId: string;
@@ -19,9 +20,15 @@ export type ChannelStatusInput = {
 
 export function useChannelStatus(input: ChannelStatusInput) {
   const threadDraft = useSidebarThreadDraft(input.threadId ?? "");
-  const draft = !!input.threadId && threadDraft.hasUnsubmittedDraft;
+  const watchedDraft = useThreadDraft(input.threadId);
+  const draft = !!input.threadId && (threadDraft.hasUnsubmittedDraft || watchedDraft);
   const rowStatuses = useSidebarThreadRowStatuses();
-  return channelStatusPresentation({ ...input, work: input.work, draft, rowStatuses });
+  // A status another plugin set on the channel's own thread belongs on its row too.
+  const threads = input.threadId && rowStatuses.has(input.threadId) &&
+    !input.threads.some((thread) => thread.threadId === input.threadId)
+    ? [...input.threads, { threadId: input.threadId, status: "idle" as const, indicator: "none" as const }]
+    : input.threads;
+  return channelStatusPresentation({ ...input, threads, work: input.work, draft, rowStatuses });
 }
 
 export function ChannelStatusIcon({ status }: {
