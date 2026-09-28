@@ -3,7 +3,7 @@ import {
   usageLimits,
   usageSummary,
 } from "./workspace-contract";
-import { defineRpcContract } from "@get-bb/plugin-sdk";
+import type { defineRpcContract } from "@get-bb/plugin-sdk";
 import { botSetupThreadRequest } from "./bot-creation-contract";
 import { z } from "zod";
 import { sendModes } from "./send-mode";
@@ -401,7 +401,7 @@ const roomInput = z.object({
   name: z.string().trim().min(1).max(80),
   memberIds: z.array(idSchema).max(16),
 });
-export const rpcContract = defineRpcContract({
+export const rpcContract = {
   createBotSetupThread: {
     input: botSetupThreadRequest,
     output: z.object({ threadId: z.string() }),
@@ -714,4 +714,4 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: z.string() }),
     output: z.object({ cancelled: z.boolean() }),
   },
-});
+} satisfies Parameters<typeof defineRpcContract>[0];
