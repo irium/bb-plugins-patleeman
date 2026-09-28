@@ -632,7 +632,6 @@ const captures = [
       for (const text of launchRoomReplies) await client.waitForText(text);
       await client.waitForAriaButton("Channel members: 2 bots");
       await client.waitForAriaButton("Search channel");
-      await client.waitForAriaButton("Channel details");
       await client.evaluate(`(() => {
         const picker = [...document.querySelectorAll('[data-app-composer] button')]
           .find((b) => (b.getAttribute('aria-label') ?? '').startsWith('Provider, model and reasoning'));
@@ -685,7 +684,9 @@ const captures = [
       const threadId = await launchRoomThread();
       await client.navigate(`/threads/${threadId}`);
       await client.waitForText(launchRoomReplies[0]);
-      await client.evaluate(`document.querySelector('button[aria-label="Channel details"]').click()`);
+      await client.evaluate(`document.querySelector('button[aria-label^="Open new tab"]').click()`);
+      await client.waitForText("Channel details");
+      await client.evaluate(`[...document.querySelectorAll('button,[role="menuitem"]')].find(e => e.innerText.trim() === 'Channel details').click()`);
       await client.waitForSelector(".channel-rail-embedded");
       await client.evaluate(`(() => {
         const rail = document.querySelector('.channel-rail-embedded');

@@ -6,7 +6,7 @@ Persistent bots with their own files, mission, and memory, and Slack-style chann
 
 1. Choose **New channel** in the sidebar. Bot Teams creates the channel and opens it as a regular BB thread, with BB's own transcript and composer. Mention a bot with `@handle` in your message to invite it. Opening an existing channel the first time creates its thread and replays its last 50 messages there, each as its own message; your earlier messages show as **You**. **Search channel** finds anything older. See [Channels are threads](#channels-are-threads).
 2. Type `@` to find a bot or choose `@all` / `@channel` to address everyone in the channel. Sending a mention invites that bot into the channel. The picker also includes **Create new bot…**, which opens a new thread with bot setup instructions prefilled. Describe what you need in chat; the agent creates the bot and invites it to this channel. Your channel draft stays saved.
-3. Click the overlapping avatars in the channel thread's header to see members and their activity. **Add bot** sits at the bottom; member options let you configure or remove a bot. The **Channel details** button beside them opens live work, requests that need you, members, and output in BB's thread panel.
+3. Click the overlapping avatars in the channel thread's header to see members and their activity. **Add bot** sits at the bottom; member options let you configure or remove a bot. The **Channel details** tab in BB's thread panel shows live work, requests that need you, members, and output.
 4. Under **Direct messages**, each row is one private thread with a bot: the bot's avatar, the thread title, and the bot's name in muted text. A bot can have many threads. The list is flat and sorted by recent activity, and new direct threads open on BB's regular thread page and get a title from the first message. Each row's menu starts a new thread with that bot and links to its profile, mission, memory, and activity. Open **Bot Teams** to manage profiles, edit `MISSION.md` and `MEMORY.md`, or inspect activity. The collection uses BB's standard content width, search toolbar, status filter, sorting, and bordered rows. Shared conversations live in Channels. Each bot also has a work thread you can open from its channel activity.
 
 In a thread, choose **Handoff to new channel** from the composer’s **+** menu, or **Start channel from thread** from the thread’s sidebar menu. Bot Teams opens a new channel thread with the source thread already linked at the top of the draft. Mention bots, add your request, then send it. The sent message keeps the thread reference as a link.
@@ -75,7 +75,7 @@ Each channel is a hidden BB thread on the **Bot Teams** provider, so it looks an
 - **Messages from elsewhere**, such as `bb bots channel send` or automations, also appear in the thread, marked as sent outside it.
 - Renaming a channel renames its thread. Deleting a channel deletes its thread. If the thread is deleted on its own, opening the channel creates a new one.
 
-The composer's model picker holds the chat mode and bot permissions. The thread header holds the member list, **Search channel**, and **Channel details**, which opens the channel rail in the thread panel. Old channel and message links (`/plugins/bot-teams/channels/…`, including those in notifications) open the channel's thread; a message link opens the channel rather than scrolling to that message. Past messages cannot be edited in a channel thread; send a correction instead.
+The composer's model picker holds the chat mode and bot permissions. The thread header holds the member list and **Search channel**; **Channel details** opens the channel rail as a thread panel tab. Old channel and message links (`/plugins/bot-teams/channels/…`, including those in notifications) open the channel's thread; a message link opens the channel rather than scrolling to that message. Past messages cannot be edited in a channel thread; send a correction instead.
 
 ## Mentions everywhere
 
@@ -114,9 +114,8 @@ from its new-tab launcher or from links in the channel rail.
 
 ## Channel rail
 
-The rail answers "what is true in this channel right now". Open it with
-**Channel details** in the channel thread's header; it appears as a tab in the
-thread panel. The other channel tabs cover what is configured and what already
+The rail answers "what is true in this channel right now". Open it as the
+**Channel details** tab in the channel thread's panel. The other channel tabs cover what is configured and what already
 happened; the rail holds live state.
 
 - **Live now** lists each working bot with its elapsed time, current activity,
@@ -356,8 +355,8 @@ collapsed so no real threads or projects appear.
 
 **Launch room** open as a BB thread. You share the ORBIT-42 brief with both
 bots and each replies under its own name; Atlas hands the release check to
-`@scribe`, which renders as a link. The header shows the member avatars,
-**Search channel**, and **Channel details**. The composer's model picker shows
+`@scribe`, which renders as a link. The header shows the member avatars and
+**Search channel**. The composer's model picker shows
 the **Directed** chat mode with **Each bot's own** permissions.
 
 ![Bots in the composer's @ menu](assets/channel-mentions.png)

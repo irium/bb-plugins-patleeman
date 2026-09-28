@@ -64,9 +64,8 @@ function useChannelSurface(threadId: string | null) {
   return { surface, load };
 }
 
-/** Header: who is in the channel, and the button that opens its live work. */
+/** Header: who is in the channel, and search across its history. */
 export function ChannelThreadHeader({ threadId }: PluginThreadHeaderActionProps) {
-  const navigate = useBbNavigate();
   const { surface, load } = useChannelSurface(threadId);
   const [searchOpen, setSearchOpen] = useState(false);
   if (!surface) return null;
@@ -77,14 +76,6 @@ export function ChannelThreadHeader({ threadId }: PluginThreadHeaderActionProps)
         <Icon name="Search" />
       </Button>
       <ChannelSearch id={surface.room.id} open={searchOpen} onOpenChange={setSearchOpen} />
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Channel details"
-        onClick={() => navigate.openThreadPanel({ actionId: channelDetailsPanelId, title: `#${surface.room.name}` })}
-      >
-        <Icon name="ListView" />
-      </Button>
     </div>
   );
 }
