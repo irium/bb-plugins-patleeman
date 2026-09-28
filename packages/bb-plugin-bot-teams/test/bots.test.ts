@@ -170,6 +170,10 @@ test("persistent channel turns receive only new messages", async () => {
     const second = x.store.work(x.a.id)[0]!;
     assert.match(second.text, /Intervening update/);
     assert.match(second.text, /Second question/);
+    // The owner's UI label "You" would read as the bot itself in its prompt.
+    assert.match(second.text, /the owner: @scribe Intervening update/);
+    assert.match(second.text, /Consider this message from the owner:/);
+    assert.doesNotMatch(second.text, /\bYou: |from You:/);
     assert.doesNotMatch(second.text, /Members:|First question|First answer/);
     assert.deepEqual(second.attachments, []);
     assert.equal(

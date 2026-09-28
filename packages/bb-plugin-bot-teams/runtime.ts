@@ -44,6 +44,12 @@ export const missingThread = (cause: unknown) =>
   /(?:^|\b)(?:thread not found|thread does not exist|HTTP 404)(?:\b|$)/i.test(
     errorText(cause),
   );
+/**
+ * "You" is the owner's label in the channel UI. In a bot's prompt it would read
+ * as the bot itself, so name the owner in the third person there.
+ */
+export const promptSpeaker = (message: Pick<RoomMessage, "botId" | "speaker">) =>
+  !message.botId && message.speaker === "You" ? "the owner" : message.speaker;
 /** Primary work is serial within a conversation, but separate channels have separate lanes. */
 export const primaryLane = (botId: string, conversationKey: string) =>
   conversationKey.startsWith("group:")
@@ -1841,7 +1847,7 @@ export class Runtime {
       )
       .map((message) => ({
         id: message.id,
-        text: `[${message.id}] ${message.speaker}: ${message.text}${message.attachments.length ? "\nAttachments: " + message.attachments.map((a) => a.name).join(", ") : ""}`,
+        text: `[${message.id}] ${promptSpeaker(message)}: ${message.text}${message.attachments.length ? "\nAttachments: " + message.attachments.map((a) => a.name).join(", ") : ""}`,
       }));
     const included: typeof entries = [];
     let transcriptLength = 0;
@@ -1888,7 +1894,7 @@ export class Runtime {
         : []),
       ...omittedRange,
       "",
-      `Consider this message from ${trigger.speaker}:`,
+      `Consider this message from ${promptSpeaker(trigger)}:`,
       (trigger.sentText ?? trigger.text) ||
         "Please inspect the attached files.",
       ...(job.coordinatorId === job.botId
@@ -1909,7 +1915,7 @@ export class Runtime {
           ]
         : []),
       ...(reference
-        ? [`Replying to ${reference.speaker}: ${reference.text}`]
+        ? [`Replying to ${promptSpeaker(reference)}: ${reference.text}`]
         : []),
     ].join("\n");
     job.contextMessageId = recent.at(-1)?.id;
