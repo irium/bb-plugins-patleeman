@@ -331,6 +331,9 @@ Bot Teams uses the unique plugin ID `bot-teams`, separate from the community plu
 
 ## Install and develop
 
+Bot Teams requires BB 0.44.0 or newer with Plugin SDK 0.5.29 or newer.
+Update BB before installing the plugin if it reports an SDK version mismatch.
+
 ```sh
 pnpm install
 pnpm --filter bb-plugin-bot-teams typecheck
