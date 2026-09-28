@@ -11,6 +11,7 @@ import { messageSchema } from "./contract";
 import type { Store } from "./store";
 import { attachmentUrl } from "./channel-attachments";
 import { linkifyMentions } from "./mentions";
+import { isForkConversation } from "./send-mode";
 import { missingThread } from "./runtime";
 
 const historyLimit = 30;
@@ -201,7 +202,7 @@ export class ChannelThreads {
       return {
         messageId: message.id,
         kind: "bot",
-        speaker: bot?.name ?? message.speaker,
+        speaker: `${bot?.name ?? message.speaker}${message.conversationKey && isForkConversation(message.conversationKey) ? " · separate answer" : ""}`,
         avatar: bot?.avatar ?? null,
         // Known @handles render as links that open the bot, like pills in the composer.
         text: linkifyMentions(message.text, (handle) => byHandle.get(handle.toLowerCase()) ?? null),

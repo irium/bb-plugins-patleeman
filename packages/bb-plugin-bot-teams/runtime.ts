@@ -17,7 +17,6 @@ import type {
 import { isAutomationTrigger, messageSchema } from "./contract";
 import type { PermissionMode } from "./contract";
 import { Store } from "./store";
-import { chatGuidance } from "./chat-guidance";
 import { activitySnippetFromTimeline } from "./activity";
 import { isExecuting } from "./job-state";
 import {

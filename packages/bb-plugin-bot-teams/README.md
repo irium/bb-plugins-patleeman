@@ -136,26 +136,23 @@ Smart first decides whether one coordinator delegates work or several bots contr
 - **Fork** when you ask something out of band beside the running task, even if
   it is about that task.
 
-An idle bot starts as a follow-up when selected. The Smart plan appears on the sent message as **Auto · Serialized** or **Auto · Parallel**.
+An idle bot starts as a follow-up when selected.
 
-To decide one message yourself, use the caret beside **Send**, where a thread
-composer keeps its own send options:
+To decide one message yourself, start it with a command:
 
-- **Auto**: the classifier chooses the action for each busy recipient, and in
-  Smart channels also chooses the coordinator and execution mode. This is the default.
-- **Steer**: change the task currently running. Also available as `/steer`.
-- **Follow-up**: wait for the current task to finish. Also `/followup` or `/queue`.
-- **Fork**: clone the selected bot’s available session context and handle the
-  message separately. Also `/fork @handle Your question` or **Ask separately**
-  in a bot message’s context menu.
+- `/steer`: change the task currently running.
+- `/followup` or `/queue`: wait for the current task to finish.
+- `/fork @handle Your question`: clone the bot's available session context and
+  handle the message separately.
 
-An explicit mode overrides the classifier in every chat mode. While a message
-carries one, it also appears beside the **+** menu so the override stays
-visible; choosing **Auto** in either control returns the message to the
-classifier, and sending clears it. Smart still decides whether multiple mentioned bots work together or in parallel; the explicit mode controls the busy-session action.
+Without a command, the classifier chooses the action for each busy recipient,
+and in Smart channels also the coordinator and execution mode. A command
+overrides the classifier in every chat mode. Smart still decides whether
+multiple mentioned bots work together or in parallel; the command controls the
+busy-session action.
 
-A fork’s answer appears in the channel, linked to the question and labeled
-**Fork**. Ordinary channel messages continue the primary session. The primary picks up public fork answers
+A fork’s answer appears in the channel under the bot's name, marked
+**separate answer**. Ordinary channel messages continue the primary session. The primary picks up public fork answers
 through later channel context; private provider histories are not merged.
 
 Forks require an existing session and a provider that supports native forks.
@@ -213,7 +210,7 @@ Bots are always available in channels and direct chats; there is no bot-level pa
 
 Failed channel responses show **Open work thread** and **Retry response**. Retrying keeps the original message and targets only that bot; repeated clicks do not start duplicate retries. A long response gets a wrap-up request at 75% of its time limit (15 minutes at the 20-minute default), asking the bot to stop new work, save its state, and report progress. If it reaches the limit without finishing, Bot Teams stops the response, posts the last recorded progress in the channel, and preserves its bot work thread and workspace. **Resume response** continues in that same work thread. For an important checkpoint or blocker before then, bots can use `bots_channel_notify`; it leaves a durable channel message and notifies the owner without waking other bots. Restore and invite a removed bot before retrying.
 
-Default limits are 100 started turns per hour, 1,000 per day, 20 minutes per turn, and two concurrent forks per bot. **Usage and limits** in the channel workbench and the bot’s **Usage** tab make these editable. Both bot and channel turn budgets apply; existing work can finish while new work waits. Provider billing and token details remain in the bot work thread. BB’s provider and concurrency limits also apply.
+Default limits are 100 started turns per hour, 1,000 per day, 20 minutes per turn, and two concurrent forks per bot. **Usage and limits** in the **Channel usage** tab and the bot’s **Usage** tab make these editable. Both bot and channel turn budgets apply; existing work can finish while new work waits. Provider billing and token details remain in the bot work thread. BB’s provider and concurrency limits also apply.
 
 ## Persistence
 

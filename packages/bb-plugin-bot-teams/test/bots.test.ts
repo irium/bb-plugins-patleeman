@@ -3588,7 +3588,6 @@ test("router validates model output and uses provider capabilities for both atte
         },
         x.a.projectId,
         x.a.hostId,
-        "/tmp/router",
         m,
         [],
         [x.a],

@@ -5,14 +5,12 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type { DirectThreadView } from "./contract";
 import { directStatusPresentation } from "./direct-status";
-import { useDirectDraft } from "./direct-draft";
 
 export function DirectMessageStatus({ thread }: { thread: DirectThreadView }) {
   const draft = useSidebarThreadDraft(thread.threadId);
-  const localDraft = useDirectDraft(thread.threadId);
   const rowStatus = useSidebarThreadRowStatus(thread.threadId);
   const status = directStatusPresentation(thread,
-    draft.hasUnsubmittedDraft || localDraft, rowStatus);
+    draft.hasUnsubmittedDraft, rowStatus);
   if (status.shortLabel === "Ready") return null;
   return (
     <span className="channel-nav-status">

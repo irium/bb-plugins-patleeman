@@ -839,73 +839,10 @@
 }
 /* BB's thread timeline: a 760px column of rows 8px apart, padded as a thread pane. */
 
-.channel-permission-heading {
-  margin: 4px 4px 2px;
-  color: var(--muted-foreground);
-  font-weight: 600;
-}
-.channel-permission-heading:not(:first-child) {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-.channel-permission-option {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  width: 100%;
-  padding: 6px;
-  border-radius: 8px;
-  text-align: start;
-}
-.channel-permission-option:hover:not(:disabled),
-.channel-permission-option:focus-visible {
-  background: var(--accent, color-mix(in srgb, currentColor 8%, transparent));
-}
-.channel-permission-option:disabled {
-  opacity: 0.6;
-}
-.channel-permission-option > span:last-child {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.channel-permission-check {
-  display: inline-flex;
-  flex: 0 0 14px;
-  padding-top: 2px;
-}
-.channel-permission-check [data-icon-root] {
-  width: 14px;
-  height: 14px;
-}
-.channel-permission-hint {
-  color: var(--muted-foreground);
-}
-.channel-permission-note {
-  margin: 4px;
-  color: var(--muted-foreground);
-}
-.channel-permission-bot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 2px 4px;
-}
-.channel-permission-bot-name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
 @media (max-width: 900px) {
   .bot-thread-bar {
     flex-wrap: wrap;
   }
-
 
 }
 @media (max-width: 700px) {
@@ -920,7 +857,6 @@
   .bot-thread-bar .bot-tabs button {
     padding: 0 6px;
   }
-
 
 }
 
@@ -1621,7 +1557,6 @@
   color: var(--warning, #bf973f);
 }
 .channel-needs-attention [data-icon-root] { width: 17px; height: 17px; }
-
 
 .channel-workbench-panel {
   display: flex;

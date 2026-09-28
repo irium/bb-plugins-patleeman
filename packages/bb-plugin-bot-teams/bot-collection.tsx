@@ -28,7 +28,7 @@ function relativeActivity(timestamp: number) {
     ["month", 2_592_000_000],
     ["year", 31_536_000_000],
   ];
-  const [unit, milliseconds] = units.find(([, size], index) =>
+  const [unit, milliseconds] = units.find((_, index) =>
     index === units.length - 1 || elapsed < units[index + 1]![1],
   )!;
   return relativeTime.format(-Math.max(1, Math.floor(elapsed / milliseconds)), unit);

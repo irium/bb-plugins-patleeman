@@ -2,12 +2,11 @@ import { classifyJevReturn } from "./jev";
 import { ChannelNotifications, notificationSchema } from "./notifications";
 import { AttentionReplies, StaleAttentionReplyError } from "./attention-replies";
 import { ChannelApprovals } from "./approvals";
-import { usageLimits } from "./workspace-contract";
 import { isExecuting } from "./job-state";
 import { broadcastHandles } from "./mentions";
 import { createHash, randomUUID } from "node:crypto";
 import { join, basename, isAbsolute, relative } from "node:path";
-import { mkdir } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { z } from "zod";
@@ -35,7 +34,6 @@ import {
   channelPostTool,
   channelProviderId,
 } from "./channel-provider";
-import { stat } from "node:fs/promises";
 import {
   Runtime,
   jobPrompt,
@@ -273,8 +271,6 @@ export default async function plugin(bb: BbPluginApi) {
   ) => {
     if (!members.length) return [];
     const config = await settings.get();
-    const path = join(store.root, "routing");
-    await mkdir(path, { recursive: true, mode: 0o700 });
     const routingStarted = Date.now();
     try {
       return await selectBots(
@@ -283,7 +279,6 @@ export default async function plugin(bb: BbPluginApi) {
         config,
         members[0]!.projectId,
         members[0]!.hostId,
-        path,
         message,
         store.visibleMessages(room.id, 9).filter((m) => m.id !== message.id).slice(-8),
         members,
@@ -303,8 +298,6 @@ export default async function plugin(bb: BbPluginApi) {
   runtime.returnDecision = async (group, signal) => {
     const bot = store.get(group.requesterBotId),
       config = await settings.get();
-    const path = join(store.root, "routing");
-    await mkdir(path, { recursive: true, mode: 0o700 });
     const started = Date.now();
     try {
       if (config.routingEngine === "jev")
@@ -319,7 +312,6 @@ export default async function plugin(bb: BbPluginApi) {
         config,
         bot.projectId,
         bot.hostId,
-        path,
         `return:${group.id}`,
         runtime.delegations.classificationPrompt(group),
         signal,

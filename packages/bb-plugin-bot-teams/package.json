@@ -30,7 +30,6 @@
   },
   "devDependencies": {
     "@get-bb/plugin-sdk": "0.5.29",
-    "@pierre/diffs": "^1.2.9",
     "@radix-ui/react-alert-dialog": "^1.1.19",
     "@radix-ui/react-context-menu": "^2.3.3",
     "@radix-ui/react-dialog": "^1.1.19",
@@ -49,8 +48,6 @@
     "better-sqlite3": "^12.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "cron-parser": "^5.5.0",
-    "hono": "^4.11.9",
     "sonner": "^1.7.4",
     "tailwind-merge": "^3.4.0",
     "tsx": "^4.20.0",
