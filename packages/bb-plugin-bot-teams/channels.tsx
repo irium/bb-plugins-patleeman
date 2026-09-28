@@ -268,16 +268,6 @@ export function ChannelLinkNavigation() {
           navigate.toThread(threadId);
           return;
         }
-        const hostId = anchor.closest<HTMLElement>("article[data-bot-host-id]")?.dataset.botHostId;
-        const path = hostId && channelFileLinkDestination(href);
-        if (hostId && path && navigate.experimental_openFilePreview({
-          target: { kind: "host", hostId, path },
-          location: null,
-        })) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
       }
       const destination = channelLinkDestination(
         href,
@@ -2086,6 +2076,18 @@ function ChannelChat({ id, messageId, replyToMessage }: { id: string; messageId?
       event.target instanceof Element
         ? event.target.closest<HTMLAnchorElement>("a[href]")
         : null;
+    if (anchor?.closest(".bot-message-markdown")) {
+      const hostId = anchor.closest<HTMLElement>("article[data-bot-host-id]")?.dataset.botHostId;
+      const path = hostId && channelFileLinkDestination(anchor.getAttribute("href") ?? "");
+      if (hostId && path && navigate.experimental_openFilePreview({
+        target: { kind: "host", hostId, path },
+        location: null,
+      })) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+    }
     const botId = anchor && mentionBotId(anchor.getAttribute("href") ?? "");
     if (!botId) return;
     event.preventDefault();
