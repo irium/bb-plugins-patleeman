@@ -24,6 +24,11 @@ script swaps that icon for the emoji glyph in the per-message action bar and
 strips it from the floating selection menu), while the drafted reply uses
 the full `emoji label` text.
 
+Optional **smart reactions** (off by default) let the assistant suggest the
+reactions that fit each reply, such as `🪶 SQLite` and `🐘 Postgres` when it
+asks you to choose. They appear as buttons inside the reply. See
+[Smart reactions](#smart-reactions).
+
 ## Smart reactions
 
 Smart reactions are off by default. Turn them on with the **Smart reactions**
