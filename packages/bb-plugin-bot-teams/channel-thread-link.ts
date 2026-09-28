@@ -9,6 +9,8 @@ import {
 import type { Room, RoomMessage } from "./contract";
 import { messageSchema } from "./contract";
 import type { Store } from "./store";
+import { attachmentUrl } from "./channel-attachments";
+import { linkifyMentions } from "./mentions";
 import { missingThread } from "./runtime";
 
 const historyLimit = 30;
@@ -125,7 +127,22 @@ export class ChannelThreads {
     this.store.db
       .prepare("INSERT INTO channel_threads VALUES (?,?,?,?)")
       .run(room.id, thread.id, room.name, this.maxRowid(room.id));
+    await this.settled(thread.id);
     return thread.id;
+  }
+
+  /**
+   * A new thread rejects messages until its first turn has stored its
+   * execution settings. Wait for that hidden start turn so the owner's first
+   * message is accepted.
+   */
+  private async settled(threadId: string, timeoutMs = 20_000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const thread = await this.bb.sdk.threads.get({ threadId });
+      if (thread.status === "idle" || thread.status === "error") return;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
   }
 
   private maxRowid(roomId: string) {
@@ -163,17 +180,20 @@ export class ChannelThreads {
     if (!message.text.trim() && !message.attachments.length) return null;
     const attachments = message.attachments.map((a) => ({
       name: a.name,
-      path: a.path,
+      url: attachmentUrl(a),
       image: a.type === "localImage",
     }));
     if (message.botId) {
-      const bot = this.store.all().find((b) => b.id === message.botId);
+      const bots = this.store.all();
+      const bot = bots.find((b) => b.id === message.botId);
+      const byHandle = new Map(bots.map((b) => [b.handle.toLowerCase(), b.id]));
       return {
         messageId: message.id,
         kind: "bot",
         speaker: bot?.name ?? message.speaker,
         avatar: bot?.avatar ?? null,
-        text: message.text,
+        // Known @handles render as links that open the bot, like pills in the composer.
+        text: linkifyMentions(message.text, (handle) => byHandle.get(handle.toLowerCase()) ?? null),
         attachments,
       };
     }

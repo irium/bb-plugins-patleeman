@@ -21,7 +21,6 @@ import { Button } from "./components/ui/button";
 import { message } from "./bot-ui";
 import { channelMessageSubPath } from "./channel-links";
 import { attachmentUrl } from "./channel-attachments";
-import { revealApproval } from "./channel-approvals";
 import { ChannelAutomationsView } from "./channel-automations-view";
 import { openWorkThread } from "./channel-threads";
 import { attentionReasons, useAttention } from "./attention-view";
@@ -428,6 +427,15 @@ export function ChannelRail({
     return () => window.removeEventListener("keydown", dismiss);
   }, [overlay, onClose]);
 
+  const updateAttention = async (id: string, action: "acknowledge" | "snooze") => {
+    setError(null);
+    try {
+      await rpc.call("attentionUpdate", action === "snooze" ? { id, action, minutes: 60 } : { id, action });
+      onChanged();
+    } catch (cause) {
+      setError(message(cause));
+    }
+  };
   const stop = async (jobId: string) => {
     setStopping(jobId);
     setError(null);
@@ -509,7 +517,9 @@ export function ChannelRail({
                 key={approval.id}
                 type="button"
                 className="channel-rail-row channel-rail-attention"
-                onClick={() => revealApproval(approval.id)}
+                title="Open the bot's work thread to answer"
+                // BB shows the approval in the bot's work thread.
+                onClick={() => navigate.toThread(approval.threadId)}
               >
                 <span className="channel-rail-avatar" aria-hidden>
                   <Icon name="BellDot" />
@@ -526,8 +536,8 @@ export function ChannelRail({
               </button>
             ))}
             {attention.data?.items.map((item) => (
+              <div key={item.id} className="channel-rail-live">
               <button
-                key={item.id}
                 type="button"
                 className="channel-rail-row channel-rail-attention"
                 onClick={() =>
@@ -548,6 +558,25 @@ export function ChannelRail({
                   </span>
                 </span>
               </button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="channel-rail-stop"
+                aria-label="Acknowledge"
+                onClick={() => void updateAttention(item.id, "acknowledge")}
+              >
+                <Icon name="Check" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="channel-rail-stop"
+                aria-label="Snooze 1 hour"
+                onClick={() => void updateAttention(item.id, "snooze")}
+              >
+                <Icon name="Clock" />
+              </Button>
+              </div>
             ))}
           </RailSection>
         )}

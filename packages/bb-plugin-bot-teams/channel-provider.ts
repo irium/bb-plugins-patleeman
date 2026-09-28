@@ -4,6 +4,8 @@ import { z } from "zod";
 export const channelProviderId = "bot-teams-channel";
 export const channelModelId = "channel";
 export const channelPostTool = "bots_channel_thread_post";
+/** Mention provider for bots in a channel thread's composer. */
+export const channelMentionProviderId = "bots";
 
 /** Hidden thread input: Bot Teams hands the bridge a stored channel message to show. */
 export const channelDeliverPrefix = "[bot-teams:channel-deliver]";
@@ -25,8 +27,9 @@ export const channelDeliverySchema = z.object({
   speaker: z.string(),
   avatar: z.string().nullable(),
   text: z.string(),
+  /** Bot Teams' own download URL: stored attachment paths are not links. */
   attachments: z
-    .array(z.object({ name: z.string(), path: z.string(), image: z.boolean() }))
+    .array(z.object({ name: z.string(), url: z.string(), image: z.boolean() }))
     .default([]),
 });
 export type ChannelDelivery = z.infer<typeof channelDeliverySchema>;
@@ -49,10 +52,17 @@ export const channelPostInput = z.object({
 
 /** The assistant text a delivery shows as. Assistant messages have no author, so the speaker leads the body. */
 export function deliveryMarkdown(delivery: ChannelDelivery) {
-  const files = delivery.attachments.map(
-    (file) => `- [${file.name.replace(/[[\]]/g, "")}](<${file.path}>)`,
-  );
-  const body = [delivery.text.trim(), files.join("\n")].filter(Boolean).join("\n\n");
+  const name = (file: { name: string }) => file.name.replace(/[[\]]/g, "");
+  // Images show inline; other files are download links.
+  const images = delivery.attachments
+    .filter((file) => file.image)
+    .map((file) => `![${name(file)}](<${file.url}&inline=1>)`);
+  const files = delivery.attachments
+    .filter((file) => !file.image)
+    .map((file) => `- [${name(file)}](<${file.url}>)`);
+  const body = [delivery.text.trim(), images.join("\n\n"), files.join("\n")]
+    .filter(Boolean)
+    .join("\n\n");
   switch (delivery.kind) {
     case "bot":
       return `**${delivery.avatar ? `${delivery.avatar} ` : ""}${delivery.speaker}**\n\n${body}`;

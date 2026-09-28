@@ -61,7 +61,7 @@ function setup() {
         },
         get: async ({ threadId }: { threadId: string }) => {
           if (missing.has(threadId)) throw new Error("HTTP 404: thread not found");
-          return { id: threadId };
+          return { id: threadId, status: "idle" };
         },
         update: async ({ title }: { title: string }) => {
           titles.push(title);
@@ -182,8 +182,13 @@ test("a bot reply leads with the bot's name, since assistant messages have no au
       speaker: "Editorial",
       avatar: "✍️",
       text: "Drafted.",
-      attachments: [{ name: "draft.md", path: "/bots/editorial/draft.md", image: false }],
+      attachments: [
+        { name: "chart.png", url: "/api/v1/plugins/bot-teams/http/attachment?id=a", image: true },
+        { name: "draft.md", url: "/api/v1/plugins/bot-teams/http/attachment?id=b", image: false },
+      ],
     }),
-    "**✍️ Editorial**\n\nDrafted.\n\n- [draft.md](</bots/editorial/draft.md>)",
+    "**✍️ Editorial**\n\nDrafted.\n\n" +
+      "![chart.png](</api/v1/plugins/bot-teams/http/attachment?id=a&inline=1>)\n\n" +
+      "- [draft.md](</api/v1/plugins/bot-teams/http/attachment?id=b>)",
   );
 });

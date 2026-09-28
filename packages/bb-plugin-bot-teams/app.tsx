@@ -52,7 +52,6 @@ import {
   channelWorkbenchPanel,
   channelWorkbenchPanelIds,
 } from "./channel-thread-surfaces";
-import { workbenchLabels } from "./channel-workbench";
 const tabs = ["profile", "mission", "memory", "activity", "usage"] as const;
 
 function BotDetail({ id, tab }: { id: string; tab: string }) {
@@ -338,7 +337,7 @@ export default definePluginApp((app) => {
   for (const panel of ["automations", "activity", "usage"] as const)
     app.slots.threadPanelAction({
       id: channelWorkbenchPanelIds[panel],
-      title: `Channel ${workbenchLabels[panel].toLowerCase()}`,
+      title: { automations: "Channel automations", activity: "Channel activity", usage: "Channel usage" }[panel],
       icon: { automations: "Clock", activity: "List", usage: "ChartNoAxesCombined" }[panel],
       layout: "flush",
       component: channelWorkbenchPanel(panel),

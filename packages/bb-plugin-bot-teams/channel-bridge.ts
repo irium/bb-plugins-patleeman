@@ -54,21 +54,49 @@ function emit(threadId: string, deltas: ThreadDelta[]) {
   io.send({ jsonrpc: "2.0", method: THREAD_DELTA_NOTIFICATION_METHOD, params: { threadId, deltas } });
 }
 
+type TextInput = Extract<PromptInput, { type: "text" }>;
+
+/** Everything the bridge reads, hidden deliveries included. */
 function promptText(input: readonly PromptInput[]) {
   return input
-    .filter((item): item is Extract<PromptInput, { type: "text" }> => item.type === "text")
+    .filter((item): item is TextInput => item.type === "text")
     .map((item) => item.text)
     .join("");
 }
 
+/**
+ * The owner's own words, as the channel router expects them: a picked bot
+ * pill becomes `@handle` again, and mention context BB adds for the agent is
+ * left out because the router reads the handle itself.
+ */
+function ownerText(input: readonly PromptInput[]) {
+  return input
+    .filter((item): item is TextInput => item.type === "text" && item.visibility !== "agent-only")
+    .map((item) => {
+      let text = item.text;
+      for (const mention of [...item.mentions].sort((a, b) => b.start - a.start)) {
+        const resource = mention.resource;
+        if (resource.kind !== "plugin" || resource.pluginId !== "bot-teams") continue;
+        const handle = resource.itemId.slice(resource.itemId.lastIndexOf(":") + 1);
+        text = `${text.slice(0, mention.start)}@${handle}${text.slice(mention.end)}`;
+      }
+      return text;
+    })
+    .join("");
+}
+
+/** BB names uploads `<name>-<timestamp>-<suffix>.<ext>`; show the name the owner picked. */
+const uploadName = (path: string) =>
+  basename(path).replace(/-\d{13}-[a-z0-9]{6}(\.[^.]+)?$/u, "$1");
+
 function promptAttachments(input: readonly PromptInput[]) {
   return input.flatMap((item) =>
     item.type === "localImage"
-      ? [{ path: item.path, name: basename(item.path), image: true }]
+      ? [{ path: item.path, name: uploadName(item.path), image: true }]
       : item.type === "localFile"
         ? [{
             path: item.path,
-            name: item.name ?? basename(item.path),
+            name: item.name ?? uploadName(item.path),
             ...(item.mimeType ? { mimeType: item.mimeType } : {}),
             ...(item.sizeBytes !== undefined ? { sizeBytes: item.sizeBytes } : {}),
             image: false,
@@ -96,11 +124,18 @@ function deliver(session: Session, text: string, clientRequestId?: ClientTurnReq
   ]);
 }
 
+/** Handing a message to the router is bookkeeping: the row stays collapsed. */
+const postPresentation = {
+  label: { pending: "Sending to channel", completed: "Sent to channel" },
+  icon: { glyph: "Send" },
+  suppress: true,
+};
+
 /** A user's message: hand it to Bot Teams, which routes it like any channel message. */
 function post(session: Session, input: readonly PromptInput[], clientRequestId?: ClientTurnRequestId) {
   session.turns += 1;
   const callId = `post-${session.providerThreadId}-${session.turns}`;
-  const args = { text: promptText(input), attachments: promptAttachments(input) };
+  const args = { text: ownerText(input), attachments: promptAttachments(input) };
   emit(session.threadId, [
     ...accepted(clientRequestId),
     { kind: "turn.open" },
@@ -108,6 +143,7 @@ function post(session: Session, input: readonly PromptInput[], clientRequestId?:
       kind: "item.open",
       key: { providerItemId: callId },
       item: { type: "tool", tool: channelPostTool, server: "bb", args },
+      presentation: postPresentation,
     },
   ]);
   requestCounter += 1;
@@ -252,6 +288,7 @@ function handleResponse(message: unknown) {
         args: {},
         ...(decoded.isError ? { error: decoded.content } : { result: decoded.content }),
       },
+      presentation: postPresentation,
     },
     decoded.isError
       ? { kind: "turn.boundary", status: "failed", error: { message: decoded.content } }

@@ -356,87 +356,65 @@ Rebuild and run `bb plugin reload bot-teams` after changes. Inspect state with `
 
 ## Staged preview
 
+These captures come from the running BB app through
+`scripts/capture-plugin-screenshots.mjs`. They use a seeded **Launch room**
+channel with two demo bots, **Atlas** and **Scribe**, whose missions fix their
+replies so each run shows the same conversation. BB's own sidebar stays
+collapsed so no real threads or projects appear.
+
+![A Bot Teams channel as a native BB thread](assets/staged-preview.png)
+
+**Launch room** open as a BB thread. You share the ORBIT-42 brief with both
+bots and each replies under its own name; Atlas hands the release check to
+`@scribe`, which renders as a link. The header shows the member avatars,
+**Search channel**, and **Channel details**. The **Directed** chat mode and
+**Bot permissions** pickers sit beside the composer.
+
+![Bots in the composer's @ menu](assets/channel-mentions.png)
+
+Typing `@` in a channel thread offers its bots. A picked bot becomes a mention
+pill, and the router receives its `@handle`.
+
+![Channel details in the thread panel](assets/channel-rail.png)
+
+**Channel details** opens the channel rail as a thread panel tab, listing the
+members and the shared `launch-brief.txt`.
+
+![Search across channel history](assets/channel-search.png)
+
+**Search channel** finds every message about the release check, including
+older history.
+
+![Channel automations in the thread panel](assets/channel-automations.png)
+
+**Channel automations** shows a paused weekday status task for Scribe.
+
 ![Bot creation through a prefilled BB thread](assets/bot-creation-thread.png)
 
-The running BB app shows the setup instructions in its standard new-thread composer.
-
-![Bot Teams in the running BB application](assets/staged-preview.png)
-
-The renamed Bot Teams collection in BB, filtered to the staged Atlas research
-bot. The staged capture used a research bot with mission schedules off.
-
-![The floating channel rail beside a staged channel transcript](assets/channel-rail.png)
-
-The running BB application shows the rail floating over the staged Rail QA
-channel's right gutter:
-an open decision under **Needs you**, the bot work thread, the member roster
-with its live state, a scheduled digest counting down, the published
-`rail-check.csv`, and the channel's turns used today. Live now is absent here
-because no bot is working at capture time.
-
-![Channel context and six native workbench tabs](assets/channel-workbench.png)
-
-The running BB application shows a staged ORBIT-42 release brief and saved
-SQLite decision, with six labeled tabs in the native right workbench. The
-capture uses temporary channels with no member bots and removes them afterward.
-The UI regression also checks drafts, channel switching, reopening the panel,
-and the 390-pixel layout. See [verification notes](docs/QA.md).
-
-![Parallel questions and send modes](assets/channel-forks.png)
-
-The running BB channel shows a real native fork’s `SIDE_ANSWER`, linked to its
-question and labeled Fork, alongside the send options beside Send. The staged
-primary session continued its timing task while this answer was produced.
-
-
-The channel Automations dialog shows a bot-created weekday brief and a one-time
-QA task, their saved schedules, and the real replies posted by scheduled work.
-Both schedules are paused after verification.
-
-![Channel automations and their replies](assets/channel-automations.png)
-
-The Bots collection in the running BB application, with Atlas, Quinn, Relay, and Scribe, using BB's standard collection layout and search controls.
+**New bot** opens BB's standard new-thread composer with the setup instructions.
 
 ![Bots collection in BB](assets/bots-collection.png)
 
-Atlas's profile shows the native settings layout.
+The Bots collection uses BB's standard collection layout and search controls.
 
 ![Bot profile settings in BB](assets/bot-profile.png)
 
-A disposable QA bot's memory in the running application, with staged working
-agreements and next steps in the Markdown editor.
+A bot's profile uses the native settings layout.
 
 ![Bot Markdown editor in BB](assets/bot-markdown-editor.jpg)
 
-The running BB application with Atlas and Scribe in **Launch room**, including real readiness replies and answers about a shared brief. The capture verifies the clickable channel title at the left of the header, sidebar Channels, bot identities, the shared file, the avatar member menu, and BB-style composer controls.
+A bot's memory in the Markdown editor.
 
-![Channels and the member menu in the running BB application](assets/staged-preview.png)
-
+To reproduce the channel captures, create Atlas and Scribe with the demo
+missions in [docs/QA.md](docs/QA.md#readme-capture-fixture), seed **Launch room**,
+then run:
 
 ```sh
-BB_CAPTURE_ONLY=bots,bots-emoji,bots-collection,bots-profile,bots-memory \
+BB_CAPTURE_ONLY=bots,bots-mentions,bots-rail,bots-search,bots-automations \
 BB_CAPTURE_PROJECT_ID=proj_... \
 BB_CAPTURE_THREAD_ID=thr_... \
 node scripts/capture-plugin-screenshots.mjs
 ```
-
-See [verification notes](docs/QA.md) for test coverage and live walkthrough results.
-
-![Search across channel history in the running BB app](assets/channel-search.png)
-
-The search preview shows both demo bots’ replies to the staged launch brief.
-
-The migrated Council channel, with live replies from Grug, Architect, and Designer
-and the compact membership menu. Their original model and reasoning choices are retained.
-
-![Council advisors consulting through a BB channel](assets/channel-consultation.png)
-
-The image workflow and chat mode selector below were captured in the running app after a user pasted an image and a real bot published the same local preview through its tool.
-
-![Inline owner and bot images in a BB channel](assets/channel-images.png)
-
-![Chat mode selector beneath the composer](assets/channel-behavior.png)
-
 
 ## Notifications
 
@@ -480,9 +458,9 @@ Smart parallel work creates a return group when it starts. Helpers can finish in
 
 ## Attention requests
 
-Decisions, blockers, and important updates appear on their channel messages and in the channel details rail. Each request stays open until you acknowledge it. Reading its channel does not dismiss it. Reply in the channel composer, or use **Acknowledge** and **Snooze 1 hour** on the message. The CLI supports other snooze durations from 1 minute to 30 days.
+Decisions, blockers, and important updates appear under **Needs you** in **Channel details**. Each request stays open until you acknowledge it. Reading its channel does not dismiss it. Reply in the channel composer, or use **Acknowledge** and **Snooze 1 hour** on the message. The CLI supports other snooze durations from 1 minute to 30 days.
 
-Open requests highlight their channel message in amber with **Needs you**, **Acknowledge**, and **Snooze 1 hour** actions. Snoozed and acknowledged messages offer **Bring back**. A bell replaces the channel’s sidebar hash while requests need attention, including when the channel is selected or working. Reading the channel does not clear the bell; acknowledge or snooze does. Historical pings from builds without attention capture show **Mentioned you** without sending old alerts.
+Open requests stay under **Needs you** until you acknowledge or snooze them. A bell replaces the channel’s sidebar hash while requests need attention, including when the channel is selected or working. Reading the channel does not clear the bell; acknowledge or snooze does. Historical pings from builds without attention capture show **Mentioned you** without sending old alerts.
 
 Bots can mention `@user` in a final response to request a decision. Mentions inside code, quotes, or links do not create requests. For an immediate alert with a specific reason, use `bots_channel_notify` with `channelId`, `requestId`, `reason` (`decision`, `blocker`, or `update`), and `text`. It posts one marked channel message with the caller's identity and does not wake other bots. Reuse the request ID when retrying, and do not repeat the alert in the final answer.
 
@@ -495,11 +473,3 @@ In **Settings → Bot Teams**, **Attention push notifications** controls queued 
 - `bb bots channel notify CHANNEL --reason blocker --text "The release needs your decision." --request-id UUID`
 
 The notify command runs from an agent or bot thread. Request management belongs to the owner. The plugin RPC methods `attentionList` and `attentionUpdate` expose the same operations.
-
-![Attention request in a channel in the staged BB application](assets/channel-attention.png)
-
-The live capture shows a marked decision about the channel rail in the seeded Rail QA channel.
-
-![Highlighted owner ping and channel attention bell](assets/channel-ping-highlight.png)
-
-The staged channel shows an open ORBIT-42 request and a quoted `@user` example that does not trigger attention.

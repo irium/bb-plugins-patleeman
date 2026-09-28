@@ -375,6 +375,26 @@ async function pluginRpc(pluginId, method, input) {
 }
 
 /** Run the bb CLI as the owner, not as the thread this script may run inside. */
+// Bot Teams captures read the seeded "Launch room" channel: Atlas and Scribe
+// with fixed replies from their demo missions (see the Bot Teams README).
+const launchRoomReplies = [
+  "Ready. I'll keep the decision log for ORBIT-42 and post next steps after each check.",
+  "Release check passed: the brief, owner, and Friday window all line up.",
+  "Logged: release check passed. Next step: confirm the Friday release window.",
+];
+let launchRoomId = null;
+async function launchRoomThread() {
+  const { rooms } = await pluginRpc("bot-teams", "list", null);
+  const room = rooms.find((r) => r.name === "Launch room" && !r.archived);
+  if (!room?.threadId) throw new Error("Seed the Launch room channel thread with Atlas and Scribe before capturing.");
+  const { messages } = await pluginRpc("bot-teams", "room", { id: room.id });
+  for (const reply of launchRoomReplies)
+    if (!messages.some((m) => m.botId && m.text.startsWith(reply.slice(0, 40))))
+      throw new Error(`Launch room is missing the seeded reply: ${reply}`);
+  launchRoomId = room.id;
+  return room.threadId;
+}
+
 async function bbCli(args) {
   const env = { ...process.env };
   delete env.BB_THREAD_ID;
@@ -603,47 +623,57 @@ const captures = [
     },
   },
   {
-    id: "bots-ping-highlight",
-    showSidebar: true,
+    id: "bots",
     packageDir: "bb-plugin-bot-teams",
-    fileName: "channel-ping-highlight.png",
+    fileName: "staged-preview.png",
     setup: async (client) => {
-      const { items } = await pluginRpc("bot-teams", "attentionList", { status: "open" });
-      const request = items.find(item => item.id === "ping-highlight-qa" && item.channelName === "Attention QA");
-      if (!request) throw new Error("Seed the open ORBIT-42 @user ping in Attention QA before capture.");
-      await client.navigate(`/plugins/bot-teams/channels/${request.roomId}/message/${request.id}`);
-      for (const text of ["Needs you", "Should we release on Friday or Monday?", "Acknowledge"]) await client.waitForText(text);
+      const threadId = await launchRoomThread();
+      await client.navigate(`/threads/${threadId}`);
+      for (const text of launchRoomReplies) await client.waitForText(text);
+      await client.waitForAriaButton("Channel members: 2 bots");
+      await client.waitForAriaButton("Search channel");
+      await client.waitForAriaButton("Channel details");
       await client.evaluate(`(() => {
-        document.querySelector('button[aria-label^="Hide right panel"]')?.click();
-        document.querySelector('button[aria-label^="Toggle sidebar"][aria-expanded="false"]')?.click();
-      })()`);
-      await sleep(350);
-      await client.evaluate(`(() => {
-        const m = document.getElementById('channel-message-ping-highlight-qa');
-        const bell = document.querySelector('.channel-needs-attention[aria-label="1 request needs your attention"]');
-        if (!m?.classList.contains('needs-owner-attention') || !bell?.checkVisibility() || bell.getBoundingClientRect().left < 0) throw new Error('The ping highlight and persistent channel bell must both be visible');
-        if (document.querySelector('[aria-label="Channel conversation"] [role="alert"]')) throw new Error('The staged channel must not contain a live error');
+        const controls = document.querySelector('.channel-composer-controls');
+        if (!controls?.checkVisibility() || !controls.innerText.includes('Directed') || !controls.innerText.includes('Bot permissions'))
+          throw new Error('The chat mode and bot permission pickers must sit beside the composer');
+        if (!document.querySelector('a[href^="/plugins/bot-teams/mention/"]'))
+          throw new Error("A bot's @mention must render as a link");
+        if (document.body.innerText.includes('bots_channel_thread_post'))
+          throw new Error('Posting to the channel must stay a collapsed bookkeeping row');
       })()`);
     },
   },
   {
-    id: "bots-attention",
+    id: "bots-mentions",
     packageDir: "bb-plugin-bot-teams",
-    fileName: "channel-attention.png",
+    fileName: "channel-mentions.png",
     setup: async (client) => {
-      const { items } = await pluginRpc("bot-teams", "attentionList", { status: "open" });
-      const request = items.find(item => item.channelName === "Rail QA" && item.message.text === "Should the rail default to open on first run?");
-      if (!request) throw new Error("Seed the rail default decision request in Rail QA before capture.");
-      await client.navigate(`/plugins/bot-teams/channels/${request.roomId}/message/${encodeURIComponent(request.message.id)}`);
-      await client.evaluate(`document.querySelector('button[aria-label^="Hide right panel"]')?.click()`);
-      await sleep(600);
-      for (const text of ["Decision needed", "Should the rail default to open on first run?", "Acknowledge"]) await client.waitForText(text);
+      const threadId = await launchRoomThread();
+      await client.navigate(`/threads/${threadId}`);
+      await client.waitForText(launchRoomReplies[0]);
+      await client.evaluate(`document.querySelector('[data-app-composer] [contenteditable="true"]')?.focus()`);
+      // The menu asks providers once a character follows the trigger. A full
+      // handle keeps BB's own thread and project suggestions, which are the
+      // owner's real data, out of a published screenshot.
+      await client.command("Input.insertText", { text: "@atlas" });
+      await client.waitForText("Bots");
       await client.evaluate(`(() => {
-        if (!document.querySelector('.channel-attention-banner')) throw new Error('Channel attention banner must be rendered');
-        const message = Array.from(document.querySelectorAll('[data-channel-message]'))
-          .find(node => node.getAttribute('data-channel-message') === ${JSON.stringify(request.message.id)});
-        if (!message?.querySelector('.message-attention')) throw new Error('The live request must be marked on its channel message');
+        const menu = document.body.innerText;
+        for (const text of ['Atlas', '@atlas'])
+          if (!menu.includes(text)) throw new Error('The @ menu is missing ' + text);
+        const headings = [...document.querySelectorAll('[role="listbox"] *, [data-mention-menu] *')]
+          .map((e) => e.childElementCount === 0 ? e.textContent.trim() : '');
+        if (headings.includes('Threads') || headings.includes('Projects'))
+          throw new Error('The @ menu shows real threads or projects; narrow the query');
       })()`);
+      return async () => {
+        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape" });
+        await client.evaluate(`(() => {
+          const editor = document.querySelector('[data-app-composer] [contenteditable="true"]');
+          editor?.focus(); document.execCommand('selectAll'); document.execCommand('delete');
+        })()`);
+      };
     },
   },
   {
@@ -651,206 +681,36 @@ const captures = [
     packageDir: "bb-plugin-bot-teams",
     fileName: "channel-rail.png",
     setup: async (client) => {
-      const { rooms } = await pluginRpc("bot-teams", "list", null);
-      const room = rooms.find(r => process.env.BB_CAPTURE_RAIL_CHANNEL_ID ? r.id === process.env.BB_CAPTURE_RAIL_CHANNEL_ID : r.name === "Rail QA");
-      if (!room || room.archived) throw new Error("Seed or restore the Rail QA channel before capturing.");
-      if (!room.memberIds.length) throw new Error("Rail QA must have a member bot so the rail's roster is real.");
-      const data = await pluginRpc("bot-teams", "room", { id: room.id });
-      if (!data.messages.some(m => m.attachments.some(a => a.name === "rail-check.csv")))
-        throw new Error("Seed the staged rail-check.csv attachment so the Output section is real.");
-      const { automations } = await pluginRpc("bot-teams", "automationList", { channelId: room.id, limit: 50, offset: 0 });
-      if (!automations.some(a => a.enabled && a.nextRunAt))
-        throw new Error("Seed an enabled Rail QA automation so the countdown is real.");
-      const attention = await pluginRpc("bot-teams", "attentionList", { status: "open", channelId: room.id });
-      if (!attention.items.some(item => item.reason === "decision"))
-        throw new Error(
-          "Seed an open decision request in Rail QA before capture:\n" +
-            "  bb bots channel notify 'Rail QA' --reason decision --text '...'",
-        );
-      await client.navigate(`/plugins/bot-teams/channels/${room.id}`);
-      await client.waitForText("Rail QA");
-      // The rail shares the channel with BB's own right panel; the capture
-      // shows the channel at full width, which is when the rail is meant to show.
-      await client.evaluate(`document.querySelector('button[aria-label^="Hide right panel"]')?.click()`);
-      await sleep(600);
-      for (const text of ["Decision needed", "Members", "Output"])
-        await client.waitForText(text);
+      const threadId = await launchRoomThread();
+      await client.navigate(`/threads/${threadId}`);
+      await client.waitForText(launchRoomReplies[0]);
+      await client.evaluate(`document.querySelector('button[aria-label="Channel details"]').click()`);
+      await client.waitForSelector(".channel-rail-embedded");
       await client.evaluate(`(() => {
-        const rail = document.querySelector('.channel-rail');
-        if (!rail?.checkVisibility()) throw new Error('The channel rail must be visible');
-        const sections = [...rail.querySelectorAll('.channel-rail-section')].map(s => s.dataset.section);
-        for (const required of ['attention', 'members', 'automation', 'output'])
-          if (!sections.includes(required)) throw new Error('The rail is missing its ' + required + ' section');
-        if (!rail.querySelector('[data-section="members"] .channel-rail-row'))
-          throw new Error('The member roster must be rendered');
-        if (!/in \\d/.test(rail.querySelector('[data-section="automation"]')?.innerText ?? ''))
-          throw new Error('The automation countdown must be rendered');
-        // The rail is meant to read as text at rest: no counts, no carets, no
-        // idle tags and no controls until something is hovered.
-        const shown = el => parseFloat(getComputedStyle(el).opacity) > 0.05;
-        if (rail.querySelector('.channel-rail-count'))
-          throw new Error('Counts must only appear on a collapsed section');
-        if ([...rail.querySelectorAll('.channel-rail-chevron')].some(shown))
-          throw new Error('Section carets must wait for hover');
-        if ([...rail.querySelectorAll('.channel-rail-state')].some(e => e.innerText.trim() === 'Idle'))
-          throw new Error('Idle is the resting state and must not be labelled');
-        if ([...rail.querySelectorAll('button')].filter(b => !b.matches('.channel-rail-row, .channel-rail-section-toggle, .channel-rail-more')).some(shown))
-          throw new Error('Row and section controls must wait for hover');
-        const main = document.querySelector('.bot-room-main').getBoundingClientRect().width;
-        if (main < 480) throw new Error('The rail must not crush the transcript');
+        const rail = document.querySelector('.channel-rail-embedded');
+        for (const text of ['Members', 'Atlas', 'Scribe', 'Output', 'launch-brief.txt'])
+          if (!rail.innerText.includes(text)) throw new Error('Channel details is missing ' + text);
       })()`);
     },
   },
   {
-    id: "bots-native-tabs",
+    id: "bots-search",
     packageDir: "bb-plugin-bot-teams",
-    fileName: "channel-workbench.png",
+    fileName: "channel-search.png",
     setup: async (client) => {
-      const id = process.env.BB_CAPTURE_CHANNEL_ID;
-      if (!id) throw new Error("Set BB_CAPTURE_CHANNEL_ID to a Workbench tabs QA fixture.");
-      const { room, messages } = await pluginRpc("bot-teams", "room", { id });
-      if (room.name !== "Workbench tabs QA" || room.memberIds.length ||
-          !messages.some(m => m.saved && m.text.includes("ORBIT-42")))
-        throw new Error("Expected the memberless Workbench tabs QA fixture with a saved release decision.");
-      await client.navigate(`/plugins/bot-teams/channels/${id}`);
-      await client.waitForText("ORBIT-42 release planning.");
-      await client.openChannelTab("Channel context");
-      await client.waitForInputValue("Brief and instructions", "This is a staged release-planning channel. The release code is ORBIT-42.");
+      const threadId = await launchRoomThread();
+      await client.navigate(`/threads/${threadId}`);
+      await client.waitForText(launchRoomReplies[0]);
+      await client.evaluate(`document.querySelector('button[aria-label="Search channel"]').click()`);
+      await client.waitForSelector('input[aria-label="Search channel history"]');
+      await client.evaluate(`document.querySelector('input[aria-label="Search channel history"]').focus()`);
+      await client.command("Input.insertText", { text: "release check" });
+      await client.waitForText("3 messages");
+      await client.evaluate(`[...document.querySelectorAll('.channel-search-result')].find(r => r.innerText.includes('Logged'))?.click()`);
       await client.evaluate(`(() => {
-        const tabs = [...document.querySelectorAll('[aria-label="Right panel views"] button[aria-pressed]')];
-        if (tabs.length !== 6 || tabs.some(tab => {
-          const label = tab.querySelector('.sr-only');
-          return !label || label.getBoundingClientRect().width < 10 || getComputedStyle(label).clipPath !== 'none';
-        })) throw new Error('Expected six native tabs with readable labels');
-        if (document.querySelector('.channel-workbench').closest('.bot-room') || document.querySelector('select[aria-label="Channel detail view"]'))
-          throw new Error('Channel details must use native workbench tabs');
-      })()`);
-    },
-  },
-  {
-    id: "bots-workbench",
-    packageDir: "bb-plugin-bot-teams",
-    fileName: "channel-workbench.png",
-    setup: async (client) => {
-      const { rooms } = await pluginRpc("bot-teams", "list", null);
-      const room = rooms.find(r => process.env.BB_CAPTURE_CHANNEL_ID ? r.id === process.env.BB_CAPTURE_CHANNEL_ID : r.name === "Workbench QA");
-      if (!room || room.archived) throw new Error("Seed or restore Workbench QA before capturing.");
-      const data = await pluginRpc("bot-teams", "room", {id:room.id});
-      if (!data.messages.some(m => m.botId && m.text === "ORBIT-42 release report is ready." && m.attachments.some(a => a.name === "release-check.csv")))
-        throw new Error("A real bot must have published the staged release-check.csv report.");
-      const context = await pluginRpc("bot-teams", "channelContext", {id:room.id});
-      const initialUsage=await pluginRpc("bot-teams","usage",{id:room.id,kind:"channel"});
-      const savedMessage=data.messages.find(m=>m.saved);
-      if(!savedMessage)throw new Error("Seed a saved release-planning decision.");
-      if (!context.brief.includes("ORBIT-42") || !context.attachmentIds.length) throw new Error("Seed the release brief and retain the real report as a reference.");
-      await client.navigate("/");
-      await client.waitForText(room.name);
-      await client.evaluate(`(() => {
-        const button = Array.from(document.querySelectorAll('.channels-sidebar button')).find(b => b.textContent.includes(${JSON.stringify(room.name)}));
-        if (!button) throw new Error('Missing staged channel in the sidebar'); button.click();
-      })()`);
-      await client.waitForText("ORBIT-42 release report is ready.");
-      const openPanel = (name) => client.openChannelTab(name);
-      const fill = async (label,value) => {
-        await client.evaluate(`(() => {
-          const e=Array.from(document.querySelectorAll('input,textarea,select')).find(e=>e.getAttribute('aria-label')===${JSON.stringify(label)});
-          if(!e) throw new Error('Missing input: '+${JSON.stringify(label)});
-          const prototype=e instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:e instanceof HTMLSelectElement?HTMLSelectElement.prototype:HTMLInputElement.prototype;
-          Object.getOwnPropertyDescriptor(prototype,'value').set.call(e,${JSON.stringify(value)});
-          e.dispatchEvent(new Event(e instanceof HTMLSelectElement?'change':'input',{bubbles:true}));
-        })()`);
-        await sleep(100);
-      };
-      await openPanel("Channel context");
-      await client.waitForInputValue("Brief and instructions",context.brief);
-      await client.evaluate(`(() => {
-        const panel = document.querySelector('.channel-workbench');
-        const tab = document.querySelector('[aria-label="Right panel views"] button[aria-label="Channel context"]');
-        if (!tab || tab.getAttribute('aria-pressed') !== 'true' || panel.closest('.bot-room'))
-          throw new Error('Channel details must be in the native BB workbench, outside the conversation');
-        if (document.querySelector('select[aria-label="Channel detail view"]'))
-          throw new Error('The channel dropdown must be replaced with native tabs');
-        const tabs = [...document.querySelectorAll('[aria-label="Right panel views"] button[aria-pressed]')];
-        if (tabs.length !== 6 || tabs.some(tab => tab.querySelector('.sr-only')?.getBoundingClientRect().width < 10))
-          throw new Error('Expected six native channel tabs with visible labels');
-      })()`);
-      await client.clickButtonText("Version history");
-      await client.evaluate(`(() => {
-        const versions=document.querySelectorAll('.channel-revisions details');
-        if(versions.length<2)throw new Error('Expected retained context history');
-        const referenceVersion=Array.from(versions).find(v=>v.querySelector('pre').textContent.includes('attachmentIds'));
-        if(!referenceVersion)throw new Error('Reference change missing from comparison');
-        referenceVersion.querySelector('summary').click();
-      })()`);
-      await client.waitForText("Use this version");
-      if(process.env.BB_CAPTURE_QA_ACTIONS === "1") {
-        const memoryDraft=context.memory.startsWith("Release preview")?"Release context verified in this channel. Keep these facts scoped here.":"Release preview verified in this channel. Keep these facts scoped here.";
-        await fill("Channel memory",memoryDraft);
-        await client.evaluate(`document.querySelector('button[aria-label^="Hide right panel"]').click()`);
-        await openPanel("Channel context");
-        await client.waitForInputValue("Channel memory",memoryDraft);
-        await client.clickButtonText("Save context");
-        await client.waitForText("Saved. Bots receive this context on their next task.");
-        await openPanel("Files");
-        await client.waitForText("release-check.csv");
-        await client.evaluate(`(() => { if(!document.querySelector('.channel-workbench a[href*="attachment"]'))throw new Error('Sent file missing from Files'); })()`);
-        await openPanel("Saved decisions");
-        await client.waitForText(savedMessage.text.slice(0,80));
-        await client.evaluate(`(() => { if(!document.querySelector('.channel-workbench .channel-search-result'))throw new Error('Saved decision missing'); })()`);
-        await openPanel("Usage and limits");
-        const priorUsage=await pluginRpc("bot-teams","usage",{id:room.id,kind:"channel"});
-        await client.waitForInputValue("Turns per hour",String(priorUsage.limits.turnsPerHour));
-        await fill("Turns per hour","12");
-        await client.clickButtonText("Save limits");
-        await client.waitForText("Limits saved.");
-        const usage=await pluginRpc("bot-teams","usage",{id:room.id,kind:"channel"});
-        if(usage.turns<1 || usage.routingCalls!==initialUsage.routingCalls || usage.limits.turnsPerHour!==12)throw new Error('Single-bot usage or saved limits incorrect');
-        await openPanel("Automations");
-        const priorSchedules=await pluginRpc("bot-teams","automationList",{channelId:room.id});
-        if(!priorSchedules.automations.some(a=>["Weekday release check","Release check at 9:30"].includes(a.name))) {
-        await client.clickButtonText("New automation");
-        await fill("Automation name","Weekday release check");
-        await fill("Automation task","Reply exactly: QA_SCHEDULE_OK. Do not create or modify automations.");
-        await fill("Schedule timezone","America/New_York");
-        await client.clickButtonText("Create automation");
-        await client.waitForText("Weekday release check");
-        await client.waitForText("Weekdays at 09:00");
-        }
-        await client.clickButtonText("Edit");
-        await fill("Automation name","Release check at 9:30");
-        await fill("Cron expression","30 9 * * 1-5");
-        await client.clickButtonText("Save automation");
-        await client.waitForText("Release check at 9:30");
-        await client.waitForText("Weekdays at 09:30");
-        const schedules=await pluginRpc("bot-teams","automationList",{channelId:room.id});
-        const saved=schedules.automations.find(a=>a.name==="Release check at 9:30");
-        if(!saved || saved.enabled || saved.trigger.cron!=="30 9 * * 1-5")throw new Error('Schedule edit lost its paused state or trigger');
-        await client.clickButtonText("Run now");
-        await client.waitForText("Run requested.");
-        await client.waitForText("QA_SCHEDULE_OK",60000);
-        await client.clickButtonText("Run history");
-        await client.waitForText("Response: done");
-        await client.waitForText("View response");
-        await client.clickButtonText("View response");
-      }
-      await openPanel("Channel context");
-      const current=await pluginRpc("bot-teams","channelContext",{id:room.id});
-      await client.waitForInputValue("Channel memory",current.memory);
-      await client.command("Emulation.setDeviceMetricsOverride", {width:390,height:844,deviceScaleFactor:1,mobile:false});
-      await sleep(900);
-      if(!await client.evaluate("!!document.querySelector('.channel-workbench')"))await openPanel("Channel context");
-      await client.evaluate(`(() => {
-        const panel=document.querySelector('.channel-workbench'),r=panel.getBoundingClientRect();
-        if(r.left<0 || r.right>innerWidth+1 || panel.scrollWidth>panel.clientWidth+1)throw new Error('Context panel overflows the narrow viewport');
-      })()`);
-      await client.command("Emulation.setDeviceMetricsOverride", {width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-      await sleep(900);
-      if(!await client.evaluate("!!document.querySelector('.channel-workbench')"))await openPanel("Channel context");
-      await client.waitForInputValue("Brief and instructions",current.brief);
-      await client.evaluate(`(() => {
-        const panel=document.querySelector('.channel-workbench');
-        if(panel.querySelector('[role="alert"]'))throw new Error(panel.querySelector('[role="alert"]').textContent);
-        if(!panel.querySelector('input[type="checkbox"]:checked'))throw new Error('Saved reference file must be checked');
+        const open = document.querySelector('.channel-search-result[aria-expanded="true"]');
+        if (!open?.innerText.includes('Next step: confirm the Friday release window.'))
+          throw new Error('Choosing a result must expand the full message in place');
       })()`);
     },
   },
@@ -859,179 +719,16 @@ const captures = [
     packageDir: "bb-plugin-bot-teams",
     fileName: "channel-automations.png",
     setup: async (client) => {
-      const { rooms } = await pluginRpc("bot-teams", "list", null);
-      const room = rooms.find(r => r.name === "Channel automations QA" && !r.archived);
-      if (!room) throw new Error("Seed or restore Channel automations QA before capturing.");
-      const { automations } = await pluginRpc("bot-teams", "automationList", { channelId: room.id });
-      const brief = automations.find(a => a.name === "Weekday channel brief");
-      if (!brief || brief.enabled || brief.trigger.timezone !== "America/New_York")
-        throw new Error("Seed the paused Weekday channel brief with its New York timezone.");
-      const data = await pluginRpc("bot-teams", "room", { id: room.id });
-      if (!data.messages.some(m => m.botId && m.text === "Scheduled channel verified: ORBIT-42."))
-        throw new Error("The scheduled bot response must be visible in the live channel.");
-      await client.navigate("/");
-      await client.waitForText("Channel automations QA");
-      await client.evaluate(`(() => {
-        const button = Array.from(document.querySelectorAll('.channels-sidebar button'))
-          .find(b => b.textContent.includes('Channel automations QA'));
-        if (!button) throw new Error('Missing staged channel in the live sidebar');
-        button.click();
-      })()`);
-      await client.waitForText("Scheduled channel verified: ORBIT-42.");
-      const openAutomations = async () => {
-        await client.openChannelTab("Automations");
-        await client.waitForText("Task details");
-        await client.waitForText("America/New_York");
-      };
-      await openAutomations();
-      if (process.env.BB_CAPTURE_QA_ACTIONS === "1") {
-        const rowAction = async (label) => {
-          await client.evaluate(`(() => {
-            const row = Array.from(document.querySelectorAll('.channel-automation'))
-              .find(e => e.textContent.includes('CLI daily check'));
-            const button = row && Array.from(row.querySelectorAll('button'))
-              .find(b => b.textContent.trim() === ${JSON.stringify(label)});
-            if (!button || button.disabled) throw new Error('Missing enabled automation action');
-            button.click();
-          })()`);
-        };
-        await rowAction("Resume");
-        await client.waitForText("Automation resumed.");
-        await rowAction("Pause");
-        await client.waitForText("Paused. Any response already in progress continues.");
-        await rowAction("Run now");
-        await client.waitForText("Run requested.");
-        await rowAction("Delete");
-        await client.waitForText("Confirm delete");
-        await rowAction("Cancel");
-        await rowAction("Delete");
-        await rowAction("Confirm delete");
-        await client.waitForText("Automation deleted.");
-        const live = await pluginRpc("bot-teams", "automationList", { channelId: room.id });
-        if (live.automations.some(a => a.name === 'CLI daily check')) throw new Error('Confirmed delete must remove the schedule');
-      }
-      if (process.env.BB_CAPTURE_QA_ACTIONS === "1" || process.env.BB_CAPTURE_QA_LAYOUT === "1") {
-        await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: false });
-        await sleep(900); // BB remounts the channel header at its mobile breakpoint.
-        if (!await client.evaluate("!!document.querySelector('.channel-automation-list')")) await openAutomations();
-        await client.evaluate(`(() => {
-          const dialog = document.querySelector('[role="dialog"]');
-          const rect = dialog.getBoundingClientRect();
-          if (rect.left < 0 || rect.right > innerWidth || rect.top < 0 || rect.bottom > innerHeight || dialog.scrollWidth > dialog.clientWidth)
-            throw new Error('Channel automations must fit on a narrow screen');
-        })()`);
-        await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-        await sleep(900);
-        if (!await client.evaluate("!!document.querySelector('.channel-automation-list')")) await openAutomations();
-      }
-      await client.evaluate(`(() => {
-        const row = Array.from(document.querySelectorAll('.channel-automation'))
-          .find(e => e.textContent.includes('Weekday channel brief'));
-        if (!row || !row.textContent.includes('Paused') || !row.textContent.includes('Schedule QA'))
-          throw new Error('Missing automation identity and paused state: ' + (row?.textContent ?? document.body.innerText.slice(-1500)));
-        row.querySelector('summary').click();
-      })()`);
-      await client.waitForText("Last dispatch:");
-      if (process.env.BB_CAPTURE_QA_HISTORY === "1") {
-        await client.evaluate(`(() => {
-          const row = Array.from(document.querySelectorAll('.channel-automation'))
-            .find(e => e.textContent.includes('Weekday channel brief'));
-          const button = row && Array.from(row.querySelectorAll('button'))
-            .find(b => b.textContent.trim() === 'Run history');
-          if (!button) throw new Error('Missing Run history action');
-          button.click();
-        })()`);
-        await client.waitForText("Dispatch history");
-        await client.evaluate(`(() => {
-          const history = document.querySelector('[aria-label="Run history for Weekday channel brief"]');
-          if (!history || !history.textContent.includes('Manual') || !history.textContent.includes('succeeded'))
-            throw new Error('The real manual dispatch must appear in channel run history');
-        })()`);
-      }
-    },
-  },
-  {
-    id: "bots-images",
-    packageDir: "bb-plugin-bot-teams",
-    fileName: "channel-images.png",
-    setup: async (client) => {
-      const { rooms } = await pluginRpc("bot-teams", "list", null);
-      const room = rooms.find(r => r.name === "Chat polish QA" && !r.archived);
-      if (!room) throw new Error("Seed or restore the Chat polish QA channel before capturing inline images.");
-      const data = await pluginRpc("bot-teams", "room", { id: room.id });
-      if (!data.messages.some(m => m.speaker === "You" && m.attachments.some(a => a.type === "localImage"))) throw new Error("Missing a real owner image message.");
-      if (!data.messages.some(m => m.botId && m.text === "Here is the inline preview." && m.attachments.some(a => a.type === "localImage"))) throw new Error("Missing a bot-published inline image response.");
-      await client.navigate("/");
-      await client.waitForText("Chat polish QA");
-      await client.evaluate(`(() => {
-        const button = Array.from(document.querySelectorAll('.channels-sidebar button')).find(b => b.textContent.trim().startsWith('#Chat polish QA'));
-        if (!button) throw new Error('QA channel missing from sidebar');
-        button.click();
-      })()`);
-      await client.waitForAriaButton("Rename channel: Chat polish QA");
-      await client.waitForText("Here is the inline preview.");
-      await client.evaluate(`(() => {
-        const row = Array.from(document.querySelectorAll('.bot-room-message')).find(m => m.textContent.includes('A preview pasted directly'));
-        if (!row) throw new Error('Owner paste missing');
-        row.scrollIntoView({block:'start'});
-      })()`);
-      await sleep(600);
-      await client.evaluate(`(() => {
-        const images = Array.from(document.querySelectorAll('[role="log"] .channel-image img'));
-        for (const alt of ['channel-preview.png', 'Four color swatches']) {
-          if (!images.some(i => i.alt === alt && i.complete && i.naturalWidth === 720 && i.naturalHeight === 360)) throw new Error('Inline image failed to load: ' + alt);
-        }
-      })()`);
-    },
-  },
-  {
-    id: "bots-behavior",
-    packageDir: "bb-plugin-bot-teams",
-    fileName: "channel-behavior.png",
-    setup: async (client) => {
-      await captures.find(c => c.id === "bots-images").setup(client);
-      await client.clickAriaButtonWithPointer("Chat mode: Smart");
-      for (const text of ["Choose relevant bots", "Only mentions and replies", "All bots can respond"]) await client.waitForText(text);
-      await client.evaluate(`(() => {
-        const items = Array.from(document.querySelectorAll('[aria-label="Chat mode"] [role="menuitemradio"]'));
-        if (!items.some(b => b.textContent.startsWith('Smart') && b.getAttribute('aria-checked') === 'true')) throw new Error('Smart selection missing');
-        const trigger = document.querySelector('[aria-label="Chat mode: Smart"]');
-        const box = document.querySelector('.group-compose');
-        if (!trigger || !box || trigger.getBoundingClientRect().top < box.getBoundingClientRect().bottom) throw new Error('Chat mode must be beneath the composer');
-      })()`);
-    },
-  },
-  {
-    id: "bots-consultation",
-    packageDir: "bb-plugin-bot-teams",
-    fileName: "channel-consultation.png",
-    setup: async (client) => {
-      const { rooms, bots } = await pluginRpc("bot-teams", "list", null);
-      const room = rooms.find(r => r.name === "Council" && !r.archived);
-      if (!room) throw new Error("Migrate the Council advisors and seed their consultation before capturing.");
-      const names = room.memberIds.map(id => bots.find(b => b.id === id)?.name);
-      for (const name of ["Grug", "Architect", "Designer"]) if (!names.includes(name)) throw new Error("Missing migrated advisor: " + name);
-      await client.navigate("/");
-      await client.waitForText("Council");
-      await client.evaluate(`(() => {
-        const button = Array.from(document.querySelectorAll('.channels-sidebar button')).find(b => b.textContent.trim() === '#Council');
-        if (!button) throw new Error('Council channel missing from sidebar');
-        button.click();
-      })()`);
-      await client.waitForAriaButton("Rename channel: Council");
-      await client.waitForAriaButton("Channel members: 3 bots");
-      await client.waitForText("Biggest structural risk: a growing avatar stack");
-      await client.evaluate(`(() => {
-        const messages = Array.from(document.querySelectorAll('.bot-room-message'));
-        for (const name of ['BB agent', 'Grug', 'Architect', 'Designer']) {
-          if (!messages.some(m => m.querySelector('strong')?.textContent === name && m.querySelector('p')?.textContent.length > 30)) throw new Error('Missing live response from ' + name);
-        }
-        if (!Array.from(document.querySelectorAll("button")).some(b => b.getAttribute("aria-label") === "View BB agent's work")) throw new Error('Agent attribution needs a work link');
-        const transcript = document.querySelector('[role="log"]');
-        if (transcript) transcript.scrollTop = 0;
-      })()`);
-      await client.clickFirstButtonWithAria("Channel members: 3 bots");
-      await client.waitForText("Add bot");
+      const threadId = await launchRoomThread();
+      const { automations } = await pluginRpc("bot-teams", "automationList", { channelId: launchRoomId, limit: 50, offset: 0 });
+      if (!automations.some((a) => a.name === "Weekday launch status" && !a.enabled))
+        throw new Error("Seed the paused Weekday launch status automation in Launch room before capturing.");
+      await client.navigate(`/threads/${threadId}`);
+      await client.waitForText(launchRoomReplies[0]);
+      await client.evaluate(`document.querySelector('button[aria-label^="Open new tab"]').click()`);
+      await client.waitForText("Channel automations");
+      await client.evaluate(`[...document.querySelectorAll('button,[role="menuitem"]')].find(e => e.innerText.trim() === 'Channel automations').click()`);
+      await client.waitForText("Weekday launch status");
     },
   },
   {
@@ -1042,9 +739,7 @@ const captures = [
       const room = await pluginRpc("bot-teams", "createRoom", {
         name: "Bot creation QA", memberIds: [], requestId: crypto.randomUUID(),
       });
-      const channelPath = `/plugins/bot-teams/channels/${room.id}`;
       const setupPath = `/plugins/bot-teams/bots/new/${room.id}`;
-      const draftText = "Keep this channel draft @";
       const checkComposer = async (channel = false) => {
         await client.waitForText("Help me create a persistent bot in BB Bot Teams");
         if (channel) await client.waitForText(room.id);
@@ -1066,24 +761,6 @@ const captures = [
         // Direct links and reload must show the same native composer.
         await client.navigate("/plugins/bot-teams/bots/new");
         await checkComposer();
-        await client.navigate(channelPath);
-        await client.waitForAriaButton("Channel members: 0 bots");
-        await client.evaluate(`(() => {
-          const editor = document.querySelector('textarea[aria-label="Message channel"]');
-          Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(editor, ${JSON.stringify(draftText)});
-          editor.dispatchEvent(new Event('input', { bubbles: true }));
-          editor.focus();
-        })()`);
-        await client.waitForText("Create new bot…");
-        await client.clickButtonText("Create new bot…");
-        await checkComposer(true);
-        await client.clickFirstButtonWithAria("Back to channel");
-        await client.waitForInputValue("Message channel", draftText);
-        await client.clickFirstButtonWithAria("Channel members: 0 bots");
-        await client.clickButtonText("Add bot");
-        await client.waitForText("Create new bot…");
-        await client.clickButtonText("Create new bot…");
-        await checkComposer(true);
         await client.navigate(setupPath);
         await checkComposer(true);
         await client.command("Emulation.setDeviceMetricsOverride", {
@@ -1182,42 +859,6 @@ const captures = [
     },
   },
   {
-    id: "bot-teams",
-    packageDir: "bb-plugin-bot-teams",
-    setup: async (client) => {
-      const { bots } = await pluginRpc("bot-teams", "list", null);
-      const atlas = bots.find((bot) => bot.name === "Atlas" && bot.description === "Research and verify the facts");
-      if (!atlas || atlas.intervalMinutes !== 0) {
-        throw new Error("Seed the Atlas demonstration bot with mission schedules off before capturing Bot Teams.");
-      }
-      const cleanup = async () => {
-        if (atlas.retired) await pluginRpc("bot-teams", "retire", { id: atlas.id, retired: true });
-      };
-      try {
-        if (atlas.retired) await pluginRpc("bot-teams", "retire", { id: atlas.id, retired: false });
-        await client.navigate("/plugins/bot-teams/bots");
-        await client.waitForText("Bot Teams");
-        await client.waitForAriaButton("Filter bots");
-        await client.evaluate(`(() => {
-          const input = document.querySelector('input[aria-label="Search bots"]');
-          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Atlas');
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-        })()`);
-        await client.waitForText("Research and verify the facts");
-        await client.evaluate(`(() => {
-          const rows = [...document.querySelectorAll('[data-bots-collection] [data-resource-row]')];
-          if (location.pathname !== '/plugins/bot-teams/bots' || rows.length !== 1 || !rows[0].textContent.includes('Atlas') || !rows[0].textContent.includes('Research and verify the facts')) {
-            throw new Error('The renamed Bot Teams collection must show only the staged Atlas bot.');
-          }
-        })()`);
-        return cleanup;
-      } catch (error) {
-        await cleanup();
-        throw error;
-      }
-    },
-  },
-  {
     id: "bots-collection",
     packageDir: "bb-plugin-bot-teams",
     fileName: "bots-collection.png",
@@ -1246,203 +887,6 @@ const captures = [
         }
         const width = collection.firstElementChild.getBoundingClientRect().width;
         if (width > 1024 || width < 900) throw new Error('Bots collection must use BB collection content width');
-      })()`);
-    },
-  },
-  {
-    id: "bots-forks",
-    packageDir: "bb-plugin-bot-teams",
-    fileName: "channel-forks.png",
-    setup: async (client) => {
-      const { rooms } = await pluginRpc("bot-teams", "list", null);
-      const room = rooms.find((r) => process.env.BB_CAPTURE_CHANNEL_ID ? r.id === process.env.BB_CAPTURE_CHANNEL_ID : r.name === "Fork QA");
-      if (!room) throw new Error("Seed the Fork QA channel with a real primary session and native fork before capturing.");
-      const data = await pluginRpc("bot-teams", "room", { id: room.id });
-      const fork = data.jobs.find((j) => j.forkSourceThreadId && j.reply === "SIDE_ANSWER");
-      if (!fork?.threadId || fork.threadId === fork.forkSourceThreadId)
-        throw new Error("Fork QA must contain a completed native fork with SIDE_ANSWER and a distinct source thread.");
-      await client.navigate("/");
-      await client.waitForText(room.name);
-      await client.evaluate(`(() => {
-        const button = Array.from(document.querySelectorAll('.channels-sidebar button')).find(b => b.textContent.includes(${JSON.stringify(room.name)}));
-        if (!button) throw new Error('Staged channel missing from real sidebar');
-        button.click();
-      })()`);
-      await client.waitForText("SIDE_ANSWER");
-      await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"][aria-expanded="true"]')?.click()`);
-      await sleep(350);
-      await client.evaluate(`(() => {
-        const answer = Array.from(document.querySelectorAll('.bot-room-message')).find(m => m.textContent.includes('SIDE_ANSWER') && m.querySelector('.channel-fork-label'));
-        if (!answer) throw new Error('Native fork answer must be visibly labeled Fork');
-        const trigger = document.querySelector('button[aria-label^="Send mode:"]');
-        if (!trigger) throw new Error('Send mode control missing');
-      })()`);
-      const sendLabel = await client.evaluate(`document.querySelector('button[aria-label^="Send mode:"]').getAttribute('aria-label')`);
-      await client.clickAriaButtonWithPointer(sendLabel);
-      for (const text of ["Send this message", "Change the task currently running.", "Wait for the current task to finish.", "Ask separately while the current task continues."])
-        await client.waitForText(text);
-      await client.evaluate(`(() => {
-        if (document.querySelectorAll('[role="menuitemradio"]').length !== 4) throw new Error('All four send modes must be rendered');
-      })()`);
-      return async () => {
-        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-        await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
-        await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"][aria-expanded="false"]')?.click()`);
-        await sleep(350);
-      };
-    },
-  },
-  {
-    id: "bots",
-    packageDir: "bb-plugin-bot-teams",
-    setup: async (client) => {
-      const { rooms } = await pluginRpc("bot-teams", "list", null);
-      const room = rooms.find((candidate) => candidate.name === "Launch room");
-      if (!room) throw new Error("Seed the Launch room channel with Atlas and Scribe before capturing.");
-      await client.navigate("/");
-      await client.waitForText("Launch room");
-      await client.evaluate(`(() => {
-        const button = Array.from(document.querySelectorAll(".channels-sidebar button"))
-          .find((candidate) => candidate.textContent.includes("Launch room"));
-        if (!button) throw new Error("Launch room is not visible in the Channels sidebar");
-        button.click();
-      })()`);
-      await client.waitForText("Launch room");
-      await client.waitForText("Atlas is ready. I will verify the facts before we decide.");
-      await client.waitForText("Scribe is ready. I will record our decisions and next steps.");
-      await client.waitForAriaButton("Channel members: 2 bots");
-      await client.waitForAriaButton("Prompt actions");
-      await client.waitForAriaButton("Start voice input");
-      await client.waitForText("launch-brief.txt");
-      await client.waitForText("ORBIT-42");
-      await client.evaluate(`(() => {
-        const messages = Array.from(document.querySelectorAll(".bot-room-message"));
-        for (const [speaker, reply] of [
-          ["Atlas", "Atlas is ready. I will verify the facts before we decide."],
-          ["Scribe", "Scribe is ready. I will record our decisions and next steps."],
-        ]) {
-          if (!messages.some((entry) => entry.querySelector("strong")?.textContent === speaker && entry.textContent.includes(reply))) {
-            throw new Error("Missing live bot reply from " + speaker);
-          }
-        }
-        for (const speaker of ["Atlas", "Scribe"]) {
-          if (!messages.some((entry) => entry.querySelector("strong")?.textContent === speaker && entry.textContent.includes("ORBIT-42"))) {
-            throw new Error("Missing attachment answer from " + speaker);
-          }
-        }
-        if (!document.querySelector('[aria-label="Channel conversation"]') || !document.querySelector(".channel-avatar-stack")) {
-          throw new Error("Channel transcript and avatar stack must be visible");
-        }
-        if (!document.querySelector('.channel-reactions button[aria-label="👍: You"]')) {
-          throw new Error("Seed a thumbs-up reaction on the live Atlas reply before capturing");
-        }
-        const header = document.querySelector(".channel-header");
-        const row = header.closest('[data-testid="app-page-header-content-row"]');
-        const title = row.querySelector('.channel-title[role="button"]');
-        if (!title || title.textContent.trim() !== "#Launch room" || !title.getAttribute("aria-label").includes("Rename channel")) {
-          throw new Error("The channel name must be the clickable header title");
-        }
-        if (!row.firstElementChild.contains(title)) {
-          throw new Error("The channel title must sit inside BB's native pane drag handle");
-        }
-        if (title.getBoundingClientRect().left > row.getBoundingClientRect().left + 24 || /Channels/.test(row.innerText)) {
-          throw new Error("The channel title must replace Channels at the left of the header");
-        }
-        const headerBounds = header.getBoundingClientRect();
-        const rowBounds = row.getBoundingClientRect();
-        if (rowBounds.right - headerBounds.right > 48 || headerBounds.right > rowBounds.right + 1) {
-          throw new Error("Channel controls must align at the right of the host header, beside the panel toggle");
-        }
-        const headerButtons = Array.from(header.querySelectorAll("button"), (button) => button.getBoundingClientRect());
-        if (headerButtons.some((bounds, index) => index > 0 && bounds.left < headerButtons[index - 1].right)) {
-          throw new Error("Channel title and header controls must not overlap");
-        }
-        const firstMessage = messages[0];
-        const composer = document.querySelector(".group-compose");
-        // A thread row: name line, prose, and BB's reserved 20px action row.
-        if (header.getBoundingClientRect().height > 40 || firstMessage.getBoundingClientRect().height > 80) {
-          throw new Error("Channels should use BB's thread spacing in the header and transcript");
-        }
-        if (!composer.classList.contains("rounded-xl") || !composer.classList.contains("shadow-lift") || Math.abs(composer.getBoundingClientRect().height - 116) > 4 || composer.querySelector("textarea").disabled) {
-          throw new Error("Channel composer must match BB's native composer and remain usable");
-        }
-        if (Array.from(header.querySelectorAll("button")).some((button) => /pause|resume|stop|run/i.test(button.textContent + button.getAttribute("aria-label")))) {
-          throw new Error("Channels must not expose run or pause controls");
-        }
-        const actions = firstMessage.querySelector(".bot-message-actions");
-        if (getComputedStyle(actions).position !== "absolute" || actions.parentElement.getBoundingClientRect().height > 28) {
-          throw new Error("Message actions must use BB's action row beneath the message");
-        }
-        document.querySelector(".channel-avatar-stack").click();
-      })()`);
-      await client.waitForText("Add bot");
-      await client.evaluate(`(() => {
-        const menu = document.querySelector('[role="dialog"][aria-label="Channel members"]');
-        if (!menu || !menu.textContent.includes("Atlas") || !menu.textContent.includes("Scribe") || /paused/i.test(menu.textContent)) {
-          throw new Error("Avatar stack must open the live member list with channel presence");
-        }
-        if (Array.from(menu.querySelectorAll("button")).at(-1)?.textContent.trim() !== "Add bot") {
-          throw new Error("Add bot must be at the bottom of the member menu");
-        }
-      })()`);
-    },
-  },
-  {
-    id: "bots-emoji",
-    packageDir: "bb-plugin-bot-teams",
-    fileName: "emoji-picker.png",
-    setup: async (client) => {
-      await captures.find((capture) => capture.id === "bots").setup(client);
-      await client.clickFirstButtonWithAria("Channel members: 2 bots");
-      await client.clickFirstButtonWithAria("Add reaction");
-      await client.waitForAriaButton("Flags");
-      await client.evaluate(`(() => {
-        const picker = document.querySelector(".channel-emoji-picker");
-        for (const category of ["Recently Used", "Smileys & People", "Animals & Nature", "Food & Drink", "Travel & Places", "Activities", "Objects", "Symbols", "Flags"]) {
-          if (!Array.from(picker.querySelectorAll('[role="tab"]')).some((tab) => tab.getAttribute("aria-label") === category)) {
-            throw new Error("Missing emoji category: " + category);
-          }
-        }
-        if (picker.querySelectorAll('button[aria-label^="Skin tone"]').length !== 6 || picker.querySelector("img")) {
-          throw new Error("The full picker must have skin tones and use native emoji");
-        }
-        picker.querySelector("input").focus();
-      })()`);
-      await client.command("Input.insertText", { text: "otter" });
-      await client.waitForText("1 result found.");
-      await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
-      await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
-      await sleep(150);
-      await client.evaluate(`(() => {
-        if (document.activeElement?.getAttribute("data-unified") !== "1f9a6") {
-          throw new Error("Typing otter and pressing ArrowDown must focus the matching emoji");
-        }
-      })()`);
-      await client.clickFirstButtonWithAria("Clear");
-      await client.waitForInputValue("Type to search for an emoji", "");
-      await client.command("Input.insertText", { text: "Canada" });
-      await client.waitForAriaButton("flag: Canada");
-      await client.clickFirstButtonWithAria("Clear");
-      await client.waitForInputValue("Type to search for an emoji", "");
-    },
-  },
-  {
-    id: "bots-search",
-    packageDir: "bb-plugin-bot-teams",
-    fileName: "channel-search.png",
-    setup: async (client) => {
-      await captures.find((capture) => capture.id === "bots").setup(client);
-      await client.clickFirstButtonWithAria("Channel members: 2 bots");
-      await client.clickFirstButtonWithAria("Search channel");
-      await client.waitForText("Search the entire channel, including older messages.");
-      await client.evaluate(`document.querySelector('input[aria-label="Search channel history"]').focus()`);
-      await client.command("Input.insertText", { text: "ORBIT-42" });
-      await client.waitForText("2 messages");
-      await client.evaluate(`(() => {
-        const results = Array.from(document.querySelectorAll(".channel-search-result"));
-        if (results.length !== 2 || !results.every(r => r.textContent.includes("ORBIT-42"))) {
-          throw new Error("Channel search must find both staged bot replies");
-        }
       })()`);
     },
   },

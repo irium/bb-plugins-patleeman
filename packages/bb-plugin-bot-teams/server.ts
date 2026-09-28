@@ -29,6 +29,7 @@ import { ChannelThreads } from "./channel-thread-link";
 import {
   channelModel,
   channelPostInput,
+  channelMentionProviderId,
   channelPostTool,
   channelProviderId,
 } from "./channel-provider";
@@ -1509,6 +1510,36 @@ export default async function plugin(bb: BbPluginApi) {
       );
       return "Sent to the channel.";
     },
+  });
+  // `@` in a channel thread's composer offers the channel's bots as pills; the
+  // bridge turns a picked pill back into the @handle the router reads.
+  bb.ui.registerMentionProvider({
+    id: channelMentionProviderId,
+    label: "Bots",
+    search({ query, threadId }) {
+      const room = threadId ? channelThreads.roomForThread(threadId) : null;
+      if (!room) return [];
+      const q = query.toLowerCase();
+      const bots = store
+        .all()
+        .filter((bot) => !bot.retired)
+        .filter((bot) => `${bot.name} ${bot.handle}`.toLowerCase().includes(q))
+        .sort((a, b) =>
+          Number(room.memberIds.includes(b.id)) - Number(room.memberIds.includes(a.id)) ||
+          a.name.localeCompare(b.name),
+        )
+        .map((bot) => ({
+          id: bot.handle,
+          title: `${bot.avatar} ${bot.name}`,
+          subtitle: `@${bot.handle}${room.memberIds.includes(bot.id) ? "" : " · not in this channel yet"}`,
+          icon: "Bot",
+        }));
+      const everyone = "all".startsWith(q) || "channel".startsWith(q)
+        ? [{ id: "all", title: "@all", subtitle: "Everyone in this channel", icon: "Users" }]
+        : [];
+      return [...everyone, ...bots].slice(0, 8);
+    },
+    resolve: (handle) => ({ context: `@${handle}` }),
   });
   bb.providers.register({
     id: channelProviderId,

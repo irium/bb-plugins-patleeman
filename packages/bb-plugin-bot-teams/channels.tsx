@@ -44,6 +44,7 @@ import { ErrorMessage, message } from "./bot-ui";
 import { ChannelSidebarRow } from "./channel-sidebar-row";
 import { DirectSidebarThread } from "./direct-sidebar-row";
 import { channelLinkDestination } from "./channel-links";
+import { mentionBotId } from "./mentions";
 import { Modal } from "./channel-controls";
 
 const uuid = /^[a-f0-9-]{36}$/;
@@ -179,6 +180,13 @@ export function ChannelLinkNavigation() {
           : null;
       if (!anchor || anchor.hasAttribute("download")) return;
       const href = anchor.getAttribute("href") ?? "";
+      const botId = mentionBotId(href);
+      if (botId) {
+        event.preventDefault();
+        event.stopPropagation();
+        navigate.toPluginPanel("bots", { subPath: `${botId}/profile` });
+        return;
+      }
       const destination = channelLinkDestination(
         href,
         window.location.origin,

@@ -610,3 +610,54 @@ before tapping. Temporary bot-free channels are deleted after each run.
 Repeat with `BB_CHANNEL_QA_SESSION=<browser-automation session> node
 scripts/qa-bot-teams-channel-discovery.mjs`. Package typecheck/build, the focused
 read-only review, marketplace schema/index checks, and `git diff --check` passed.
+
+## README capture fixture
+
+The README's channel screenshots use two demo bots on a small model with
+mission schedules off, so their replies are fixed:
+
+```sh
+bb bots create Atlas --description "Research and verify the facts" --avatar "🧭" \
+  --provider codex --model gpt-6-luna --reasoning low --interval 0 \
+  --mission-file atlas-mission.md
+bb bots create Scribe --description "Record decisions and next steps" --avatar "📝" \
+  --provider codex --model gpt-6-luna --reasoning low --interval 0 \
+  --mission-file scribe-mission.md
+```
+
+`atlas-mission.md`:
+
+```markdown
+# Atlas (demo bot for Bot Teams screenshots)
+
+Research and verify facts for the owner.
+
+These replies are fixed so the README screenshots are deterministic:
+
+- When the owner shares the ORBIT-42 launch brief, reply exactly: "Ready. I checked the brief: the Friday release and the release-check owner both match the plan. I'll verify anything new before we decide."
+- When asked to run the release check, reply exactly: "Release check passed: the brief, owner, and Friday window all line up. @scribe, please log it."
+```
+
+`scribe-mission.md`:
+
+```markdown
+# Scribe (demo bot for Bot Teams screenshots)
+
+Record decisions and next steps for the owner.
+
+These replies are fixed so the README screenshots are deterministic:
+
+- When the owner shares the ORBIT-42 launch brief, reply exactly: "Ready. I'll keep the decision log for ORBIT-42 and post next steps after each check."
+- When @atlas asks you to log the release check, reply exactly: "Logged: release check passed. Next step: confirm the Friday release window."
+```
+
+Seed **Launch room** as a Directed channel with both bots. In its thread, send
+"@atlas @scribe Here's the ORBIT-42 launch brief. Are you both ready?" with a
+`launch-brief.txt` attachment, wait for both replies, then send
+"@atlas Please run the release check." Add the paused automation:
+
+```sh
+bb bots channel schedule "Launch room" --name "Weekday launch status" \
+  --text "Post the day's ORBIT-42 launch status and open decisions." \
+  --bot scribe --cron "0 9 * * 1-5" --timezone America/New_York --paused
+```
