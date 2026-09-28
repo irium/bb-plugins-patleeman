@@ -190,6 +190,9 @@ export class ChannelThreads {
 
   private delivery(message: RoomMessage): ChannelDelivery | null {
     if (message.internalResult) return null;
+    // A scheduled run stores its prompt as a message with no bot; like the
+    // transcript, show only the reply it produces.
+    if (message.automationId && !message.botId) return null;
     if (!message.text.trim() && !message.attachments.length) return null;
     const attachments = message.attachments.map((a) => ({
       name: a.name,

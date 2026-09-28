@@ -145,6 +145,7 @@ test("new messages are delivered in order; thread posts and internal results are
   x.post({ botId: x.bot.id, speaker: "Editorial", text: "internal", internalResult: true });
   x.post({ botId: x.bot.id, speaker: "Editorial", text: "Here is the draft." });
   x.post({ text: "sent from the CLI" });
+  x.post({ text: "Automation prompt", automationId: "auto_1", speaker: "Automation: Digest" });
   x.post({ botId: x.bot.id, speaker: "Editorial", text: "" });
   await x.links.sync(x.room.id);
   assert.deepEqual(
