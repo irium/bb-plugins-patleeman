@@ -55,7 +55,8 @@ export const isChannelMode = (value: string): value is ChannelMode =>
 
 export const channelDeliverySchema = z.object({
   messageId: z.string(),
-  kind: z.enum(["bot", "you", "system", "history"]),
+  /** `you`: the owner, from outside this thread; `owner`: the owner, replayed from before it existed. */
+  kind: z.enum(["bot", "you", "owner", "system"]),
   speaker: z.string(),
   avatar: z.string().nullable(),
   /** The bot's work thread for this reply; its name links there. */
@@ -108,9 +109,9 @@ export function deliveryMarkdown(delivery: ChannelDelivery) {
     }
     case "you":
       return `**You** · sent outside this thread\n\n${body}`;
+    case "owner":
+      return `**You**\n\n${body}`;
     case "system":
       return `_${body}_`;
-    case "history":
-      return body;
   }
 }

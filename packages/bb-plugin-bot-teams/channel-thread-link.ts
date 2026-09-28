@@ -14,7 +14,8 @@ import { linkifyMentions } from "./mentions";
 import { isForkConversation } from "./send-mode";
 import { missingThread } from "./runtime";
 
-const historyLimit = 30;
+/** A channel with history opens its thread on this many recent messages. */
+const replayLimit = 50;
 
 function selectionKey(room: Room) {
   return `${room.responseBehavior ?? "everyone"}:${levelForPermission(room.permissionMode)}`;
@@ -28,7 +29,6 @@ function deliveryText(delivery: ChannelDelivery) {
 function hiddenInput(text: string) {
   return { type: "text" as const, text, mentions: [], visibility: "agent-only" as const };
 }
-const historyExcerpt = 600;
 
 interface Link {
   roomId: string;
@@ -121,13 +121,10 @@ export class ChannelThreads {
   private async create(room: Room) {
     const config = await this.bb.sdk.system.config();
     if (!config.primaryHostId) throw new Error("BB has no primary machine for channel threads.");
-    // Earlier history rides the first input: a separate send can arrive before
-    // the new thread has stored its execution settings.
-    const history = this.history(room.id);
     const thread = await this.bb.sdk.threads.spawn({
       projectId: await this.projectId(),
       environment: { type: "host", hostId: config.primaryHostId, workspace: { type: "personal" } },
-      input: [hiddenInput(history ? deliveryText(history) : channelStartPrefix)],
+      input: [hiddenInput(channelStartPrefix)],
       title: room.name,
       visibility: "hidden",
       providerId: channelProviderId,
@@ -136,11 +133,40 @@ export class ChannelThreads {
       executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit" },
       pluginMetadata: { channelRoomId: room.id },
     });
+    // Messages already in the channel replay below; later ones follow the watermark.
+    const watermark = this.maxRowid(room.id);
     this.store.db
       .prepare("INSERT INTO channel_threads VALUES (?,?,?,?)")
-      .run(room.id, thread.id, room.name, this.maxRowid(room.id));
+      .run(room.id, thread.id, room.name, watermark);
     await this.settled(thread.id);
+    await this.replay(room.id, thread.id, watermark);
     return thread.id;
+  }
+
+  /**
+   * A channel that already had messages opens its thread on the most recent
+   * ones, each as its own message. Messages the owner sent before the thread
+   * existed show as theirs, since they cannot become native bubbles.
+   */
+  private async replay(roomId: string, threadId: string, through: number) {
+    const rows = this.store.db
+      .prepare("SELECT json FROM room_messages WHERE room_id=? AND rowid<=? ORDER BY rowid")
+      .all(roomId, through) as { json: string }[];
+    const deliveries = rows
+      .map((row) => this.delivery(messageSchema.parse(JSON.parse(row.json)), false))
+      .filter((delivery): delivery is ChannelDelivery => delivery !== null);
+    const shown = deliveries.slice(-replayLimit);
+    if (deliveries.length > shown.length)
+      await this.send(threadId, {
+        messageId: `replay:${roomId}`,
+        kind: "system",
+        speaker: "BB",
+        avatar: null,
+        workThreadId: null,
+        text: `Showing the last ${shown.length} messages. Use Search channel for older ones.`,
+        attachments: [],
+      });
+    for (const delivery of shown) await this.send(threadId, delivery);
   }
 
   /**
@@ -164,31 +190,8 @@ export class ChannelThreads {
     return row.n;
   }
 
-  /** One catch-up message for a channel that had history before it became a thread. */
-  private history(roomId: string): ChannelDelivery | null {
-    const lines = this.store
-      .messages(roomId, historyLimit * 2)
-      .map((message) => this.delivery(message))
-      .filter((delivery): delivery is ChannelDelivery => delivery !== null && delivery.kind !== "system")
-      .slice(-historyLimit)
-      .map((delivery) => {
-        const text = delivery.text.trim();
-        const excerpt = text.length > historyExcerpt ? `${text.slice(0, historyExcerpt)}…` : text;
-        return `**${delivery.kind === "you" ? "You" : delivery.speaker}:** ${excerpt.replace(/\n+/g, " ")}`;
-      });
-    if (!lines.length) return null;
-    return {
-      messageId: `history:${roomId}`,
-      kind: "history",
-      speaker: "BB",
-      avatar: null,
-      workThreadId: null,
-      text: `**Earlier in this channel**\n\n${lines.join("\n\n")}`,
-      attachments: [],
-    };
-  }
-
-  private delivery(message: RoomMessage): ChannelDelivery | null {
+  /** `live`: delivered as it happens, when a message from outside the thread is marked as such. */
+  private delivery(message: RoomMessage, live = true): ChannelDelivery | null {
     if (message.internalResult) return null;
     // A scheduled run stores its prompt as a message with no bot; like the
     // transcript, show only the reply it produces.
@@ -216,7 +219,7 @@ export class ChannelThreads {
     }
     return {
       messageId: message.id,
-      kind: message.system ? "system" : "you",
+      kind: message.system ? "system" : live ? "you" : "owner",
       speaker: message.speaker,
       avatar: null,
       workThreadId: null,

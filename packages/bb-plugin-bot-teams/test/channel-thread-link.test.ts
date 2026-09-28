@@ -121,20 +121,38 @@ test("a new channel gets a hidden thread on the channel provider", async () => {
   assert.equal(x.links.roomForThread("thr_1")?.id, x.room.id);
 });
 
-test("existing history arrives once, in the thread's first input", async () => {
+test("an existing channel replays its recent messages one by one, then continues live", async () => {
   const x = setup();
   x.post({ text: "Draft the launch post" });
   x.post({ botId: x.bot.id, speaker: "Editorial", text: "Drafted." });
   await x.links.ensure(x.room);
   const first = (x.spawned[0] as { input: { text: string }[] }).input[0]!.text;
-  assert.ok(first.startsWith(channelDeliverPrefix));
-  const history = channelDeliverySchema.parse(JSON.parse(first.slice(channelDeliverPrefix.length)));
-  assert.equal(history.kind, "history");
-  assert.match(history.text, /\*\*You:\*\* Draft the launch post/);
-  assert.match(history.text, /\*\*Editorial:\*\* Drafted\./);
-  // Messages already in the catch-up are not delivered again.
+  assert.equal(first, channelStartPrefix);
+  assert.deepEqual(
+    x.deliveries().map((d) => [d.kind, d.speaker, d.text]),
+    [
+      ["owner", "You", "Draft the launch post"],
+      ["bot", "Editorial", "Drafted."],
+    ],
+  );
+  assert.equal(deliveryMarkdown(x.deliveries()[0]!), "**You**\n\nDraft the launch post");
+  // Replayed messages are not delivered again; new ones follow.
   await x.links.sync(x.room.id);
-  assert.equal(x.sent.length, 0);
+  assert.equal(x.sent.length, 2);
+  x.post({ botId: x.bot.id, speaker: "Editorial", text: "Published." });
+  await x.links.sync(x.room.id);
+  assert.deepEqual(x.deliveries().at(-1)?.text, "Published.");
+});
+
+test("a long history replays its last 50 messages after a note about the rest", async () => {
+  const x = setup();
+  for (let i = 1; i <= 55; i++) x.post({ botId: x.bot.id, speaker: "Editorial", text: `Update ${i}` });
+  await x.links.ensure(x.room);
+  const replayed = x.deliveries();
+  assert.equal(replayed.length, 51);
+  assert.match(replayed[0]!.text, /Showing the last 50 messages\. Use Search channel/);
+  assert.equal(replayed[1]!.text, "Update 6");
+  assert.equal(replayed.at(-1)!.text, "Update 55");
 });
 
 test("new messages are delivered in order; thread posts and internal results are not", async () => {
