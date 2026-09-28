@@ -1,14 +1,14 @@
 {
   "name": "bb-plugin-emoji-react",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "type": "module",
   "engines": {
-    "bb": ">=0.36",
-    "bbPluginSdk": "^0.4.1"
+    "bb": ">=0.39",
+    "bbPluginSdk": ">=0.4.16"
   },
   "bb": {
     "name": "Emoji React",
-    "description": "Emoji reactions in the assistant-message text-selection menu and per-message action bar. Select text, pick a reaction from the menu (or use the action-bar buttons), and it drafts a reply — the reaction list is configurable in settings.",
+    "description": "Emoji reactions in the assistant-message text-selection menu and per-message action bar. Select text, pick a reaction from the menu (or use the action-bar buttons), and it drafts a reply — the reaction list is configurable in settings. Optional smart reactions let the assistant suggest the reactions that fit each reply.",
     "branding": {
       "icon": "./assets/icon.svg"
     },

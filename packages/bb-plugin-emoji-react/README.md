@@ -24,11 +24,52 @@ script swaps that icon for the emoji glyph in the per-message action bar and
 strips it from the floating selection menu), while the drafted reply uses
 the full `emoji label` text.
 
+## Smart reactions
+
+Smart reactions are off by default. Turn them on with the **Smart reactions**
+toggle in settings. When they are on, the assistant suggests reactions that fit
+each reply that needs an answer. They appear as buttons under the message.
+Clicking one drafts that reaction in the composer, the same way the other
+reaction buttons do.
+
+The assistant uses your configured reactions when they fit. When a reply
+offers distinct choices, it writes specific ones, such as `🪶 SQLite` and
+`🐘 Postgres`. Replies that need no answer get no buttons.
+
+This works through a message directive. The plugin adds instructions that ask
+the assistant to end such a reply with one line:
+
+```
+::reactions{items="🪶 SQLite|🐘 Postgres|❓ Clarify"}
+```
+
+The frontend draws that line as buttons. Items are separated by `|`, so
+labels can contain commas. The plugin shows at most 5 items, drops items longer
+than 60 characters, and drops items without both an emoji and a label.
+
+- Instructions apply when a thread's agent session starts or resumes, so turn
+  the setting on before you start a thread. A running session keeps the
+  instructions it started with.
+- The buttons still render if you later turn the setting off, so older replies
+  never show the raw line. If you disable the plugin, the line shows as plain
+  text.
+
 ## Staged preview
 
 ![Live BB screenshot of Emoji React settings](assets/staged-preview.png)
 
-Captured from the running BB application with configured reaction data.
+Captured from the running BB application with configured reaction data. The
+settings page shows the default reaction list, the location toggles, and the
+**Smart reactions** toggle turned on.
+
+![Smart reactions under a live assistant reply](assets/smart-reactions.png)
+
+A live thread with smart reactions on. It asked whether to use SQLite or
+Postgres for a small todo app. The assistant's reply ends with its suggested
+reactions: SQLite, Postgres, and Clarify. The capture script also clicks
+SQLite and checks that the reply was drafted in the composer. To seed it, turn
+smart reactions on, start a thread with that question, and pass its ID as
+`BB_CAPTURE_SMART_REACTIONS_THREAD_ID`.
 
 ## Settings
 
@@ -51,6 +92,10 @@ Captured from the running BB application with configured reaction data.
 - **Show at bottom of user messages** (`showInUserBar`) — when enabled
   (default), reactions appear as buttons at the bottom of your own messages.
 
+- **Smart reactions** (`smartReactions`) — off by default. When enabled, the
+  assistant suggests reactions for each reply that needs an answer. See
+  [Smart reactions](#smart-reactions).
+
 Disable any surface you don’t want — at least one must stay enabled for
 reactions to be visible. The editor has a **Where reactions appear** group
 with those three toggles, so you can keep only the selection menu, only the
@@ -66,6 +111,7 @@ bb plugin config emoji-react set quotePosition before
 bb plugin config emoji-react set showInSelectionMenu true
 bb plugin config emoji-react set showInAssistantBar true
 bb plugin config emoji-react set showInUserBar false
+bb plugin config emoji-react set smartReactions true
 bb plugin reload emoji-react
 ```
 
@@ -92,6 +138,11 @@ re-interpretation.
   endpoint. It now includes a **Where reactions appear** toggle group for the
   three surfaces; the host-rendered raw settings form below the editor also
   exposes the same three booleans.
+- Smart reactions: `server.ts` keeps the settings in memory and, when
+  `smartReactions` is on, returns instructions from `bb.agents.configure`.
+  `app.tsx` registers a `reactions` message directive that renders the
+  suggested items as buttons. `src/smart-reactions.ts` parses the untrusted
+  directive attribute and builds the instructions.
 - A content script replaces the plugin's compact icon with the reaction
   glyph: the per-message action bar renders plugin actions as icon-only
   buttons (the title lives in `aria-label`), so the script swaps the icon
@@ -109,6 +160,6 @@ re-interpretation.
 bb plugin install .    # register
 bb plugin dev          # watch loop: rebuild + reload on save
 pnpm typecheck
-pnpm test              # vitest for src/emoji-items parsing
+pnpm test              # vitest for reaction parsing, drafts, and smart reactions
 pnpm build             # self-contained dist/
 ```

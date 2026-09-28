@@ -9,7 +9,11 @@
 //    below it. Both surfaces render the emoji itself, not the plugin icon —
 //    see the content script at the bottom.
 //
-// 2. Settings — a settingsSection editor with emoji + label rows (like
+// 2. Smart reactions (off by default) — the assistant ends a reply that needs
+//    an answer with `::reactions{items="…"}`; a messageDirective renders it as
+//    reaction buttons under that message. Clicking one drafts the reaction.
+//
+// 3. Settings — a settingsSection editor with emoji + label rows (like
 //    NeonPilot's `emoji-label-list` control). Saving persists via the
 //    standard plugin settings endpoint and re-applies the menu immediately
 //    through a disable/enable cycle, because the host only re-interprets a
@@ -28,6 +32,7 @@ import {
   useSettings,
   type PluginComposerApi,
   type PluginMessageActionContext,
+  type PluginMessageDirectiveProps,
 } from "@bb/plugin-sdk/app";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -43,6 +48,10 @@ import {
   parseQuotePosition,
   type QuotePosition,
 } from "./src/draft";
+import {
+  parseSmartReactions,
+  SMART_REACTIONS_DIRECTIVE,
+} from "./src/smart-reactions";
 
 const PLUGIN_ID = "emoji-react";
 
@@ -146,6 +155,48 @@ function draftReaction(
 }
 
 // ---------------------------------------------------------------------------
+// Smart reactions: `::reactions{items="👍 Ship it|❓ Why"}` in an assistant
+// message renders as a row of reaction buttons. The buttons stay on older
+// messages too, and still render if the setting is later turned off, so the
+// raw directive line never shows.
+// ---------------------------------------------------------------------------
+
+function SmartReactions({ attributes }: PluginMessageDirectiveProps) {
+  const items = parseSmartReactions(attributes.items);
+  if (items.length === 0) return null;
+  return (
+    <div
+      className="my-2 flex flex-wrap gap-1.5"
+      role="group"
+      aria-label="Suggested reactions"
+    >
+      {items.map((item) => (
+        <Button
+          key={item.text}
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 rounded-full px-2.5 text-xs font-normal"
+          onClick={() => {
+            const composer = composerRef.current;
+            if (composer === null) {
+              toast.error(
+                "Emoji reactions need the thread composer open — open this thread in the main view and try again.",
+              );
+              return;
+            }
+            draftReaction(composer, item.text, null, false, "before");
+          }}
+        >
+          <span aria-hidden="true">{item.emoji}</span>
+          <span>{item.label}</span>
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Settings editor (settingsSection on the plugin detail page)
 // ---------------------------------------------------------------------------
 
@@ -171,6 +222,9 @@ function EmojiReactionsSettings() {
   const [showInUserBar, setShowInUserBar] = useState(
     values?.showInUserBar !== false,
   );
+  const [smartReactions, setSmartReactions] = useState(
+    values?.smartReactions === true,
+  );
   const [saving, setSaving] = useState(false);
 
   // Keep local state in sync when settings change elsewhere (CLI, the
@@ -186,6 +240,7 @@ function EmojiReactionsSettings() {
     setShowInSelectionMenu(values?.showInSelectionMenu !== false);
     setShowInAssistantBar(values?.showInAssistantBar !== false);
     setShowInUserBar(values?.showInUserBar !== false);
+    setSmartReactions(values?.smartReactions === true);
   }, [
     values?.emojiItems,
     values?.quoteSelection,
@@ -193,6 +248,7 @@ function EmojiReactionsSettings() {
     values?.showInSelectionMenu,
     values?.showInAssistantBar,
     values?.showInUserBar,
+    values?.smartReactions,
   ]);
 
   const updateItem = (index: number, patch: Partial<EmojiItem>) => {
@@ -239,6 +295,7 @@ function EmojiReactionsSettings() {
             showInSelectionMenu,
             showInAssistantBar,
             showInUserBar,
+            smartReactions,
           },
         }),
       });
@@ -403,6 +460,24 @@ function EmojiReactionsSettings() {
         ) : null}
       </div>
 
+      <div className="rounded-md border border-border p-3 space-y-2">
+        <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={smartReactions}
+            onChange={(event) => setSmartReactions(event.target.checked)}
+            className="size-4 accent-foreground"
+          />
+          Smart reactions
+        </label>
+        <p className="text-xs text-muted-foreground">
+          The assistant suggests reactions that fit each reply that needs an
+          answer, shown as buttons under the message. It uses the reactions
+          above when they fit and writes specific ones for distinct options.
+          Applies to threads started or resumed after you save.
+        </p>
+      </div>
+
       <div className="flex justify-end">
         <Button
           type="button"
@@ -471,6 +546,13 @@ export default definePluginApp((app) => {
     banners: [
       { id: "composer-bridge", chrome: "bare", component: ComposerBridge },
     ],
+  });
+
+  // Registered even when smart reactions are off, so replies that already
+  // carry the directive keep rendering as buttons.
+  app.slots.messageDirective({
+    id: SMART_REACTIONS_DIRECTIVE,
+    component: SmartReactions,
   });
 
   app.slots.settingsSection({
