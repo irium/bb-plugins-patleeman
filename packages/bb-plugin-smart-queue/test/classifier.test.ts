@@ -75,6 +75,19 @@ test("Jev reports every failed provider, and rejects unknown options", async (t)
   await assert.rejects(askJev({ zenApiKey: "k" }, situation, signal(), env), /unknown/);
 });
 
+test("a failed Jev request reports the provider's reason", async (t) => {
+  t.mock.method(globalThis, "fetch", async () =>
+    Response.json(
+      { errors: [{ detail: "Unsupported provider in model field: typesafe.", status: 400 }] },
+      { status: 400 },
+    ),
+  );
+  await assert.rejects(
+    askJev({ typesafeApiKey: "a" }, situation, signal(), env),
+    /^Error: TypeSafe request failed \(HTTP 400\)\. Unsupported provider in model field: typesafe\.$/,
+  );
+});
+
 test("a custom endpoint gets its own model, and no auth header without a key", async (t) => {
   const calls: { url: string; init: RequestInit }[] = [];
   t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {

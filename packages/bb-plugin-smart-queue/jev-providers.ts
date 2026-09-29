@@ -169,9 +169,10 @@ export function jevRoutes(
   return { routes, problems };
 }
 
-export function describeHttpFailure(route: JevRoute, status: number) {
-  if (status === 401 || status === 403) return `${route.name} rejected the API key (HTTP ${status}).`;
-  if (status === 402) return `${route.name} says the account is out of credit (HTTP 402).`;
-  if (status === 429 || status === 529) return `${route.name} rate-limited Jev (HTTP ${status}).`;
-  return `${route.name} request failed (HTTP ${status}).`;
+export function describeHttpFailure(route: JevRoute, status: number, detail: string | null = null) {
+  const reason = detail ? ` ${detail.replace(/[.\s]+$/, "")}.` : "";
+  if (status === 401 || status === 403) return `${route.name} rejected the API key (HTTP ${status}).${reason}`;
+  if (status === 402) return `${route.name} says the account is out of credit (HTTP 402).${reason}`;
+  if (status === 429 || status === 529) return `${route.name} rate-limited Jev (HTTP ${status}).${reason}`;
+  return `${route.name} request failed (HTTP ${status}).${reason}`;
 }

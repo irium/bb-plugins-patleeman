@@ -16,6 +16,8 @@ type Tracking = {
   createdAt: number;
   /** When Smart Queue first saw the row, so a queue snapshot taken earlier cannot prune it. */
   seenAt: number;
+  /** The text classified, so an edit to the queued card can start a fresh decision. */
+  text: string;
   /** Resolves once this row's decision, including any steer, has been applied. */
   applied: Promise<void>;
   finish: () => void;
@@ -140,16 +142,17 @@ export class SmartQueue {
    * The app's composer queues a busy-thread message by creating the row
    * directly, which runs no hook and fires no `message.queued`. A periodic
    * snapshot of every live row finds those, and forgets rows that left the
-   * queue without an event.
+   * queue without an event. Edits and manual sends fire no event either, so
+   * the snapshot also cancels a decision for a row the owner sent by hand
+   * (claimed rows stop being editable) and restarts one for an edited row.
    */
   sync(rows: readonly QueuedRow[], listedAt: number) {
-    const live = new Set(rows.map((row) => row.id));
-    for (const [id, entry] of this.entries)
-      if (!live.has(id) && entry.seenAt < listedAt) {
-        if (entry.state === "pending") entry.controller.abort();
-        entry.finish();
-        this.entries.delete(id);
-      }
+    const live = new Map(rows.map((row) => [row.id, row]));
+    for (const [id, entry] of this.entries) {
+      if (entry.seenAt >= listedAt) continue;
+      const row = live.get(id);
+      if (!row || !row.editable || rowText(row) !== entry.text) this.gone({ id });
+    }
     for (const row of rows) this.queued(row);
   }
 
@@ -157,7 +160,8 @@ export class SmartQueue {
   queued(row: QueuedRow) {
     if (this.entries.has(row.id)) return;
     if (row.initiator !== "user" || row.senderThreadId !== null || row.originPluginId !== null) return;
-    if (row.payload.kind !== "inline") return;
+    // A claimed row is already on its way to the provider.
+    if (row.payload.kind !== "inline" || !row.editable) return;
     const held = this.heldByUs(row);
     if (!held && row.waitingOn?.kind !== "thread-busy") return;
     const controller = new AbortController();
@@ -168,6 +172,7 @@ export class SmartQueue {
       threadId: row.threadId,
       createdAt: row.createdAt,
       seenAt: this.now(),
+      text: rowText(row),
       applied,
       finish,
       startedAt: this.now(),
@@ -221,7 +226,8 @@ export class SmartQueue {
         if (!this.entries.has(row.id)) return;
         await this.deps.steer(row);
       } catch (error) {
-        if (/not found|HTTP 404/i.test(String(error))) {
+        // Cancelled, or already being sent because the owner sent it by hand.
+        if (/not found|HTTP 404|already being sent/i.test(String(error))) {
           this.entries.delete(row.id);
           return;
         }

@@ -33,6 +33,7 @@ const row = (overrides: Partial<QueuedRow> = {}) =>
     senderThreadId: null,
     originPluginId: null,
     payload: { kind: "inline" },
+    editable: true,
     waitingOn: { kind: "plugin", pluginId: "smart-queue", reason: decidingReason },
     content: [{ type: "text", text: "Actually use SQLite", mentions: [] }],
     ...overrides,
@@ -203,6 +204,66 @@ test("a failed steer falls back to follow-up", async () => {
   assert.equal(calls.rechecks, 1);
   const decision = await queue.dispatch(context({ queuedMessages: [row()] }));
   assert.equal(decision.action, "wait");
+});
+
+test("a steer that loses to a manual send is dropped, not relabeled as a follow-up", async () => {
+  const { queue, calls } = harness(steer, {
+    steer: async () => {
+      throw new Error("BbHttpError: HTTP 409: Queued message is already being sent");
+    },
+  });
+  queue.queued(row());
+  await settle();
+  assert.equal(queue.entries.size, 0);
+  assert.equal(calls.records.length, 0);
+  assert.equal(calls.rechecks, 0);
+});
+
+test("sending a held row by hand cancels its pending decision", async () => {
+  let aborted = false;
+  const { queue, calls, advance } = harness(steer, {
+    classify: (_, __, signal) =>
+      new Promise<Verdict>((_resolve, reject) =>
+        signal.addEventListener("abort", () => ((aborted = true), reject(signal.reason)), { once: true }),
+      ),
+  });
+  queue.queued(row());
+  await settle();
+  advance(10);
+  queue.sync([row({ editable: false })], 1_005);
+  await settle();
+  assert.equal(aborted, true);
+  assert.equal(queue.entries.size, 0, "a claimed row is not tracked again");
+  assert.deepEqual(calls.steered, []);
+  assert.equal(calls.records.length, 0);
+});
+
+test("editing a held row restarts its decision with the new text", async () => {
+  const classified: string[] = [];
+  let aborts = 0;
+  const { queue, advance } = harness(followup, {
+    classify: (r, _, signal) => {
+      classified.push(r.content.map((block) => (block.type === "text" ? block.text : "")).join(""));
+      if (classified.length === 1)
+        return new Promise<Verdict>((_resolve, reject) =>
+          signal.addEventListener("abort", () => (aborts++, reject(signal.reason)), { once: true }),
+        );
+      return Promise.resolve(followup);
+    },
+  });
+  queue.queued(row());
+  await settle();
+  advance(10);
+  const edited = row({ content: [{ type: "text", text: "Actually use Postgres", mentions: [] }] });
+  queue.sync([edited], 1_005);
+  await settle();
+  assert.equal(aborts, 1);
+  assert.deepEqual(classified, ["Actually use SQLite", "Actually use Postgres"]);
+  assert.equal(queue.entries.get("q_1")?.state, "decided");
+  advance(10);
+  queue.sync([edited], 1_015);
+  await settle();
+  assert.equal(classified.length, 2, "an unchanged row is not classified again");
 });
 
 test("steers land in send order when a later classification finishes first", async () => {

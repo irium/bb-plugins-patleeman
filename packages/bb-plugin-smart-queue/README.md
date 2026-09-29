@@ -82,7 +82,8 @@ Both composer settings work:
 
 When several messages steer, they reach the turn in the order you sent them.
 The queued card's own **Send now** and **Steer** buttons still override Smart
-Queue.
+Queue, and sending a card by hand cancels its pending decision. Editing a held
+card starts a fresh decision for the new text.
 
 ## Settings
 

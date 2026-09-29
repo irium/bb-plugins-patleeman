@@ -89,6 +89,25 @@ async function boundedJson(response: Response): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
+const errorBodySchema = z.union([
+  z.object({ errors: z.array(z.object({ detail: z.string() })).min(1) }).transform((body) => body.errors[0]!.detail),
+  z.object({ detail: z.string() }).transform((body) => body.detail),
+  z.object({ error: z.object({ message: z.string() }) }).transform((body) => body.error.message),
+  z.object({ error: z.string() }).transform((body) => body.error),
+  z.object({ message: z.string() }).transform((body) => body.message),
+]);
+
+/** The provider's own reason for a failed request, so a rejected model or header is visible in the logs. */
+async function errorDetail(response: Response): Promise<string | null> {
+  try {
+    const parsed = errorBodySchema.safeParse(await boundedJson(response));
+    return parsed.success ? parsed.data.replace(/\s+/g, " ").trim().slice(0, 300) || null : null;
+  } catch {
+    await response.body?.cancel().catch(() => {});
+    return null;
+  }
+}
+
 async function askRoute(route: JevRoute, situation: Situation, timeoutMs: number, signal: AbortSignal) {
   const bearer = route.apiKeyCommand ? await commandToken(route.apiKeyCommand) : route.apiKey;
   signal.throwIfAborted();
@@ -111,10 +130,10 @@ async function askRoute(route: JevRoute, situation: Situation, timeoutMs: number
     signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
   });
   if (!response.ok) {
-    await response.body?.cancel();
+    const detail = await errorDetail(response);
     if (route.apiKeyCommand && (response.status === 401 || response.status === 403))
       forgetCommandToken(route.apiKeyCommand);
-    throw new Error(describeHttpFailure(route, response.status));
+    throw new Error(describeHttpFailure(route, response.status, detail));
   }
   const parsed = jevResponseSchema.safeParse(await boundedJson(response));
   if (!parsed.success) throw new Error(`${route.name} returned an invalid decision response.`);

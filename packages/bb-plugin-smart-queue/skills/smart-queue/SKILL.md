@@ -65,6 +65,10 @@ and any configuration problems.
   failed too. Read `bb plugin logs smart-queue` for the reason.
 - A queued card that says *Smart Queue: follow-up after the current turn* is
   released when the thread goes idle. The owner can use the card's **Send now**
-  or **Steer** button to override it.
+  or **Steer** button to override it. Sending a card by hand cancels its
+  pending decision, and editing a held card classifies the new text.
+- `request failed (HTTP 400)` from a Jev provider ends with the provider's own
+  reason, such as an unsupported model name. Run `bb smart-queue check` to
+  retry with a fixed sample.
 - To stop all classification, run
   `bb plugin config smart-queue set enabled false`.
