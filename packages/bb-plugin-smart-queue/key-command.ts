@@ -61,6 +61,12 @@ export async function commandToken(command: string, timeoutMs = 15_000): Promise
   return request;
 }
 
+/** Whether the next `commandToken` call would reuse a cached token instead of running the command. */
+export function hasCommandToken(command: string) {
+  const cached = cache.get(command);
+  return !!cached && cached.expiresAt > Date.now();
+}
+
 /** Drops a token the endpoint rejected, so the next call runs the command again. */
 export function forgetCommandToken(command: string) {
   cache.delete(command);

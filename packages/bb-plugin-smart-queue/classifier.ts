@@ -2,7 +2,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { Fallback } from "./contract";
 import { describeHttpFailure, jevRoutes, type JevProviderSettings, type JevRoute } from "./jev-providers";
-import { commandToken, forgetCommandToken } from "./key-command";
+import { commandToken, forgetCommandToken, hasCommandToken } from "./key-command";
 
 export type Action = "steer" | "followup";
 export type Verdict = {
@@ -108,7 +108,14 @@ async function errorDetail(response: Response): Promise<string | null> {
   }
 }
 
-async function askRoute(route: JevRoute, situation: Situation, timeoutMs: number, signal: AbortSignal) {
+async function askRoute(
+  route: JevRoute,
+  situation: Situation,
+  timeoutMs: number,
+  signal: AbortSignal,
+  retried = false,
+): Promise<z.infer<typeof jevResponseSchema>["answers"]["action"]> {
+  const reused = !!route.apiKeyCommand && hasCommandToken(route.apiKeyCommand);
   const bearer = route.apiKeyCommand ? await commandToken(route.apiKeyCommand) : route.apiKey;
   signal.throwIfAborted();
   const response = await fetch(route.endpoint, {
@@ -131,8 +138,11 @@ async function askRoute(route: JevRoute, situation: Situation, timeoutMs: number
   });
   if (!response.ok) {
     const detail = await errorDetail(response);
-    if (route.apiKeyCommand && (response.status === 401 || response.status === 403))
+    if (route.apiKeyCommand && (response.status === 401 || response.status === 403)) {
       forgetCommandToken(route.apiKeyCommand);
+      // A cached token can be revoked before its expiry; a fresh one gets one more try.
+      if (reused && !retried) return askRoute(route, situation, timeoutMs, signal, true);
+    }
     throw new Error(describeHttpFailure(route, response.status, detail));
   }
   const parsed = jevResponseSchema.safeParse(await boundedJson(response));

@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   JevUnavailableError,
   askJev,
@@ -146,6 +149,28 @@ test("the model prompt carries bounded data and parses strict JSON", () => {
   assert.equal(parseModelVerdict('Answer: {"action":"Steer"}').action, "steer");
   assert.throws(() => parseModelVerdict('{"action":"fork"}'));
   assert.throws(() => parseModelVerdict("steer"));
+});
+
+test("a rejected cached command token is refreshed and retried once", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "smart-queue-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  // Prints tok-1, tok-2, ... so each run of the command yields a new token.
+  const command = `n=$(cat "${dir}/n" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "${dir}/n"; echo tok-$n`;
+  const settings = { customJevEndpoint: "https://gw.example.com/v1/systemone", customJevModel: "jev", customJevApiKeyCommand: command };
+  const bearers: string[] = [];
+  let reject = new Set<string>();
+  t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
+    const bearer = (init.headers as Record<string, string>).Authorization!;
+    bearers.push(bearer);
+    return reject.has(bearer) ? new Response("{}", { status: 401 }) : Response.json(jevAnswer("followup", 0.9));
+  });
+  await askJev(settings, situation, signal(), env);
+  reject = new Set(["Bearer tok-1"]);
+  await askJev(settings, situation, signal(), env);
+  assert.deepEqual(bearers, ["Bearer tok-1", "Bearer tok-1", "Bearer tok-2"]);
+  reject = new Set(["Bearer tok-2", "Bearer tok-3"]);
+  await assert.rejects(askJev(settings, situation, signal(), env), /rejected the API key \(HTTP 401\)/);
+  assert.deepEqual(bearers.slice(3), ["Bearer tok-2", "Bearer tok-3"], "a fresh token that fails is not retried");
 });
 
 test("a custom endpoint sends its extra headers and the key command's token", async (t) => {
