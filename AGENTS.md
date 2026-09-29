@@ -16,6 +16,25 @@ lists.
   Confirm that both indexes list the same plugins, IDs are unique, and all
   referenced package directories and local icon assets exist.
 
+## Stable BB compatibility
+
+Every plugin must install on the current stable BB release. npm's `latest`
+tag for `@get-bb/plugin-sdk` tracks BB Nightly, so `npm install`, `pnpm add`,
+and plugin scaffolding all default to an SDK that stable BB does not ship yet.
+Stable BB then refuses the plugin with "requires bb plugin SDK ...".
+
+- Pin `@get-bb/plugin-sdk` to an exact version no newer than the SDK in the
+  current stable release (`pnpm check:compat` prints it), for example
+  `pnpm add -D -E @get-bb/plugin-sdk@<stable-sdk>`. Typecheck against that
+  version so nightly-only APIs fail to compile.
+- Keep `engines.bbPluginSdk` at or below that version and `engines.bb` at or
+  below the stable app version. Don't copy the version the scaffold or
+  `bb plugin build` on Nightly writes.
+- Run `pnpm check:compat` before handoff. It prints the current stable app and
+  SDK versions and fails on any plugin that stable BB would refuse. Don't
+  raise a floor past stable to make it pass; wait for the API to ship in
+  stable instead.
+
 ## Plugin documentation
 
 All new plugins must include at least one screenshot captured from the running

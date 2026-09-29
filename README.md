@@ -101,6 +101,18 @@ pnpm build
 
 Each package README documents its installation and runtime requirements.
 
+Plugins must install on the current stable BB release, not only on Nightly.
+npm's `latest` tag for `@get-bb/plugin-sdk` follows Nightly, so check before
+pushing:
+
+```sh
+pnpm check:compat
+```
+
+The check reads the stable release, looks up the plugin SDK it ships, and
+fails if any plugin's `engines` range or pinned SDK version is newer. CI runs
+the same check on every push and pull request.
+
 This repository is also a BB plugin collection. Install one plugin from this
 checkout with:
 

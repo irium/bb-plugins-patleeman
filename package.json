@@ -6,6 +6,7 @@
   "scripts": {
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
+    "check:compat": "node scripts/check-sdk-compat.mjs",
     "dev": "pnpm -r --if-present dev",
     "clean": "pnpm -r --if-present clean",
     "plugins:install": "bash scripts/install-all.sh"
