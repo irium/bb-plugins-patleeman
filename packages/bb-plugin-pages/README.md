@@ -20,7 +20,8 @@ script seeds a project page called "Offline mode launch" with a nested
 
 The sidebar shows the project's page tree, expanded to the sub-page, and an
 empty Global section. The header shows the breadcrumb, the last edit, and the
-**Ask a bot** and **Comments** buttons. The script deletes both pages
+**Ask a bot**, **Dictate**, and **Comments** buttons. **Dictate** appears
+because Talk is installed in the staged app. The script deletes both pages
 afterwards.
 
 ## What you get
@@ -47,6 +48,24 @@ afterwards.
 - **Version history.** Pages saves a version before an agent's or bot's first
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.
+
+## Dictation with Talk
+
+With the [Talk](../bb-plugin-talk) plugin installed, you can dictate into a
+page:
+
+- **Dictate** in the header, or **Dictate** in the `/` menu, starts Talk. Press
+  **Stop dictation** or ✓ in Talk's pill to finish, and the transcript goes in
+  at your cursor. Blank lines in the transcript start new paragraphs. If you
+  haven't clicked into the page yet, the text goes at the end.
+- *Talk: Start or finish dictation* from the command palette works while the
+  cursor is in a page.
+- If you finish while you're somewhere else, Talk keeps the text. Its **Go
+  back** button reopens the page, and the text is added when the page loads.
+
+Talk does the recording, transcription, and durability. Pages only marks the
+editor as a Talk dictation field and inserts the text Talk hands it. Without
+Talk, the dictation controls are hidden.
 
 ## Bot Teams integration
 

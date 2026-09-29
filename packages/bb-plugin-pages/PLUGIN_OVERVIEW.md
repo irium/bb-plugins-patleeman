@@ -12,6 +12,8 @@ live.
 - **Bots that do the work.** @mention a Bot Teams bot in a page or a comment
   and it edits the page and replies. Give a page an owner bot and a schedule,
   and it keeps the page up to date.
+- **Dictation.** With the Talk plugin installed, press **Dictate** or type
+  `/dictate` and speak. The transcript goes in at your cursor.
 - **A page tree.** Pages per project plus global pages, nested to any depth,
   with version history you can restore from.
 

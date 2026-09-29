@@ -20,6 +20,16 @@ import { DOCUMENT_FRAGMENT, THREADS_MAP } from "../schema-config";
 import { pageSchema } from "./blocks";
 import type { PageConnection } from "./connection";
 import { authorInfo } from "./context";
+import {
+  dictationParagraphs,
+  pageFieldKey,
+  pageFieldLabel,
+  spacedAfter,
+  TALK_FIELD_ATTR,
+  TALK_FIELD_LABEL_ATTR,
+  TALK_INSERT_EVENT,
+  toggleTalk,
+} from "./talk";
 
 const HUMAN_COLOR = "#2563eb";
 
@@ -207,7 +217,73 @@ export function PageEditor({
     return mergeGroups(getDefaultReactSlashMenuItems(editor), custom);
   }, [editor]);
 
-  const slashMenuItems = useCallback(async (query: string) => filterSuggestionItems(slashItems, query), [slashItems]);
+  const fieldKey = pageFieldKey(page.id);
+  const slashMenuItems = useCallback(
+    async (query: string) => {
+      // Offered only while Talk is installed and loaded.
+      const talk = document.documentElement.dataset.bbTalk
+        ? [
+            {
+              title: "Dictate",
+              subtext: "Speak and Talk types it here",
+              aliases: ["talk", "voice", "speak", "transcribe", "mic"],
+              group: "Talk",
+              icon: <Icon name="Mic" className="size-4" />,
+              onItemClick: () => void toggleTalk(fieldKey),
+            },
+          ]
+        : [];
+      return filterSuggestionItems([...slashItems, ...talk], query);
+    },
+    [slashItems, fieldKey],
+  );
+
+  // Talk dictates at the cursor. Before the user has put the cursor in the
+  // page, a dictation goes at the end instead of the top.
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const cursorPlaced = useRef(false);
+  useEffect(() => {
+    const field = fieldRef.current;
+    if (!field) return;
+    const onInsert = (event: Event) => {
+      const text = (event as CustomEvent<{ text?: unknown }>).detail?.text;
+      const paragraphs = typeof text === "string" && editor.isEditable ? dictationParagraphs(text) : [];
+      if (!paragraphs.length) return;
+      event.preventDefault();
+      if (!cursorPlaced.current) {
+        const last = editor.document[editor.document.length - 1];
+        if (last?.type === "paragraph" && Array.isArray(last.content) && last.content.length === 0) {
+          editor.setTextCursorPosition(last, "end");
+        } else if (last) {
+          const inserted = editor.insertBlocks(
+            paragraphs.map((paragraph) => ({ type: "paragraph" as const, content: paragraph })),
+            last,
+            "after",
+          );
+          editor.setTextCursorPosition(inserted[inserted.length - 1]!, "end");
+          cursorPlaced.current = true;
+          return;
+        }
+        cursorPlaced.current = true;
+      }
+      const inline = editor.transact((tr) => {
+        const { $from, from, to } = tr.selection;
+        if (!$from.parent.isTextblock) return false;
+        tr.insertText(spacedAfter($from.parent.textBetween(0, $from.parentOffset, undefined, " "), paragraphs[0]!), from, to);
+        return true;
+      });
+      const rest = inline ? paragraphs.slice(1) : paragraphs;
+      if (!rest.length) return;
+      const inserted = editor.insertBlocks(
+        rest.map((paragraph) => ({ type: "paragraph" as const, content: paragraph })),
+        editor.getTextCursorPosition().block,
+        "after",
+      );
+      editor.setTextCursorPosition(inserted[inserted.length - 1]!, "end");
+    };
+    field.addEventListener(TALK_INSERT_EVENT, onInsert);
+    return () => field.removeEventListener(TALK_INSERT_EVENT, onInsert);
+  }, [editor]);
 
   const mentionItems = useCallback(async (query: string): Promise<DefaultReactSuggestionItem[]> => {
     const insert = (kind: string, target: string, label: string) => () => {
@@ -278,7 +354,12 @@ export function PageEditor({
       renderEditor={false}
       className="pages-editor flex min-h-0 flex-1"
     >
-      <div className="pages-main min-w-0 flex-1">
+      <div
+        ref={fieldRef}
+        className="pages-main min-w-0 flex-1"
+        {...{ [TALK_FIELD_ATTR]: fieldKey, [TALK_FIELD_LABEL_ATTR]: pageFieldLabel(page.title) }}
+        onFocus={() => (cursorPlaced.current = true)}
+      >
         <BlockNoteViewEditor />
       </div>
       {sidePanel === "comments" ? (

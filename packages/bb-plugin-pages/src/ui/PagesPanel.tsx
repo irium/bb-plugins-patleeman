@@ -17,6 +17,7 @@ import { PageConnection } from "./connection";
 import { PagesUiContext, type PagesUi } from "./context";
 import { AskBotDialog, HistoryDialog, KeepUpdatedDialog } from "./dialogs";
 import { PageEditor, type SidePanel } from "./PageEditor";
+import { pageFieldKey, toggleTalk, useTalk, type TalkView } from "./talk";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 type Project = { id: string; name: string };
@@ -563,6 +564,29 @@ function usePresence(connection: PageConnection | null): Presence[] {
   return presence;
 }
 
+const TALK_WORKING_PHASES = new Set(["starting", "finalizing", "transcribing"]);
+
+function DictateButton({ talk, ready, onToggle }: { talk: TalkView; ready: boolean; onToggle(): void }) {
+  if (talk.mode === "unavailable") return null;
+  if (talk.mode === "here") {
+    const working = TALK_WORKING_PHASES.has(talk.phase);
+    return (
+      <Button variant="ghost" size="sm" aria-pressed onClick={onToggle} disabled={working}>
+        <Icon name={working ? "Mic" : "Square"} className={working ? "animate-pulse" : "text-red-500"} />
+        {talk.phase === "starting" ? "Starting…" : working ? "Transcribing…" : "Stop dictation"}
+      </Button>
+    );
+  }
+  const busy = talk.mode === "elsewhere";
+  return (
+    <span title={busy ? "Talk is busy with another recording." : "Dictate into this page with Talk"}>
+      <Button variant="ghost" size="sm" onClick={onToggle} disabled={busy || !ready}>
+        <Icon name="Mic" /> Dictate
+      </Button>
+    </span>
+  );
+}
+
 function PageView({
   page,
   pages,
@@ -580,6 +604,7 @@ function PageView({
 }) {
   const { connection, status, synced } = useConnection(page.id);
   const presence = usePresence(connection);
+  const talk = useTalk(pageFieldKey(page.id));
   const [sidePanel, setSidePanel] = useState<SidePanel>(null);
   const [dialog, setDialog] = useState<"ask" | "refresh" | "history" | null>(null);
   const [requests, setRequests] = useState<RequestView[]>([]);
@@ -619,6 +644,7 @@ function PageView({
               <Icon name="Bot" /> Ask a bot
             </Button>
           </span>
+          <DictateButton talk={talk} ready={Boolean(connection && synced)} onToggle={() => toggleTalk(pageFieldKey(page.id))} />
           <Button
             variant="ghost"
             size="sm"

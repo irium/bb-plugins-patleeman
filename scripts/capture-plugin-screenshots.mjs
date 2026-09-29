@@ -1566,6 +1566,9 @@ const captures = [
         await client.waitForText("Weekly active teams");
         await client.waitForText("Localise onboarding for Japanese and German");
         await client.waitForSelector(".recharts-bar-rectangle");
+        // Talk is installed in the staged app, so the page offers dictation.
+        await client.waitForSelector('[data-talk-field^="pages:"]');
+        await client.waitForText("Dictate");
         await sleep(1000);
       } catch (error) {
         await cleanup();

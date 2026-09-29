@@ -82,6 +82,16 @@ When you are a bot handling one of these requests, follow its instructions:
 edit with `pages_edit`, then reply in the named comment thread with
 `pages_comment_reply` or start one with `pages_comment`.
 
+## Dictation
+
+With the Talk plugin installed, the user can dictate into a page: **Dictate**
+in the header, `/dictate`, or *Talk: Start or finish dictation* while the
+cursor is in the page. Talk records and transcribes, and Pages inserts the
+text at the cursor, or at the end if the user hasn't clicked into the page.
+Text finished elsewhere is added when the user goes back to the page.
+Dictation edits the page as the user, not an agent. Recordings are in Talk's
+Recordings page (`bb talk list`).
+
 ## CLI
 
 Output is bounded and tab-separated where it is a list.
