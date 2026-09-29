@@ -19,7 +19,7 @@
  */
 
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -408,6 +408,85 @@ async function bbCli(args) {
   return stdout;
 }
 
+async function talkRpc(method, input) {
+  const dir = await mkdtemp(join(tmpdir(), "bb-talk-capture-"));
+  const file = join(dir, "input.json");
+  await writeFile(file, JSON.stringify(input));
+  try {
+    return JSON.parse(await bbCli(["plugin", "rpc", "call", "talk", method, "--input-file", file, "--json"]));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function runText(command, args) {
+  const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => (stdout += chunk));
+  child.stderr.on("data", (chunk) => (stderr += chunk));
+  const code = await new Promise((resolvePromise) => child.on("close", resolvePromise));
+  if (code !== 0) throw new Error(`${command} failed: ${stderr}`);
+  return stdout;
+}
+
+/**
+ * Seeds a finished Talk recording from speech synthesized with macOS `say`,
+ * uploaded and transcribed through the live plugin and BB's voice service.
+ */
+async function seedTalkRecording(projectId) {
+  const pieces = [
+    ["sync", "Welcome to the weekly product sync. First up, the offline mode beta shipped to forty teams on Monday, and crash reports are down by half since the storage fix."],
+    ["sync", "Onboarding is the next focus. New users still stall at the import step, so design will prototype a guided import this sprint."],
+    ["sync", "For hiring, Maria is running the loop for two senior engineers, with first interviews scheduled for Thursday."],
+    ["after", "Action items. Priya drafts the guided import spec. Sam shares the crash dashboard. Everyone reviews the roadmap before Friday."],
+  ];
+  const dir = await mkdtemp(join(tmpdir(), "bb-talk-seed-"));
+  const recording = await talkRpc("recording_create", { kind: "recording", projectId, threadId: null });
+  try {
+    await talkRpc("recording_rename", { id: recording.id, title: "Weekly product sync" });
+    let startedAt = Date.now() - 20 * 60_000;
+    const sessions = { sync: "captureseed1", after: "captureseed2" };
+    const indexes = { sync: 0, after: 0 };
+    for (const [n, [session, text]] of pieces.entries()) {
+      const aiff = join(dir, `${n}.aiff`);
+      const m4a = join(dir, `${n}.m4a`);
+      await runText("say", ["-o", aiff, text]);
+      await runText("afconvert", ["-f", "m4af", "-d", "aac", "-b", "32000", aiff, m4a]);
+      const audio = await readFile(m4a);
+      const info = await runText("afinfo", [m4a]);
+      const durationMs = Math.round(Number(/estimated duration: ([\d.]+)/.exec(info)?.[1] ?? 0) * 1000);
+      await talkRpc("segment_put", {
+        recordingId: recording.id,
+        sessionId: sessions[session],
+        index: indexes[session]++,
+        startedAt,
+        durationMs,
+        mimeType: "audio/mp4",
+        audioBase64: audio.toString("base64"),
+      });
+      startedAt += durationMs + (session === "sync" ? 0 : 60_000);
+    }
+    await talkRpc("recording_state", { id: recording.id, status: "finishing" });
+    const started = Date.now();
+    for (;;) {
+      const current = JSON.parse(await bbCli(["talk", "show", recording.id, "--json"]));
+      if (current.status === "done" && current.pendingCount === 0) {
+        if (current.failedCount > 0) throw new Error(`Talk could not transcribe ${current.failedCount} seeded pieces.`);
+        break;
+      }
+      if (Date.now() - started > 120_000) throw new Error("Timed out waiting for Talk to transcribe the seeded recording.");
+      await sleep(1000);
+    }
+    return recording.id;
+  } catch (error) {
+    await talkRpc("recording_delete", { id: recording.id }).catch(() => {});
+    throw error;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 async function ensureChrome() {
   try {
     return { webSocketUrl: await findPageTarget(), process: null };
@@ -425,6 +504,9 @@ async function ensureChrome() {
         `--remote-debugging-address=127.0.0.1`,
         `--remote-debugging-port=${cdpPort}`,
         "--window-size=1440,1000",
+        // Talk records from a synthetic microphone without a permission prompt.
+        "--use-fake-ui-for-media-stream",
+        "--use-fake-device-for-media-stream",
         "about:blank",
       ],
       { stdio: "ignore" },
@@ -1432,6 +1514,36 @@ const captures = [
         throw error;
       }
       return restore;
+    },
+  },
+  {
+    id: "talk",
+    packageDir: "bb-plugin-talk",
+    privateSidebar: true,
+    setup: async (client) => {
+      const recordingId = await seedTalkRecording(projectId);
+      const cleanup = async () => {
+        await client.evaluate(`document.querySelector('[data-talk-overlay] button[aria-label="Stop recording"]')?.click()`);
+        await sleep(1500);
+        await talkRpc("recording_delete", { id: recordingId });
+      };
+      try {
+        await client.navigate(`/plugins/talk/recordings/${recordingId}`);
+        await client.waitForText("Weekly product sync");
+        await client.waitForText("offline mode beta");
+        await client.waitForText("guided import spec");
+        await client.waitForText("Record more");
+        // Record from the synthetic microphone so the live pill is on screen.
+        await client.clickButtonText("Record more");
+        await client.waitForSelector("[data-talk-overlay]");
+        await client.waitForAriaButton("Stop recording");
+        await client.waitForText("Pause");
+        await sleep(2500);
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
     },
   },
   {

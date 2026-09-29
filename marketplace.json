@@ -354,6 +354,30 @@
       }
     },
     {
+      "id": "talk",
+      "displayName": "Talk",
+      "description": "Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable.",
+      "icon": {
+        "url": "./packages/bb-plugin-talk/icons/talk.svg"
+      },
+      "tags": [
+        "productivity",
+        "voice",
+        "dictation"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-plugins.git",
+          "subdir": "packages/bb-plugin-talk",
+          "ref": "main"
+        }
+      }
+    },
+    {
       "id": "tok-speed",
       "displayName": "Tok Speed",
       "description": "Paints a small visible provider-output tokens-per-second figure in every assistant message's hover menu — hidden reasoning and host tool time excluded.",
