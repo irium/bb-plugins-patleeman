@@ -243,8 +243,21 @@
   font-size: var(--text-xs);
   white-space: normal;
 }
+/* Touch has no hover, so the options button stays visible and the row always
+   leaves room for it. Archive lives in that menu, so its button is dropped. */
 @media (hover: none), (pointer: coarse) {
   .direct-thread-options { opacity: 1; }
+  .direct-thread-nav-row .direct-thread-options {
+    width: 36px;
+    height: 36px;
+    pointer-events: auto;
+  }
+  .direct-thread-nav-row .direct-thread-archive { display: none; }
+  .direct-thread-nav-row .channel-nav-row {
+    height: var(--bb-sidebar-row-height-coarse, 36px);
+    padding-right: 40px;
+  }
+  .direct-thread-nav-row .direct-thread-bot { display: block; }
 }
 .bot-direct-chat [data-bot-direct-native-picker] {
   display: none;
