@@ -59,27 +59,43 @@ export async function askJev(
     throw new Error(
       "Set the OpenCode Zen API key in Bot Teams settings to use Jev.",
     );
-  const response = await fetch("https://opencode.ai/zen/v1/systemone", {
-    method: "POST",
-    redirect: "error",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: config.jevModel,
-      state: JSON.stringify(state),
-      questions,
-    }),
-    signal: AbortSignal.any([signal, AbortSignal.timeout(config.jevTimeoutMs)]),
-  });
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error(
-      `Jev classification failed (HTTP ${response.status}). Check the Zen key, credits, and model in Bot Teams settings.`,
-    );
+  // Node 20's AbortSignal.any() holds its sources weakly, so a bare
+  // AbortSignal.timeout() there can be collected before it fires. Own the timer.
+  const request = new AbortController();
+  const abort = () => request.abort(signal.reason);
+  signal.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(
+    () => request.abort(new DOMException("The operation was aborted due to timeout", "TimeoutError")),
+    config.jevTimeoutMs,
+  );
+  let body: unknown;
+  try {
+    const response = await fetch("https://opencode.ai/zen/v1/systemone", {
+      method: "POST",
+      redirect: "error",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: config.jevModel,
+        state: JSON.stringify(state),
+        questions,
+      }),
+      signal: request.signal,
+    });
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error(
+        `Jev classification failed (HTTP ${response.status}). Check the Zen key, credits, and model in Bot Teams settings.`,
+      );
+    }
+    body = await response.json();
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", abort);
   }
-  const parsed = responseSchema.safeParse(await response.json());
+  const parsed = responseSchema.safeParse(body);
   if (!parsed.success)
     throw new Error("Jev returned an invalid decision response.");
   for (const [id, question] of Object.entries(questions)) {
