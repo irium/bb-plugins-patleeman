@@ -12,7 +12,7 @@ import {
 import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
 import { useSdk } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Icon } from "@/components/ui/icon";
 import { HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, UPLOAD_PATH } from "../constants";
 import type { BotView, PageMetaView } from "../contract";
@@ -111,12 +111,14 @@ export function PageEditor({
   bots,
   pages,
   sidePanel,
+  onCloseSidePanel,
 }: {
   connection: PageConnection;
   page: PageMetaView;
   bots: BotView[];
   pages: PageMetaView[];
   sidePanel: SidePanel;
+  onCloseSidePanel(): void;
 }) {
   const sdk = useSdk();
   const dark = useDarkMode();
@@ -133,6 +135,15 @@ export function PageEditor({
         new DefaultThreadStoreAuth(HUMAN_USER_ID, "editor"),
       ),
     [connection],
+  );
+
+  const openThreads = useSyncExternalStore(
+    useCallback((onChange: () => void) => threadStore.subscribe(onChange), [threadStore]),
+    () => {
+      let count = 0;
+      for (const thread of threadStore.getThreads().values()) if (!thread.resolved && !thread.deletedAt) count += 1;
+      return count;
+    },
   );
 
   const editor = useCreateBlockNote(
@@ -352,7 +363,7 @@ export function PageEditor({
       theme={dark ? "dark" : "light"}
       slashMenu={false}
       renderEditor={false}
-      className="pages-editor flex min-h-0 flex-1"
+      className="pages-editor flex min-h-0 min-w-0 flex-1"
     >
       <div
         ref={fieldRef}
@@ -363,7 +374,27 @@ export function PageEditor({
         <BlockNoteViewEditor />
       </div>
       {sidePanel === "comments" ? (
-        <aside className="pages-comments hidden w-80 shrink-0 border-l border-border pl-3 lg:block">
+        // Beside the page on wide screens, a sheet over it on narrow ones.
+        <aside
+          aria-label="Comments"
+          className="pages-comments w-80 shrink-0 border-l border-border pl-3 max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-40 max-lg:w-full max-lg:max-w-sm max-md:max-w-none max-md:border-l-0 max-lg:overflow-auto max-lg:bg-background max-lg:p-3 max-lg:shadow-2xl"
+        >
+          <div className="mb-2 flex items-center justify-between lg:hidden">
+            <span className="text-sm font-medium">Comments</span>
+            <button
+              type="button"
+              aria-label="Close comments"
+              className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground"
+              onClick={onCloseSidePanel}
+            >
+              <Icon name="X" className="size-4" />
+            </button>
+          </div>
+          {openThreads ? null : (
+            <p className="px-1 py-2 text-sm text-muted-foreground">
+              No open comments. Select text in the page and choose <span className="text-foreground">Comment</span> to start one.
+            </p>
+          )}
           <ThreadsSidebar filter="open" sort="position" />
         </aside>
       ) : null}

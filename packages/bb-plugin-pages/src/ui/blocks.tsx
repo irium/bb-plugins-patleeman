@@ -83,7 +83,7 @@ function DataBlock({
       {editable && draft === null ? (
         <button
           type="button"
-          className="absolute top-2 right-2 z-10 rounded-md border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground opacity-0 transition-opacity group-hover/data:opacity-100 hover:text-foreground"
+          className="pages-reveal absolute top-2 right-2 z-10 rounded-md border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground opacity-0 transition-opacity group-hover/data:opacity-100 hover:text-foreground"
           onClick={() => {
             setDraft(prettyJson(source));
             setDraftError(null);
@@ -232,7 +232,7 @@ const EXAMPLE_STATS = JSON.stringify([
 
 function StatsView({ items }: { items: StatItem[] }) {
   return (
-    <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(items.length, 4)}, minmax(0, 1fr))` }}>
+    <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr))" }}>
       {items.map((item, index) => (
         <div key={index} className="min-w-0 rounded-md bg-background/60 px-3 py-2">
           <div className="truncate text-xs text-muted-foreground">{item.label}</div>

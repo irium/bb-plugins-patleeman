@@ -43,3 +43,25 @@
   flex-direction: column;
   gap: 10px;
 }
+
+/* Phones: the side menu's drag handles need hover, so the body text can use
+   the width they reserve. */
+@media (max-width: 767px) {
+  .pages-main > .bn-editor {
+    padding-inline: 16px;
+  }
+}
+
+/* Touch screens can't hover, so controls revealed on hover stay visible. A
+   chart or stats block's Edit button then sits above the data instead of
+   over it. */
+@media (hover: none) {
+  .pages-reveal {
+    opacity: 1;
+  }
+  .pages-data > .pages-reveal {
+    position: static;
+    display: block;
+    margin: 0 0 8px auto;
+  }
+}

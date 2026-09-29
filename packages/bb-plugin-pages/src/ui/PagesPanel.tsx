@@ -160,6 +160,7 @@ export function PagesPanel({ subPath }: { subPath: string }) {
     <PagesUiContext.Provider value={ui}>
       <div className="pages-root flex h-full min-h-0 bg-background text-foreground">
         <Sidebar
+          className={cn(pageId && "max-md:hidden")}
           pages={pages}
           error={error}
           projects={projects}
@@ -171,7 +172,7 @@ export function PagesPanel({ subPath }: { subPath: string }) {
           rpc={rpc}
           onChanged={refetch}
         />
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className={cn("flex min-w-0 flex-1 flex-col", !pageId && "max-md:hidden")}>
           {pageId && pageMeta ? (
             <PageView
               key={pageId}
@@ -181,9 +182,18 @@ export function PagesPanel({ subPath }: { subPath: string }) {
               rpc={rpc}
               requestsVersion={requestsVersion}
               onDeleted={() => navigate.toPluginPanel("pages", { subPath: "", replace: true })}
+              onBack={() => navigate.toPluginPanel("pages", { subPath: "" })}
             />
           ) : pageId && pageMeta === null ? (
-            <EmptyState title="Page not found" body="It may have been deleted." />
+            <EmptyState
+              title="Page not found"
+              body="It may have been deleted."
+              action={
+                <Button size="sm" variant="outline" className="md:hidden" onClick={() => navigate.toPluginPanel("pages", { subPath: "" })}>
+                  All pages
+                </Button>
+              }
+            />
           ) : pageId ? null : (
             <EmptyState
               title="Pages"
@@ -215,6 +225,7 @@ function EmptyState({ title, body, action }: { title: string; body: string; acti
 // Sidebar ---------------------------------------------------------------------
 
 function Sidebar({
+  className,
   pages,
   error,
   projects,
@@ -226,6 +237,7 @@ function Sidebar({
   rpc,
   onChanged,
 }: {
+  className?: string;
   pages: PageMetaView[] | null;
   error: string | null;
   projects: Project[];
@@ -266,7 +278,7 @@ function Sidebar({
           <button
             type="button"
             title={`New ${global ? "global " : ""}page`}
-            className="rounded p-0.5 opacity-0 group-hover/section:opacity-100 hover:bg-state-hover hover:text-foreground"
+            className="pages-reveal rounded p-0.5 opacity-0 group-hover/section:opacity-100 hover:bg-state-hover hover:text-foreground"
             onClick={() => void onCreate(null, global)}
           >
             <Icon name="Plus" className="size-3.5" />
@@ -306,7 +318,7 @@ function Sidebar({
   };
 
   return (
-    <nav className="pages-sidebar flex w-64 shrink-0 flex-col border-r border-border bg-sidebar/40">
+    <nav className={cn("pages-sidebar flex w-64 shrink-0 flex-col border-r border-border bg-sidebar/40 max-md:w-full max-md:border-r-0", className)}>
       <div className="flex h-12 items-center gap-1 border-b border-border px-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -406,7 +418,7 @@ function TreeRow({
     <>
       <div
         className={cn(
-          "group/row flex h-7 cursor-pointer items-center gap-1 rounded-md pr-1 hover:bg-state-hover",
+          "group/row flex h-7 cursor-pointer items-center gap-1 rounded-md pr-1 hover:bg-state-hover max-md:h-10",
           active && "bg-state-active text-foreground",
         )}
         style={{ paddingLeft: 4 + depth * 14 }}
@@ -430,7 +442,7 @@ function TreeRow({
         <button
           type="button"
           title="Add a page inside"
-          className="rounded p-0.5 text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground"
+          className="pages-reveal rounded p-0.5 text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground"
           onClick={(event) => {
             event.stopPropagation();
             void onCreate(page.id);
@@ -489,7 +501,7 @@ function PageMenu({
           title="Page actions"
           className={cn(
             "rounded p-0.5 text-muted-foreground hover:text-foreground",
-            compact ? "opacity-0 group-hover/row:opacity-100 data-[state=open]:opacity-100" : "p-1.5 hover:bg-state-hover",
+            compact ? "pages-reveal opacity-0 group-hover/row:opacity-100 data-[state=open]:opacity-100" : "p-1.5 hover:bg-state-hover",
           )}
           onClick={(event) => event.stopPropagation()}
         >
@@ -564,6 +576,31 @@ function usePresence(connection: PageConnection | null): Presence[] {
   return presence;
 }
 
+/** A title that wraps onto more lines instead of scrolling sideways. */
+function TitleField(props: Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "className" | "rows">) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const fit = useCallback(() => {
+    const field = ref.current;
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${field.scrollHeight}px`;
+  }, []);
+  useEffect(fit, [fit, props.value]);
+  useEffect(() => {
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [fit]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      placeholder="Untitled"
+      className="block w-full resize-none overflow-hidden bg-transparent text-4xl leading-tight font-bold tracking-tight outline-none placeholder:text-muted-foreground/50 max-md:text-3xl"
+      {...props}
+    />
+  );
+}
+
 const TALK_WORKING_PHASES = new Set(["starting", "finalizing", "transcribing"]);
 
 function DictateButton({ talk, ready, onToggle }: { talk: TalkView; ready: boolean; onToggle(): void }) {
@@ -573,15 +610,15 @@ function DictateButton({ talk, ready, onToggle }: { talk: TalkView; ready: boole
     return (
       <Button variant="ghost" size="sm" aria-pressed onClick={onToggle} disabled={working}>
         <Icon name={working ? "Mic" : "Square"} className={working ? "animate-pulse" : "text-red-500"} />
-        {talk.phase === "starting" ? "Starting…" : working ? "Transcribing…" : "Stop dictation"}
+        <span className="max-md:sr-only">{talk.phase === "starting" ? "Starting…" : working ? "Transcribing…" : "Stop dictation"}</span>
       </Button>
     );
   }
   const busy = talk.mode === "elsewhere";
   return (
     <span title={busy ? "Talk is busy with another recording." : "Dictate into this page with Talk"}>
-      <Button variant="ghost" size="sm" onClick={onToggle} disabled={busy || !ready}>
-        <Icon name="Mic" /> Dictate
+      <Button variant="ghost" size="sm" onClick={onToggle} disabled={busy || !ready} aria-label="Dictate">
+        <Icon name="Mic" /> <span className="max-md:sr-only">Dictate</span>
       </Button>
     </span>
   );
@@ -594,6 +631,7 @@ function PageView({
   rpc,
   requestsVersion,
   onDeleted,
+  onBack,
 }: {
   page: PageMetaView;
   pages: PageMetaView[];
@@ -601,6 +639,7 @@ function PageView({
   rpc: Rpc;
   requestsVersion: number;
   onDeleted(): void;
+  onBack(): void;
 }) {
   const { connection, status, synced } = useConnection(page.id);
   const presence = usePresence(connection);
@@ -630,18 +669,27 @@ function PageView({
   const active = requests.filter((request) => request.status === "queued" || request.status === "working");
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 text-sm">
+    // Positioned so the narrow-screen comments sheet stays inside the panel.
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 text-sm max-md:gap-1 max-md:px-1.5">
+        <button
+          type="button"
+          aria-label="All pages"
+          className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground md:hidden"
+          onClick={onBack}
+        >
+          <Icon name="ChevronLeft" className="size-5" />
+        </button>
         <Breadcrumbs page={{ ...page, title }} pages={pages} />
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex shrink-0 items-center gap-1 max-md:gap-0">
           <PresenceStack presence={presence} />
           <ConnectionBadge status={status} />
           <span className="hidden px-2 text-xs text-muted-foreground md:inline">
             Edited {relativeTime(page.updatedAt)} by {actorName(page.updatedBy, bots.bots)}
           </span>
           <span title={bots.reason ?? undefined}>
-            <Button variant="ghost" size="sm" onClick={() => setDialog("ask")} disabled={!bots.available}>
-              <Icon name="Bot" /> Ask a bot
+            <Button variant="ghost" size="sm" onClick={() => setDialog("ask")} disabled={!bots.available} aria-label="Ask a bot">
+              <Icon name="Bot" /> <span className="max-md:sr-only">Ask a bot</span>
             </Button>
           </span>
           <DictateButton talk={talk} ready={Boolean(connection && synced)} onToggle={() => toggleTalk(pageFieldKey(page.id))} />
@@ -649,9 +697,10 @@ function PageView({
             variant="ghost"
             size="sm"
             aria-pressed={sidePanel === "comments"}
+            aria-label="Comments"
             onClick={() => setSidePanel((panel) => (panel === "comments" ? null : "comments"))}
           >
-            <Icon name="MessageSquare" /> Comments
+            <Icon name="MessageSquare" /> <span className="max-md:sr-only">Comments</span>
           </Button>
           <PageMenu
             page={page}
@@ -680,8 +729,8 @@ function PageView({
         </div>
       </header>
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className={cn("mx-auto w-full px-6 pt-10 pb-32", sidePanel ? "max-w-6xl" : "max-w-4xl")}>
-          <div className="px-[54px]">
+        <div className={cn("mx-auto w-full px-6 pt-10 pb-32 max-md:px-0 max-md:pt-5", sidePanel ? "max-w-6xl" : "max-w-4xl")}>
+          <div className="px-[54px] max-md:px-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className="mb-2 rounded-md text-5xl leading-none hover:bg-state-hover" title="Change icon">
@@ -708,9 +757,7 @@ function PageView({
                 ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
-            <input
-              className="w-full bg-transparent text-4xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/50"
-              placeholder="Untitled"
+            <TitleField
               value={title}
               onFocus={() => (editingTitle.current = true)}
               onBlur={() => (editingTitle.current = false)}
@@ -732,17 +779,24 @@ function PageView({
             />
           </div>
           {page.archived ? (
-            <div className="mx-[54px] mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+            <div className="mx-[54px] mt-4 rounded-md max-md:mx-4 border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
               This page is archived.
             </div>
           ) : null}
           <div className="mt-6 flex">
             {connection && synced ? (
-              <PageEditor connection={connection} page={page} bots={bots.bots} pages={pages} sidePanel={sidePanel} />
+              <PageEditor
+                connection={connection}
+                page={page}
+                bots={bots.bots}
+                pages={pages}
+                sidePanel={sidePanel}
+                onCloseSidePanel={() => setSidePanel(null)}
+              />
             ) : status === "missing" ? (
-              <p className="px-[54px] text-sm text-muted-foreground">This page no longer exists.</p>
+              <p className="px-[54px] text-sm text-muted-foreground max-md:px-4">This page no longer exists.</p>
             ) : (
-              <p className="px-[54px] text-sm text-muted-foreground">Connecting…</p>
+              <p className="px-[54px] text-sm text-muted-foreground max-md:px-4">Connecting…</p>
             )}
           </div>
         </div>
@@ -767,7 +821,7 @@ function Breadcrumbs({ page, pages }: { page: PageMetaView; pages: PageMetaView[
   return (
     <div className="flex min-w-0 items-center gap-1 text-muted-foreground">
       {trail.map((crumb) => (
-        <span key={crumb.id} className="flex min-w-0 items-center gap-1">
+        <span key={crumb.id} className="flex min-w-0 items-center gap-1 max-md:hidden">
           <button type="button" className="truncate hover:text-foreground" onClick={() => navigate.toPluginPanel("pages", { subPath: crumb.id })}>
             {crumb.icon} {crumb.title || "Untitled"}
           </button>
@@ -777,7 +831,7 @@ function Breadcrumbs({ page, pages }: { page: PageMetaView; pages: PageMetaView[
       <span className="truncate text-foreground">
         {page.icon} {page.title || "Untitled"}
       </span>
-      {!page.projectId ? <span className="rounded bg-foreground/6 px-1.5 text-xs">Global</span> : null}
+      {!page.projectId ? <span className="rounded bg-foreground/6 px-1.5 text-xs max-md:hidden">Global</span> : null}
     </div>
   );
 }
@@ -878,7 +932,7 @@ function PageStrip({
             {request.threadId ? (
               <button
                 type="button"
-                className="ml-2 text-xs underline-offset-2 opacity-0 group-hover/req:opacity-100 hover:text-foreground hover:underline"
+                className="pages-reveal ml-2 text-xs underline-offset-2 opacity-0 group-hover/req:opacity-100 hover:text-foreground hover:underline"
                 onClick={() => navigate.toThread(request.threadId!)}
               >
                 Open thread
