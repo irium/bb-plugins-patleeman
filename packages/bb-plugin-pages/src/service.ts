@@ -9,9 +9,12 @@ import { applyEdits, mentionsIn, readMarkdown, restoreFromState, seedMarkdown, t
 import { PageHub, type Actor, type LivePage } from "./hub";
 import { shortId } from "./markdown";
 import { PageStore, type PageMeta, type RequestRow } from "./store";
+import { absorbAgentChange, emptySeen, markSeen, unseen, type Seen } from "./watch";
 
 const SNAPSHOT_GAP_MS = 10 * 60_000;
 const WATCH_DELAY_MS = 2500;
+/** How long to wait before retrying requests when Bot Teams is unavailable. */
+const BOTS_RETRY_MS = 60_000;
 const MAX_CONTEXT_CHARS = 1200;
 const REASONING_LEVELS = ["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"] as const;
 
@@ -78,9 +81,7 @@ export function requestView(row: RequestRow): RequestView {
   };
 }
 
-interface WatchState {
-  mentions: Set<string>;
-  comments: Set<string>;
+interface WatchState extends Seen {
   timer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -103,7 +104,9 @@ export class PagesService {
       },
       // Take the watcher's baseline at load, so a page's first human change
       // (say, a comment mentioning a bot) counts as new.
-      opened: (page) => void this.state(page),
+      // A page reopened with requests still pending (Bot Teams was
+      // unavailable) gets another scan.
+      opened: (page) => (this.watch.has(page.id) ? this.scheduleWatch(page) : void this.state(page)),
       changed: (page, origin) => {
         if (typeof origin === "string") this.absorb(page);
         else if (origin !== "load") this.scheduleWatch(page);
@@ -303,40 +306,35 @@ export class PagesService {
   private state(page: LivePage): WatchState {
     let state = this.watch.get(page.id);
     if (!state) {
-      state = { mentions: new Set(), comments: new Set(), timer: null };
+      state = { ...emptySeen(), timer: null };
       this.watch.set(page.id, state);
-      this.collect(page, state);
+      markSeen(state, this.found(page));
     }
     return state;
   }
 
-  /** Records current mentions/comments as seen without dispatching. */
+  /** Records what an agent or bot wrote as seen without dispatching. */
   private absorb(page: LivePage): void {
     const state = this.watch.get(page.id);
-    if (state) this.collect(page, state);
+    if (state) absorbAgentChange(state, this.found(page));
   }
 
-  private collect(page: LivePage, state: WatchState): { mentions: ReturnType<typeof mentionsIn>; comments: { threadId: string; id: string; author: string; text: string }[] } {
-    const mentions = mentionsIn(page.doc).filter((mention) => mention.kind === "bot");
-    const comments = [...threadAuthors(page.doc)].flatMap(([threadId, thread]) =>
-      thread.comments.map((comment) => ({ threadId, ...comment })),
-    );
-    const fresh = {
-      mentions: mentions.filter((mention) => !state.mentions.has(`${mention.blockId}:${mention.target}`)),
-      comments: comments.filter((comment) => !state.comments.has(comment.id)),
+  private found(page: LivePage) {
+    return {
+      mentions: mentionsIn(page.doc).filter((mention) => mention.kind === "bot"),
+      comments: [...threadAuthors(page.doc)].flatMap(([threadId, thread]) =>
+        thread.comments.map((comment) => ({ threadId, ...comment })),
+      ),
     };
-    for (const mention of mentions) state.mentions.add(`${mention.blockId}:${mention.target}`);
-    for (const comment of comments) state.comments.add(comment.id);
-    return fresh;
   }
 
-  private scheduleWatch(page: LivePage): void {
+  private scheduleWatch(page: LivePage, delay = WATCH_DELAY_MS): void {
     const state = this.state(page);
     if (state.timer) clearTimeout(state.timer);
     state.timer = setTimeout(() => {
       state.timer = null;
       void this.scan(page.id).catch((error) => this.bb.log.warn(`Page watcher failed: ${errorText(error)}`));
-    }, WATCH_DELAY_MS);
+    }, delay);
   }
 
   private async scan(pageId: string): Promise<void> {
@@ -345,10 +343,16 @@ export class PagesService {
     const meta = this.store.meta(pageId);
     const state = this.watch.get(pageId);
     if (!meta || !state) return;
-    const fresh = this.collect(page, state);
+    const fresh = unseen(state, this.found(page));
     if (!fresh.mentions.length && !fresh.comments.length) return;
     const directory = await this.bots.list();
-    if (!directory.available) return;
+    if (!directory.available) {
+      // Leave the requests unseen and try again; they go out once Bot Teams
+      // is installed or enabled.
+      if (this.hub.has(pageId)) this.scheduleWatch(page, BOTS_RETRY_MS);
+      return;
+    }
+    markSeen(state, fresh);
     const markdown = readMarkdown(page.doc, { ids: true });
 
     for (const mention of fresh.mentions) {

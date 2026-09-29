@@ -8,8 +8,9 @@ read-only usage skill and the standard Agent Plugins MCP bridge.
 ![Live BB screenshot of the Spool setup page](assets/staged-preview.png)
 
 Captured from the running BB application on the Spool sidebar page. The live
-surface shows the three-step setup flow, the included MCP tools, and the
-read-only/audit trust boundaries.
+surface shows the live Agent Plugins bridge status for this machine, the
+three-step setup flow, the included MCP tools, and the read-only/audit trust
+boundaries.
 
 ## What is included
 
@@ -20,7 +21,11 @@ read-only/audit trust boundaries.
   runtime limits for progressive disclosure.
 - `plugin.json` and `mcp.json` — an Agent Plugins 1.1 payload that launches
   `spool mcp` over stdio.
-- A `Spool` page in the BB sidebar that explains how to install both halves.
+- A `Spool` page in the BB sidebar that explains how to install both halves
+  and checks the Agent Plugins bridge live. Its status chip says whether
+  agents can reach Spool, and a notice names what's missing: Agent Plugins
+  itself, or the `spool` server not installed, disabled, awaiting approval,
+  or failing to start.
 
 The package is deliberately dual-purpose. Install it as a BB plugin to get the
 page and automatic skill. Install the same folder in the **Agent Plugins**
@@ -52,6 +57,12 @@ bb plugin install ./packages/bb-plugin-spool --yes
 Then open **Agent Plugins** in BB and install the same
 `./packages/bb-plugin-spool` folder. Enable the `spool` MCP server and choose
 **Approve & start**. The MCP configuration expects the `spool` CLI on `PATH`.
+The Spool page shows **MCP ready** once agents can reach it.
+
+Without Agent Plugins, the skill still loads but has no tools to call. It
+tells agents to report that Spool isn't connected and to send the user to the
+Spool page, rather than answer without checking. Any other MCP client can run
+`spool mcp` directly.
 
 For local event queries, start the service separately:
 

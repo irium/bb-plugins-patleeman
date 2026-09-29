@@ -89,6 +89,12 @@ The strip under the title shows each request as queued, working, done, or
 failed, with the bot's reply. Pages remembers which mentions and comments it
 has already sent, so bots are never asked twice.
 
+Without Bot Teams, pages, comments, and agent tools work as usual. The bot
+buttons say Bot Teams isn't installed or enabled. A mention or comment for a
+bot made while Bot Teams is unavailable, for example while it reloads, waits
+and is sent once Bot Teams is back, as long as the BB server hasn't restarted
+in between.
+
 ## For agents
 
 Agents get eight tools: `pages_list`, `pages_read`, `pages_create`,

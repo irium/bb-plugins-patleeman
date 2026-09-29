@@ -3,7 +3,8 @@ Give BB agents a clear, read-only path into explicitly selected Spool context.
 ## What you get
 
 - A **Spool** page in the BB sidebar that explains setup, the MCP surface, and
-  the trust boundaries around collected events.
+  the trust boundaries around collected events, and checks live whether the
+  Agent Plugins bridge and `spool` server are ready.
 - A full `spool` skill covering discovery, bounded pagination, source health,
   retention, citations, privacy, and when to use the CLI instead.
 - A standard Agent Plugins `plugin.json` and `mcp.json` payload in the same
@@ -25,6 +26,8 @@ not written to the usage log.
 ## Requirements
 
 Install the `spool` CLI on the BB host and keep it available on `PATH`. Install
-the BB **Agent Plugins** plugin before enabling the bundled MCP payload. Local
+the BB **Agent Plugins** plugin before enabling the bundled MCP payload;
+without it, the Spool page says so and the skill tells agents Spool isn't
+connected. Local
 event reads also require a running Spool service and explicitly selected
 sources. Remote profiles use Spool's normal connection and scope rules.

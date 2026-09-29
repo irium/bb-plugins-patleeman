@@ -33,7 +33,16 @@ import {
   type FieldRef,
   type TalkStatus,
 } from "./fields";
-import { PENDING_STORAGE_KEY, addPending, readPending, withoutPending, writePending } from "./pending-inserts";
+import {
+  PENDING_STORAGE_KEY,
+  addPending,
+  readPending,
+  readTimes,
+  staleFields,
+  withoutPending,
+  writePending,
+  writeTimes,
+} from "./pending-inserts";
 import { LevelTracker, pickMimeType, rmsOf, segmentPolicy, shouldCut, type SegmentPolicy } from "./segmenter";
 
 export type Phase =
@@ -780,7 +789,7 @@ export class TalkController {
       if (!insertIntoField(field.key, text)) {
         writePending(addPending(readPending(), `${FIELD_PENDING_PREFIX}${field.key}`, text));
         toast.success(`Dictation ready. It goes into ${field.label} when you go back.`, {
-          action: { label: "Go back", onClick: () => requestOpenField(field.key) },
+          action: { label: "Go back", onClick: () => this.openField(field) },
         });
         this.onPendingChanged();
       }
@@ -799,6 +808,23 @@ export class TalkController {
       );
     }
     this.finishIdle();
+  }
+
+  /**
+   * "Go back" to a field. If its owner is gone, say because the plugin was
+   * disabled, the waiting text is copied instead of stranded.
+   */
+  private openField(field: FieldRef): void {
+    if (requestOpenField(field.key)) return;
+    const pendingKey = `${FIELD_PENDING_PREFIX}${field.key}`;
+    const text = readPending()[pendingKey];
+    if (!text) return;
+    writePending(withoutPending(readPending(), pendingKey));
+    this.onPendingChanged();
+    void navigator.clipboard?.writeText(text).then(
+      () => toast.info(`Talk couldn't open ${field.label}, so it copied your dictation. Paste it where you need it.`),
+      () => toast.info(`Talk couldn't open ${field.label}. Your dictation is in Talk recordings.`),
+    );
   }
 
   /** Reports a finished capture the server discarded once it was transcribed. */
@@ -865,6 +891,7 @@ export class TalkController {
    * on screen for a full poll first, so its owner has loaded its content.
    */
   private flushPendingFields(): void {
+    this.expirePendingFields();
     const visible = document.visibilityState === "visible";
     const seen = new Set<string>();
     for (const [pendingKey, text] of Object.entries(readPending())) {
@@ -880,6 +907,23 @@ export class TalkController {
       this.onPendingChanged();
     }
     this.fieldsOnScreen = seen;
+  }
+
+  /** Drops field dictations whose owner hasn't shown the field for days. */
+  private expirePendingFields(): void {
+    const pending = readPending();
+    const keys = Object.keys(pending).filter((key) => key.startsWith(FIELD_PENDING_PREFIX));
+    const before = readTimes();
+    const { stale, times } = staleFields(keys, before, Date.now());
+    if (JSON.stringify(times) !== JSON.stringify(before)) writeTimes(times);
+    if (stale.length === 0) return;
+    writePending(stale.reduce(withoutPending, pending));
+    toast.info(
+      stale.length === 1
+        ? "A dictation waited days for a field that never came back, so Talk stopped holding it. It's still in Talk recordings."
+        : `${stale.length} dictations waited days for fields that never came back, so Talk stopped holding them. They're still in Talk recordings.`,
+    );
+    this.onPendingChanged();
   }
 
   /** Sidebar decorations: where Talk is dictating, and waiting dictations. */

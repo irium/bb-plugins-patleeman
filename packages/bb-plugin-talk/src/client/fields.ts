@@ -10,8 +10,9 @@
 //   (detail `{ text }`) on the field. Insert the text and call
 //   preventDefault(). Otherwise the text waits until the field is back on
 //   screen.
-// - For "Go back", Talk dispatches `bb-talk:open-field` (detail
-//   `{ field }`) on window. The owner shows that field.
+// - For "Go back", Talk dispatches a cancelable `bb-talk:open-field`
+//   (detail `{ field }`) on window. The owner shows that field and calls
+//   preventDefault(). If no owner does, Talk copies the dictation instead.
 // - While Talk runs, `<html data-bb-talk>` is "idle", "dictating" (into the
 //   field named by `data-bb-talk-field`), or "busy", and
 //   `data-bb-talk-phase` holds the capture phase. `bb-talk:state` fires on
@@ -72,8 +73,11 @@ export function insertIntoField(key: string, text: string): boolean {
   return event.defaultPrevented;
 }
 
-export function requestOpenField(key: string): void {
-  window.dispatchEvent(new CustomEvent(OPEN_FIELD_EVENT, { detail: { field: key } }));
+/** Asks the field's owner to show it. Returns false when no owner did. */
+export function requestOpenField(key: string): boolean {
+  const event = new CustomEvent(OPEN_FIELD_EVENT, { detail: { field: key }, cancelable: true });
+  window.dispatchEvent(event);
+  return event.defaultPrevented;
 }
 
 /** Mirrors Talk's state onto `<html>` for field owners. */

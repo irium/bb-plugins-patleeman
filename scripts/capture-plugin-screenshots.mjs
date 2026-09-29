@@ -964,7 +964,18 @@ const captures = [
     setup: async (client) => {
       await client.navigate("/plugins/spool/spool");
       await client.waitForText("Spool for BB");
-      await client.waitForText("MCP included");
+      // The chip reports the live Agent Plugins bridge; assert it matches.
+      const bridge = await client.evaluate(`fetch("/api/v1/plugins/spool/rpc/bridge", { method: "POST", headers: { "content-type": "application/json" }, body: "null" }).then((response) => response.json()).then((body) => body.result.state)`, true);
+      const chips = {
+        ready: "MCP ready",
+        "no-bridge": "Agent Plugins missing",
+        "not-installed": "MCP not installed",
+        disabled: "MCP disabled",
+        "needs-approval": "Needs approval",
+        error: "MCP error",
+      };
+      if (!chips[bridge]) throw new Error(`Unexpected Spool bridge state: ${bridge}`);
+      await client.waitForText(chips[bridge]);
       await client.waitForText("Connect it once");
       await client.waitForText("MCP surface");
       await client.waitForText("Trust boundaries");

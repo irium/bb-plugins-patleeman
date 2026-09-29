@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { INSERT_EVENT, clearStatus, fieldAt, insertIntoField, parseField, publishStatus } from "./fields";
+import { INSERT_EVENT, OPEN_FIELD_EVENT, clearStatus, fieldAt, insertIntoField, parseField, publishStatus, requestOpenField } from "./fields";
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -48,5 +48,18 @@ describe("dictation fields", () => {
     expect(document.documentElement.dataset).toMatchObject({ bbTalk: "dictating", bbTalkField: "pages:pg_1", bbTalkPhase: "recording" });
     publishStatus("idle", null, "idle");
     expect(document.documentElement.dataset.bbTalkField).toBeUndefined();
+  });
+});
+
+describe("requestOpenField", () => {
+  it("reports whether an owner opened the field", () => {
+    expect(requestOpenField("pages:pg_1")).toBe(false);
+    const open = (event: Event) => event.preventDefault();
+    window.addEventListener(OPEN_FIELD_EVENT, open);
+    try {
+      expect(requestOpenField("pages:pg_1")).toBe(true);
+    } finally {
+      window.removeEventListener(OPEN_FIELD_EVENT, open);
+    }
   });
 });

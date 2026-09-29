@@ -21,7 +21,8 @@ live.
 
 Pages are stored in this plugin's database on the BB server. Bot requests run
 in each bot's own Bot Teams thread. Pages works without Bot Teams, but you
-need it for the bot features.
+need it for the bot features. Requests made while Bot Teams is briefly
+unavailable wait and go out once it's back.
 
 ## For agents
 

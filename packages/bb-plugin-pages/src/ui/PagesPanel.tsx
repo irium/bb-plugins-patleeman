@@ -80,10 +80,19 @@ function usePagesData(rpc: Rpc, projectId: string | null) {
   useEffect(() => {
     refetch();
   }, [refetch]);
+  // Polls so the panel notices Bot Teams being installed, enabled or edited;
+  // a hidden tab waits until it's shown again.
   useEffect(() => {
-    refetchBots();
-    const timer = setInterval(refetchBots, 30_000);
-    return () => clearInterval(timer);
+    const poll = () => {
+      if (document.visibilityState === "visible") refetchBots();
+    };
+    poll();
+    const timer = setInterval(poll, 30_000);
+    document.addEventListener("visibilitychange", poll);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", poll);
+    };
   }, [refetchBots]);
   return { pages, bots, error, refetch, setPages };
 }

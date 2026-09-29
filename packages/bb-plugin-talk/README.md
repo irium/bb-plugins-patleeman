@@ -130,9 +130,13 @@ DOM, defined in [src/client/fields.ts](src/client/fields.ts):
 - **Receive the text.** Talk dispatches a cancelable `bb-talk:insert` event
   on the field, with the detail `{ text }`. Insert the text and call
   `preventDefault()`. If no field takes it, Talk keeps the text and delivers
-  it once the field has been back on screen for a moment.
-- **Go back.** Talk dispatches `bb-talk:open-field` on `window`, with the
-  detail `{ field }`. The plugin that owns the key navigates to it.
+  it once the field has been back on screen for a moment. Text whose field
+  hasn't come back within three days is dropped, with a toast; it's still in
+  Talk recordings.
+- **Go back.** Talk dispatches a cancelable `bb-talk:open-field` on `window`,
+  with the detail `{ field }`. The plugin that owns the key navigates to it
+  and calls `preventDefault()`. If no plugin does, for example because the
+  owner was disabled, Talk copies the waiting text to the clipboard instead.
 - **Show state.** While Talk is loaded, `<html data-bb-talk>` is `idle`,
   `dictating`, or `busy`. `data-bb-talk-field` names the field being dictated
   into, and `data-bb-talk-phase` holds the capture phase. `bb-talk:state`

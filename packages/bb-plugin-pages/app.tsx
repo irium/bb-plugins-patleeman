@@ -10,7 +10,10 @@ function TalkBridge() {
   useEffect(() => {
     const onOpen = (event: Event) => {
       const id = pageIdFromField((event as CustomEvent<{ field?: unknown }>).detail?.field);
-      if (id) navigate.toPluginPanel("pages", { subPath: id });
+      if (!id) return;
+      // Tells Talk the page is opening, so it doesn't fall back to copying.
+      event.preventDefault();
+      navigate.toPluginPanel("pages", { subPath: id });
     };
     window.addEventListener(TALK_OPEN_FIELD_EVENT, onOpen);
     return () => window.removeEventListener(TALK_OPEN_FIELD_EVENT, onOpen);
