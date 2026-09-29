@@ -185,7 +185,6 @@ Verified against the running BB app and its installed Automations plugin in
   title work, hostile-message isolation, restart-worker reuse, stale-worker selection,
   and the manual-rename race. Typecheck and build pass.
 
-Screenshot: [Channel automations](../assets/channel-automations.png).
 Capture with `BB_CAPTURE_ONLY=bots-automations`; restore the QA channel if archived.
 `BB_CAPTURE_QA_ACTIONS=1` additionally exercises UI actions against a seeded paused
 `CLI daily check` schedule and verifies the dialog at 390 × 844. It deletes that

@@ -3646,12 +3646,11 @@ test("general file publication becomes visible only when its response posts", as
       { path: "/tmp/a/report.csv" },
       { threadId: job.threadId! },
     );
-    assert.equal(x.runtime.data.files(x.room.id).files.length, 0);
+    assert.equal(x.store.message(job.id)?.attachments.length ?? 0, 0);
     assert.equal(x.store.job(job.id)?.outputAttachments[0]?.type, "localFile");
     x.runtime.complete(job.threadId!, "Report ready");
     await x.runtime.driveRoom(x.room);
-    assert.equal(x.runtime.data.files(x.room.id).files[0]?.name, "report.csv");
-    assert.equal(x.store.message(job.id)?.attachments.length, 1);
+    assert.deepEqual(x.store.message(job.id)?.attachments.map((a) => a.name), ["report.csv"]);
   } finally {
     await x.close();
   }
@@ -3842,18 +3841,4 @@ test("transcript pages bound messages, seek directly, and refresh historical win
   } finally {
     await x.close();
   }
-});
-
-test("channel DM cleanup keeps rows on transient lookup failures and removes confirmed deleted threads", async () => {
-  const x = setup();
-  try {
-    await plugin(x.bb);
-    x.store.putConversation({ id: "dm", botId: x.a.id, key: `group:${x.room.id}`, kind: "group", title: x.room.name, threadId: "thr_dm", createdAt: 1 });
-    x.harness.inspection.sdk.stub("threads.get", async () => { throw new Error("HTTP 503: Unavailable"); });
-    await assert.rejects(x.harness.behavior.callRpc("channelThreads", { id: x.room.id }), /503/);
-    assert.ok(x.store.byThread("thr_dm"));
-    x.harness.inspection.sdk.stub("threads.get", async () => { throw new Error("HTTP 404: Thread not found"); });
-    assert.deepEqual(await x.harness.behavior.callRpc("channelThreads", { id: x.room.id }), []);
-    assert.equal(x.store.byThread("thr_dm"), null);
-  } finally { await x.close(); }
 });

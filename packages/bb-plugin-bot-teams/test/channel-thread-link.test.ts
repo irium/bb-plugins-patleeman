@@ -225,7 +225,7 @@ test("the composer's picker carries the chat mode and bot permissions", async ()
   await x.links.ensure(x.store.room(x.room.id));
   const spawn = x.spawned[0] as { model: string; reasoningLevel: string };
   assert.deepEqual([spawn.model, spawn.reasoningLevel], ["directed", "medium"]);
-  // A change made outside the thread (Channel details, the CLI) reaches the picker once.
+  // A change made outside the thread (the CLI, agent tools) reaches the picker once.
   x.store.putRoom({ ...x.store.room(x.room.id), responseBehavior: "smart", permissionMode: null });
   await x.links.sync(x.room.id);
   await x.links.sync(x.room.id);

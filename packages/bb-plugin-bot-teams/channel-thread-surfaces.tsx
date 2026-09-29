@@ -7,41 +7,24 @@ import {
   useRealtime,
   useRpc,
   type PluginThreadHeaderActionProps,
-  type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "./contract";
 import { Button } from "./components/ui/button";
 import { ChannelMembersMenu } from "./channel-members";
-import { ChannelRail } from "./channel-rail-view";
 import { railLive, railRoutingCount } from "./channel-rail";
 import { message } from "./bot-ui";
 import { attentionReasons } from "./attention-view";
-import { ChannelAutomationsView } from "./channel-automations-view";
 import { ChannelSearch } from "./channel-search";
-import {
-  UsagePanel,
-  workbenchLabels,
-  type WorkbenchPanel,
-} from "./channel-workbench";
-import { WorkList } from "./bot-ui";
 import { channelHandoffText, takeChannelThreadHandoff } from "./handoff-draft";
 
 /**
  * A channel is a BB thread. These surfaces add what a channel has that a
- * thread does not: its members in the header and its live work in the
- * thread panel. The chat mode and bot permissions are the composer's own
+ * thread does not: its members in the header and its live work above the
+ * composer. The chat mode and bot permissions are the composer's own
  * model picker (see channel-provider.ts). Each renders nothing on ordinary
  * threads.
  */
-export const channelDetailsPanelId = "channel-details";
-/** Roomier channel views that open as their own thread panel tabs. */
-export const channelWorkbenchPanelIds: Record<WorkbenchPanel, string> = {
-  automations: "channel-automations",
-  activity: "channel-activity",
-  usage: "channel-usage",
-};
-
 type Surface = NonNullable<z.output<typeof rpcContract.channelSurface.output>>;
 
 function useChannelSurface(threadId: string | null) {
@@ -194,54 +177,6 @@ export function ChannelComposerBanner() {
       {error && <p role="alert" className="channel-banner-error">{error}</p>}
     </div>
   );
-}
-
-/** Thread panel tab: the channel rail (live work, needs you, members, output). */
-export function ChannelDetailsPanel({ threadId }: PluginThreadPanelProps) {
-  const navigate = useBbNavigate();
-  const { surface, load } = useChannelSurface(threadId);
-  if (!surface) return <p className="channel-menu-label">This thread is not a channel.</p>;
-  return (
-    <ChannelRail
-      embedded
-      onOpenAutomations={() =>
-        navigate.openThreadPanel({ actionId: channelWorkbenchPanelIds.automations })
-      }
-      room={surface.room}
-      bots={surface.bots}
-      jobs={surface.jobs}
-      runs={surface.runs}
-      approvals={surface.approvals}
-      messageIds={[]}
-      onChanged={load}
-    />
-  );
-}
-
-/** A thread panel tab for one of the channel's workbench views. */
-export function channelWorkbenchPanel(panel: WorkbenchPanel) {
-  return function ChannelWorkbenchPanel({ threadId }: PluginThreadPanelProps) {
-    const { surface } = useChannelSurface(threadId);
-    if (!surface) return <p className="channel-menu-label">This thread is not a channel.</p>;
-    const { room, bots, jobs } = surface;
-    return (
-      <section className="channel-workbench" aria-label={workbenchLabels[panel]}>
-        {panel === "usage" ? (
-          <UsagePanel id={room.id} kind="channel" />
-        ) : panel === "automations" ? (
-          <ChannelAutomationsView
-            id={room.id}
-            bots={bots.filter((b) => room.memberIds.includes(b.id))}
-            open
-            onOpenChange={() => {}}
-            presentation="panel"
-          />
-        ) : (
-          <WorkList jobs={jobs} bots={bots} />
-        )}
-      </section>
-    );
-  };
 }
 
 /** Pre-fills a new channel thread's draft with the thread it was handed off from. */

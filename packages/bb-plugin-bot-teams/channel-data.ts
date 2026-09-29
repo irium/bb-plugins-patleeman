@@ -38,22 +38,6 @@ export class ChannelData {
       createdAt: number;
     }[];
   }
-  files(id: string, before?: string) {
-    this.store.room(id);
-    // Only sent attachments are retained here; unclaimed draft uploads are private drafts.
-    const rows = this.store.db
-      .prepare(
-        `SELECT json FROM attachments WHERE json_extract(json,'$.roomId')=?
-      AND id IN (SELECT json_extract(a.value,'$.id') FROM room_messages m,json_each(m.json,'$.attachments') a WHERE m.room_id=?) AND (? IS NULL OR rowid < (SELECT rowid FROM attachments WHERE id=?))
-      ORDER BY rowid DESC LIMIT 51`,
-      )
-      .all(id, id, before ?? null, before ?? null) as { json: string }[];
-    const files = rows.slice(0, 50).map((r) => JSON.parse(r.json));
-    return {
-      files,
-      nextBefore: rows.length > 50 ? (files.at(-1)!.id as string) : null,
-    };
-  }
   usage(roomId?: string, botId?: string) {
     const since = Date.now() - 24 * 60 * 60 * 1000;
     const limits =

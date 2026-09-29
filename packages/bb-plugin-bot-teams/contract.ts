@@ -8,15 +8,6 @@ import { botSetupThreadRequest } from "./bot-creation-contract";
 import { z } from "zod";
 import { sendModes } from "./send-mode";
 export const sendModeSchema = z.enum(sendModes);
-import {
-  channelAutomationCreate,
-  channelAutomationList,
-  channelAutomationUpdate,
-  channelAutomationAction,
-  channelAutomationView,
-  channelAutomationRuns,
-  channelAutomationRunPage,
-} from "./automation-contract";
 export const idSchema = z.string().regex(/^bot_[a-f0-9]{16}$/);
 export const permissionModeSchema = z.enum(["accept-edits", "auto", "full"]);
 export type PermissionMode = z.infer<typeof permissionModeSchema>;
@@ -456,32 +447,9 @@ export const rpcContract = {
     input: z.object({ id: z.string().uuid() }),
     output: z.object({ threadId: z.string() }),
   },
-  channelThreads: {
-    input: z.object({ id: z.string().uuid() }),
-    output: z.array(
-      z.object({
-        threadId: z.string(),
-        botId: z.string(),
-        name: z.string(),
-        avatar: z.string(),
-        active: z.boolean(),
-        needsApproval: z.boolean().default(false),
-      }),
-    ),
-  },
   channelForThread: {
     input: z.object({ threadId: z.string() }),
     output: z.string().uuid().nullable(),
-  },
-  channelFiles: {
-    input: z.object({
-      id: z.string().uuid(),
-      before: z.string().uuid().optional(),
-    }),
-    output: z.object({
-      files: z.array(attachmentSchema),
-      nextBefore: z.string().nullable(),
-    }),
   },
   usage: {
     input: z.object({ id: z.string(), kind: z.enum(["bot", "channel"]) }),
@@ -496,29 +464,6 @@ export const rpcContract = {
     output: usageSummary,
   },
 
-  automationRuns: {
-    input: channelAutomationRuns,
-    output: channelAutomationRunPage,
-  },
-  automationCreate: {
-    input: channelAutomationCreate,
-    output: channelAutomationView,
-  },
-  automationList: {
-    input: channelAutomationList,
-    output: z.object({
-      automations: z.array(channelAutomationView),
-      nextOffset: z.number().nullable(),
-    }),
-  },
-  automationUpdate: {
-    input: channelAutomationUpdate,
-    output: channelAutomationView,
-  },
-  automationAction: {
-    input: channelAutomationAction,
-    output: z.object({ ok: z.literal(true), result: z.unknown() }),
-  },
   list: {
     input: z.null(),
     output: z.object({

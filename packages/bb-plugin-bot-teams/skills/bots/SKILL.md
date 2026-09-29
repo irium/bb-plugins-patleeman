@@ -207,12 +207,12 @@ bb bots channel automation 'Release planning' AUTOMATION_ID run --request-id UUI
 bb bots channel automation 'Release planning' AUTOMATION_ID delete --yes --json
 ```
 
-The **Channel automations** tab in a channel thread's panel lists schedules and offers Pause/Resume, Run now,
+The commands above list schedules and offer Pause/Resume, Run now,
 Run history, and Delete. Ask the bot to edit its task or schedule. These are real
 BB Automations in the Bots project, backed by a fixed script that queues channel
-work. Run history records **dispatch**, while channel Activity records the bot's
+work. Run history records **dispatch**, while the bot's work thread records its
 response and failures. Pause/delete affects future runs; stop an existing response
-in Activity. If the previous response or its handoffs remain unfinished, the next
+with its **Stop** button above the channel composer. If the previous response or its handoffs remain unfinished, the next
 tick is skipped. Archived or deleted channels and archived or removed bots do not wake.
 Existing schedules remain in Automations for inspection and cleanup. Restoring a
 channel or reinviting a bot makes an enabled schedule eligible again.
@@ -333,7 +333,7 @@ to add an artifact to the current final answer. The 8 MB file limit and workspac
 containment apply. Publishing stages a file; it becomes public when the response
 posts. It does not send a separate message or wake bots.
 
-The owner can edit schedules directly in **Channel automations** or with
+The owner can edit schedules with
 `bb bots channel schedule-update CHANNEL AUTOMATION_ID --name NAME --text TEXT`
 and `--cron EXPR --timezone ZONE` or `--at ISO_TIME`. Editing keeps the schedule's
 current enabled state. History links dispatch to the actual response and work.

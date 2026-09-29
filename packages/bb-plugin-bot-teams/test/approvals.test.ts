@@ -130,7 +130,6 @@ test("a bot's pending approval reaches the channel that started the work", async
     "deny",
   ]);
   assert.deepEqual(x.approvals.counts(), { [x.room.id]: 1 });
-  assert.deepEqual([...x.approvals.waitingThreadIds(x.room.id)], ["work"]);
   assert.equal(x.changes(), 1);
   // An unchanged poll must not churn the channel view.
   await x.approvals.tick();

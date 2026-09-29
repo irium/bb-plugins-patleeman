@@ -14,15 +14,6 @@ import {
   Section,
 } from "./bot-ui";
 
-export type WorkbenchPanel =
-  | "automations"
-  | "activity"
-  | "usage";
-export const workbenchLabels: Record<WorkbenchPanel, string> = {
-  automations: "Automations",
-  activity: "Threads",
-  usage: "Usage",
-};
 export function UsagePanel({
   id,
   kind,

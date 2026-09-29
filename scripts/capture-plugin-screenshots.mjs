@@ -759,25 +759,6 @@ const captures = [
     },
   },
   {
-    id: "bots-rail",
-    packageDir: "bb-plugin-bot-teams",
-    fileName: "channel-rail.png",
-    setup: async (client) => {
-      const threadId = await launchRoomThread();
-      await client.navigate(`/threads/${threadId}`);
-      await client.waitForText(launchRoomReplies[0]);
-      await client.evaluate(`document.querySelector('button[aria-label^="Open new tab"]').click()`);
-      await client.waitForText("Channel details");
-      await client.evaluate(`[...document.querySelectorAll('button,[role="menuitem"]')].find(e => e.innerText.trim() === 'Channel details').click()`);
-      await client.waitForSelector(".channel-rail-embedded");
-      await client.evaluate(`(() => {
-        const rail = document.querySelector('.channel-rail-embedded');
-        for (const text of ['Members', 'Atlas', 'Scribe', 'Output', 'launch-brief.txt'])
-          if (!rail.innerText.includes(text)) throw new Error('Channel details is missing ' + text);
-      })()`);
-    },
-  },
-  {
     id: "bots-search",
     packageDir: "bb-plugin-bot-teams",
     fileName: "channel-search.png",
@@ -796,23 +777,6 @@ const captures = [
         if (!open?.innerText.includes('Next step: confirm the Friday release window.'))
           throw new Error('Choosing a result must expand the full message in place');
       })()`);
-    },
-  },
-  {
-    id: "bots-automations",
-    packageDir: "bb-plugin-bot-teams",
-    fileName: "channel-automations.png",
-    setup: async (client) => {
-      const threadId = await launchRoomThread();
-      const { automations } = await pluginRpc("bot-teams", "automationList", { channelId: launchRoomId, limit: 50, offset: 0 });
-      if (!automations.some((a) => a.name === "Weekday launch status" && !a.enabled))
-        throw new Error("Seed the paused Weekday launch status automation in Launch room before capturing.");
-      await client.navigate(`/threads/${threadId}`);
-      await client.waitForText(launchRoomReplies[0]);
-      await client.evaluate(`document.querySelector('button[aria-label^="Open new tab"]').click()`);
-      await client.waitForText("Channel automations");
-      await client.evaluate(`[...document.querySelectorAll('button,[role="menuitem"]')].find(e => e.innerText.trim() === 'Channel automations').click()`);
-      await client.waitForText("Weekday launch status");
     },
   },
   {

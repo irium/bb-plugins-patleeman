@@ -1,31 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  formatCountdown,
-  formatDuration,
-  nextAutomation,
-  railLive,
-  railMembers,
-  railRoutingCount,
-} from "../channel-rail";
-import { botSchema, jobSchema, runSchema, type Bot, type Job } from "../contract";
+import { railLive, railRoutingCount } from "../channel-rail";
+import { jobSchema, runSchema, type Job } from "../contract";
 
 const botId = (n: number) => `bot_${String(n).repeat(16).slice(0, 16)}`;
-
-const bot = (n: number, overrides: Record<string, unknown> = {}): Bot =>
-  botSchema.parse({
-    id: botId(n),
-    name: `Bot ${n}`,
-    handle: `bot-${n}`,
-    home: "/tmp",
-    projectId: "proj",
-    hostId: "host",
-    createdAt: 0,
-    updatedAt: 0,
-    lastWakeAt: 0,
-    error: null,
-    ...overrides,
-  });
 
 const job = (overrides: Record<string, unknown> = {}): Job =>
   jobSchema.parse({
@@ -108,80 +86,4 @@ test("routing counts only runs still choosing recipients", () => {
     ]),
     1,
   );
-});
-
-test("members sort by what they are doing, and retired bots drop out", () => {
-  const bots = [
-    bot(1, { name: "Idle" }),
-    bot(2, { name: "Working" }),
-    bot(3, { name: "Broken", error: "Provider down" }),
-    bot(4, { name: "Gone", retired: true }),
-  ];
-  const members = railMembers(
-    bots,
-    bots.map((b) => b.id),
-    [job({ botId: botId(2), activitySnippet: "Editing runtime.ts" })],
-  );
-  assert.deepEqual(
-    members.map((m) => [m.bot.name, m.state]),
-    [
-      ["Working", "working"],
-      ["Broken", "attention"],
-      ["Idle", "idle"],
-    ],
-  );
-  assert.equal(members[0]!.detail, "Editing runtime.ts");
-  assert.equal(members[0]!.threadId, "thr_1");
-  assert.equal(members[1]!.detail, "Provider down");
-});
-
-test("bots outside the channel are not members of it", () => {
-  assert.deepEqual(railMembers([bot(1), bot(2)], [botId(2)], []).length, 1);
-});
-
-const automation = (overrides: Record<string, unknown> = {}) => ({
-  id: "a",
-  projectId: "proj",
-  channelId: "room",
-  botId: botId(1),
-  name: "Standup",
-  prompt: "Summarise",
-  enabled: true,
-  trigger: { triggerType: "schedule" as const, cron: "0 9 * * *", timezone: "UTC" },
-  nextRunAt: 2000,
-  lastRunAt: null,
-  lastRunStatus: null,
-  lastError: null,
-  ...overrides,
-});
-
-test("the next automation is the soonest enabled future run", () => {
-  const next = nextAutomation(
-    [
-      automation({ id: "past", nextRunAt: 500 }),
-      automation({ id: "paused", nextRunAt: 1500, enabled: false }),
-      automation({ id: "unscheduled", nextRunAt: null }),
-      automation({ id: "soon", nextRunAt: 3000 }),
-      automation({ id: "later", nextRunAt: 9000 }),
-    ],
-    1000,
-  );
-  assert.equal(next?.id, "soon");
-});
-
-test("a channel with no upcoming run has no next automation", () => {
-  assert.equal(nextAutomation([automation({ enabled: false })], 0), null);
-});
-
-test("durations read as two coarse units", () => {
-  assert.equal(formatDuration(0), "0s");
-  assert.equal(formatDuration(45_000), "45s");
-  assert.equal(formatDuration(8_040_000), "2h 14m");
-  assert.equal(formatDuration(7_200_000), "2h");
-  assert.equal(formatDuration(134_000_000), "1d 13h");
-});
-
-test("countdowns say now rather than counting the last second", () => {
-  assert.equal(formatCountdown(500), "now");
-  assert.equal(formatCountdown(150_000), "in 2m 30s");
 });

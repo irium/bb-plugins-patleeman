@@ -22,7 +22,6 @@ import {
   type Attachment,
 } from "./contract";
 import { Store, newId, document, saveDocument } from "./store";
-import { liveChannelDms } from "./channel-dms";
 import { personalProjectId } from "./bot-project";
 import { ChannelThreads } from "./channel-thread-link";
 import { registerChannelMentions } from "./channel-mentions";
@@ -721,40 +720,6 @@ export default async function plugin(bb: BbPluginApi) {
       void channelThreads.sync(room.id);
       return { threadId };
     },
-    channelThreads: async ({ id }) => {
-      store.room(id);
-      const waiting = approvals.waitingThreadIds(id);
-      const active = new Set(
-        store
-          .roomJobs(id)
-          .filter((j) => ["queued", "dispatching", "running"].includes(j.status))
-          .map((j) => j.threadId),
-      );
-      // Threads deleted while this plugin was not listening are still listed
-      // here and would open onto nothing. Drop them, and forget them.
-      const { live, stale } = await liveChannelDms(
-        store.roomConversations(id),
-        threadExists,
-      );
-      for (const threadId of stale) store.deleteConversation(threadId);
-      return live.flatMap((c) => {
-        try {
-          const bot = store.get(c.botId);
-          return [
-            {
-              threadId: c.threadId,
-              botId: bot.id,
-              name: bot.name,
-              avatar: bot.avatar,
-              active: active.has(c.threadId),
-              needsApproval: waiting.has(c.threadId),
-            },
-          ];
-        } catch {
-          return [];
-        }
-      });
-    },
     channelForThread: ({ threadId }) => {
       const linked = channelThreads.roomForThread(threadId);
       if (linked) return linked.id;
@@ -765,7 +730,6 @@ export default async function plugin(bb: BbPluginApi) {
       const roomId = key.slice("group:".length).split(":")[0]!;
       return store.findRoom(roomId) ? roomId : null;
     },
-    channelFiles: ({ id, before }) => runtime.data.files(id, before),
     usage: ({ id, kind }) =>
       runtime.data.usage(
         kind === "channel" ? id : undefined,
@@ -788,11 +752,6 @@ export default async function plugin(bb: BbPluginApi) {
           kind === "bot" ? id : undefined,
         );
       }),
-    automationCreate: (input) => automations.create(input),
-    automationList: (input) => automations.list(input),
-    automationUpdate: (input) => automations.update(input),
-    automationAction: (input) => automations.action(input),
-    automationRuns: (input) => automations.runs(input),
     list: async () => {
       const activity = store.botActivitySummary();
       const bots = store.all();
@@ -1399,7 +1358,7 @@ export default async function plugin(bb: BbPluginApi) {
       const room = channelThreads.roomForThread(context.threadId);
       if (!room) throw new Error("This thread is not linked to a channel.");
       // The composer's picker chose this message's chat mode and bot permissions;
-      // keep the channel in step so Channel details and the CLI agree.
+      // keep the channel in step so the CLI and agent tools agree.
       const permission = permissionLevel === undefined ? undefined : permissionForLevel(permissionLevel);
       const modeChanged = mode !== undefined && mode !== (room.responseBehavior ?? "everyone");
       const permissionChanged = permission !== undefined && permission !== (room.permissionMode ?? null);
@@ -1611,14 +1570,6 @@ export default async function plugin(bb: BbPluginApi) {
       runtime.busy.set(lane, { threadId: context.thread.id, at: Date.now() });
     return { action: "proceed" };
   });
-  const threadExists = async (threadId: string) => {
-    try {
-      return !!(await bb.sdk.threads.get({ threadId }));
-    } catch (cause) {
-      if (missingThread(cause)) return false;
-      throw cause;
-    }
-  };
   // A bot work thread must not outlive the thread it points at.
   bb.events.on("thread.deleted", ({ thread }) => {
     const conversation = store.byThread(thread.id);

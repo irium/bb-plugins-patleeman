@@ -215,12 +215,9 @@ test("run history stays in its channel, preserves failures, and bounds output", 
       channelId: x.room.id,
       automationId: a.id,
     });
-    const page = (await x.harness.behavior.callRpc(
-      "automationRuns",
-      input,
-    )) as { runs: { status: string; output: string }[]; nextCursor: null };
+    const page = await x.service.runs(input);
     assert.equal(page.runs[0]!.status, "failed");
-    assert.equal(page.runs[0]!.output.length, 2000);
+    assert.equal(page.runs[0]!.output?.length, 2000);
     assert.equal(page.nextCursor, null);
     const other = x.active(x.b.id);
     await assert.rejects(

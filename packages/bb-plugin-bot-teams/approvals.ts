@@ -126,9 +126,6 @@ export class ChannelApprovals {
       [...this.byRoom].map(([roomId, approvals]) => [roomId, approvals.length]),
     );
   }
-  waitingThreadIds(roomId: string): Set<string> {
-    return new Set(this.list(roomId).map((a) => a.threadId));
-  }
 
   private eligible(job: Job) {
     if (!job.threadId || !job.roomId) return null;

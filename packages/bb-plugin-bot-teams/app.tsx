@@ -1,4 +1,3 @@
-import { channelTabLabels } from "./channel-tab-labels";
 import { threadChannelMenu } from "./thread-channel-menu";
 import { UsagePanel } from "./channel-workbench";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -46,12 +45,8 @@ import "./styles.css";
 import { botTeamsIcons } from "./icons";
 import {
   ChannelComposerBanner,
-  ChannelDetailsPanel,
   ChannelHandoffPrefill,
   ChannelThreadHeader,
-  channelDetailsPanelId,
-  channelWorkbenchPanel,
-  channelWorkbenchPanelIds,
 } from "./channel-thread-surfaces";
 const tabs = ["profile", "mission", "memory", "activity", "usage"] as const;
 
@@ -298,7 +293,6 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
 }
 export default definePluginApp((app) => {
   for (const icon of botTeamsIcons) app.experimental_icons.register(icon);
-  app.contentScripts.register(channelTabLabels);
   app.contentScripts.register(threadChannelMenu);
   app.slots.experimental_appOverlay({
     id: "channel-links",
@@ -329,20 +323,6 @@ export default definePluginApp((app) => {
     title: "Channel",
     component: ChannelThreadHeader,
   });
-  app.slots.threadPanelAction({
-    id: channelDetailsPanelId,
-    title: "Channel details",
-    icon: "ListView",
-    component: ChannelDetailsPanel,
-  });
-  for (const panel of ["automations", "activity", "usage"] as const)
-    app.slots.threadPanelAction({
-      id: channelWorkbenchPanelIds[panel],
-      title: { automations: "Channel automations", activity: "Channel activity", usage: "Channel usage" }[panel],
-      icon: { automations: "Clock", activity: "List", usage: "ChartNoAxesCombined" }[panel],
-      layout: "flush",
-      component: channelWorkbenchPanel(panel),
-    });
   app.composer.customize({
     id: "channel-thread",
     scopes: ["thread"],
