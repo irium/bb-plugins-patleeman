@@ -1,0 +1,293 @@
+import { filterSuggestionItems, insertOrUpdateBlockForSlashMenu } from "@blocknote/core";
+import { CommentsExtension, DefaultThreadStoreAuth } from "@blocknote/core/comments";
+import { withCollaboration, YjsThreadStore } from "@blocknote/core/yjs";
+import {
+  BlockNoteViewEditor,
+  getDefaultReactSlashMenuItems,
+  SuggestionMenuController,
+  ThreadsSidebar,
+  useCreateBlockNote,
+  type DefaultReactSuggestionItem,
+} from "@blocknote/react";
+import { BlockNoteView } from "@blocknote/shadcn";
+import "@blocknote/shadcn/style.css";
+import { useSdk } from "@get-bb/plugin-sdk/app";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
+import { HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, UPLOAD_PATH } from "../constants";
+import type { BotView, PageMetaView } from "../contract";
+import { DOCUMENT_FRAGMENT, THREADS_MAP } from "../schema-config";
+import { pageSchema } from "./blocks";
+import type { PageConnection } from "./connection";
+import { authorInfo } from "./context";
+
+const HUMAN_COLOR = "#2563eb";
+
+export type SidePanel = "comments" | null;
+
+function avatarUrl(label: string, background: string): string {
+  const glyph = [...label.trim()][0] ?? "?";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="${background}"/><text x="32" y="42" font-size="30" text-anchor="middle" font-family="system-ui,sans-serif" fill="white">${glyph.replace(/[<&>"]/g, "")}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function useDarkMode(): boolean {
+  const read = () => document.documentElement.classList.contains("dark") || document.body.classList.contains("dark");
+  const [dark, setDark] = useState(read);
+  useEffect(() => {
+    const observer = new MutationObserver(() => setDark(read()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+  return dark;
+}
+
+async function uploadFile(pageId: string, file: File): Promise<string> {
+  if (file.size > MAX_UPLOAD_BYTES) throw new Error("Files are limited to 15 MB.");
+  const buffer = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let index = 0; index < buffer.length; index += 0x8000) {
+    binary += String.fromCharCode(...buffer.subarray(index, index + 0x8000));
+  }
+  const response = await fetch(`/api/v1/plugins/${PLUGIN_ID}/http${UPLOAD_PATH}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ pageId, name: file.name, mime: file.type, dataBase64: btoa(binary) }),
+  });
+  const result = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
+  if (!response.ok || !result.url) throw new Error(result.error ?? `Upload failed (${response.status}).`);
+  return result.url;
+}
+
+function isoDate(offsetDays: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function nextWeekday(target: number): number {
+  const day = new Date().getDay();
+  return ((target - day + 7) % 7) || 7;
+}
+
+// BlockNote's suggestion menu keys group labels by group name and items by
+// title, so a group must be contiguous and titles unique within one list.
+function mergeGroups(base: DefaultReactSuggestionItem[], extra: DefaultReactSuggestionItem[]): DefaultReactSuggestionItem[] {
+  const items = [...base];
+  for (const item of extra) {
+    let last = -1;
+    items.forEach((candidate, index) => {
+      if (candidate.group === item.group) last = index;
+    });
+    if (last < 0) items.push(item);
+    else items.splice(last + 1, 0, item);
+  }
+  return items;
+}
+
+function uniqueTitles(items: DefaultReactSuggestionItem[]): DefaultReactSuggestionItem[] {
+  const seen = new Map<string, number>();
+  return items.map((item) => {
+    const count = seen.get(item.title) ?? 0;
+    seen.set(item.title, count + 1);
+    return count ? { ...item, title: `${item.title} (${count + 1})` } : item;
+  });
+}
+
+export function PageEditor({
+  connection,
+  page,
+  bots,
+  pages,
+  sidePanel,
+}: {
+  connection: PageConnection;
+  page: PageMetaView;
+  bots: BotView[];
+  pages: PageMetaView[];
+  sidePanel: SidePanel;
+}) {
+  const sdk = useSdk();
+  const dark = useDarkMode();
+  const botsRef = useRef(bots);
+  botsRef.current = bots;
+  const pagesRef = useRef(pages);
+  pagesRef.current = pages;
+
+  const threadStore = useMemo(
+    () =>
+      new YjsThreadStore(
+        HUMAN_USER_ID,
+        connection.doc.getMap(THREADS_MAP),
+        new DefaultThreadStoreAuth(HUMAN_USER_ID, "editor"),
+      ),
+    [connection],
+  );
+
+  const editor = useCreateBlockNote(
+    withCollaboration({
+      schema: pageSchema,
+      collaboration: {
+        fragment: connection.doc.getXmlFragment(DOCUMENT_FRAGMENT),
+        user: { name: "You", color: HUMAN_COLOR },
+        provider: { awareness: connection.awareness },
+        showCursorLabels: "activity",
+      },
+      extensions: [
+        CommentsExtension({
+          threadStore,
+          resolveUsers: async (ids: string[]) =>
+            ids.map((id) => {
+              const info = authorInfo(id, botsRef.current);
+              return {
+                id,
+                username: info.name,
+                avatarUrl: avatarUrl(info.avatar || info.name, id === HUMAN_USER_ID ? HUMAN_COLOR : "#7c3aed"),
+              };
+            }),
+        }),
+      ],
+      uploadFile: (file: File) => uploadFile(page.id, file),
+    }),
+    [connection, threadStore],
+  );
+
+  const slashItems = useMemo(() => {
+    const custom: DefaultReactSuggestionItem[] = [
+      {
+        title: "Callout",
+        subtext: "Highlight a note, tip or warning",
+        aliases: ["note", "tip", "warning", "info"],
+        group: "Basic blocks",
+        icon: <Icon name="Info" className="size-4" />,
+        onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "callout" }),
+      },
+      {
+        title: "Chart",
+        subtext: "Bar, line, area or pie chart from data",
+        aliases: ["graph", "plot", "bar", "line", "pie"],
+        group: "Data",
+        icon: <Icon name="ChartColumn" className="size-4" />,
+        onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "chart" }),
+      },
+      {
+        title: "Stats",
+        subtext: "A row of key numbers",
+        aliases: ["metrics", "kpi", "numbers"],
+        group: "Data",
+        icon: <Icon name="GridView" className="size-4" />,
+        onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "stats" }),
+      },
+      {
+        title: "Link preview",
+        subtext: "Embed a link as a card",
+        aliases: ["bookmark", "embed", "url"],
+        group: "Media",
+        icon: <Icon name="ExternalLink" className="size-4" />,
+        onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind: "bookmark" } }),
+      },
+      {
+        title: "Page link",
+        subtext: "Embed another page as a card",
+        aliases: ["subpage", "embed page"],
+        group: "Media",
+        icon: <Icon name="FileText" className="size-4" />,
+        onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind: "page" } }),
+      },
+      {
+        title: "Thread",
+        subtext: "Embed a BB thread as a card",
+        aliases: ["chat", "conversation"],
+        group: "Media",
+        icon: <Icon name="MessageSquare" className="size-4" />,
+        onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind: "thread" } }),
+      },
+    ];
+    return mergeGroups(getDefaultReactSlashMenuItems(editor), custom);
+  }, [editor]);
+
+  const slashMenuItems = useCallback(async (query: string) => filterSuggestionItems(slashItems, query), [slashItems]);
+
+  const mentionItems = useCallback(async (query: string): Promise<DefaultReactSuggestionItem[]> => {
+    const insert = (kind: string, target: string, label: string) => () => {
+      editor.insertInlineContent([{ type: "mention", props: { kind, target, label } } as never, " "]);
+    };
+    const botItems = botsRef.current.map((bot) => ({
+      title: bot.name,
+      subtext: bot.description || `@${bot.handle}`,
+      aliases: [bot.handle],
+      group: "Bots",
+      icon: <span className="text-base leading-none">{bot.avatar}</span>,
+      onItemClick: insert("bot", bot.id, bot.name),
+    }));
+    const pageItems = pagesRef.current
+      .filter((candidate) => candidate.id !== page.id && !candidate.archived)
+      .map((candidate) => ({
+        title: candidate.title || "Untitled",
+        group: "Pages",
+        icon: candidate.icon ? <span className="text-base leading-none">{candidate.icon}</span> : <Icon name="FileText" className="size-4" />,
+        onItemClick: insert("page", candidate.id, candidate.title || "Untitled"),
+      }));
+    const dates = [
+      { title: "Today", offset: 0 },
+      { title: "Tomorrow", offset: 1 },
+      { title: "Next Monday", offset: nextWeekday(1) },
+      { title: "Next Friday", offset: nextWeekday(5) },
+    ].map(({ title, offset }) => {
+      const iso = isoDate(offset);
+      return { title, subtext: iso, aliases: [iso, "date"], group: "Dates", icon: <Icon name="Calendar" className="size-4" />, onItemClick: insert("date", iso, iso) };
+    });
+    if (/^\d{4}-\d{2}-\d{2}$/.test(query.trim())) {
+      dates.unshift({
+        title: query.trim(),
+        subtext: "Date",
+        aliases: [],
+        group: "Dates",
+        icon: <Icon name="Calendar" className="size-4" />,
+        onItemClick: insert("date", query.trim(), query.trim()),
+      });
+    }
+    let threadItems: DefaultReactSuggestionItem[] = [];
+    if (query.trim().length >= 2) {
+      try {
+        const threads = (await sdk.threads.list({ projectId: page.projectId ?? undefined, limit: 50 })) as {
+          id: string;
+          title?: string | null;
+        }[];
+        threadItems = threads
+          .filter((thread) => thread.title)
+          .map((thread) => ({
+            title: thread.title!,
+            group: "Threads",
+            icon: <Icon name="MessageSquare" className="size-4" />,
+            onItemClick: insert("thread", thread.id, thread.title!),
+          }));
+      } catch {
+        // Thread suggestions are optional.
+      }
+    }
+    return uniqueTitles(filterSuggestionItems([...botItems, ...pageItems, ...dates, ...threadItems], query).slice(0, 30));
+  }, [editor, sdk, page.id, page.projectId]);
+
+  return (
+    <BlockNoteView
+      editor={editor}
+      theme={dark ? "dark" : "light"}
+      slashMenu={false}
+      renderEditor={false}
+      className="pages-editor flex min-h-0 flex-1"
+    >
+      <div className="pages-main min-w-0 flex-1">
+        <BlockNoteViewEditor />
+      </div>
+      {sidePanel === "comments" ? (
+        <aside className="pages-comments hidden w-80 shrink-0 border-l border-border pl-3 lg:block">
+          <ThreadsSidebar filter="open" sort="position" />
+        </aside>
+      ) : null}
+      <SuggestionMenuController triggerCharacter="/" getItems={slashMenuItems} />
+      <SuggestionMenuController triggerCharacter="@" getItems={mentionItems} />
+    </BlockNoteView>
+  );
+}

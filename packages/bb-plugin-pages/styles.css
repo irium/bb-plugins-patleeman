@@ -1,0 +1,45 @@
+/* BlockNote sits inside the page column; the column owns padding and
+   background so the editor blends with the host theme. */
+.pages-editor .bn-container,
+.pages-editor.bn-container {
+  --bn-colors-editor-background: transparent;
+  background: transparent;
+}
+/* Only the page body: comment composers are nested BlockNote editors. */
+.pages-main > .bn-editor {
+  background: transparent;
+  padding-inline: 54px;
+  min-height: 40vh;
+}
+.pages-main > .bn-editor:focus {
+  outline: none;
+}
+.pages-comments .bn-threads-sidebar {
+  position: sticky;
+  top: 0;
+}
+
+/* BlockNote's shadcn cards rely on arbitrary Tailwind values that the plugin
+   build does not emit, so give comment threads their spacing directly. */
+.pages-editor .bn-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
+}
+.pages-editor .bn-thread > * {
+  padding-inline: 0;
+}
+.pages-comments .bn-thread {
+  box-shadow: none;
+  width: 100%;
+}
+.pages-comments .bn-threads-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

@@ -270,6 +270,31 @@
       }
     },
     {
+      "id": "pages",
+      "displayName": "Pages",
+      "description": "Collaborative pages you write with your agents. Mention a Bot Teams bot to hand it work, or let one keep a page up to date.",
+      "icon": {
+        "url": "./packages/bb-plugin-pages/icons/pages.svg"
+      },
+      "tags": [
+        "productivity",
+        "documents",
+        "collaboration",
+        "bots"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-plugins.git",
+          "subdir": "packages/bb-plugin-pages",
+          "ref": "main"
+        }
+      }
+    },
+    {
       "id": "plannotator",
       "displayName": "Plannotator",
       "description": "Review plans in Plannotator inside BB and send decisions to agents as new thread messages.",
