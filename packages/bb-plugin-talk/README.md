@@ -39,6 +39,11 @@ afterwards.
 - **Recordings for meetings.** **New recording** on the Recordings page, or
   the command *Talk: Start or stop a recording*, records for as long as you
   need without inserting anywhere.
+- **A table of recordings.** The Recordings page lists everything in a
+  table you can search, filter to recordings or dictations, and sort by
+  title, date, length, or word count. Tick rows, or shift-click for a range,
+  to start one thread that mentions them all, copy their transcripts as one
+  document, retry failed pieces, or delete them together.
 - **A pill that follows you.** A small overlay at the top of the window stays
   put as you move between threads and pages. Everything else stays clickable.
   Drag it anywhere in the window and it stays there, even after a reload.

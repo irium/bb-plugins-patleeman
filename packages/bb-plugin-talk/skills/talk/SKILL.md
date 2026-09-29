@@ -45,6 +45,10 @@ or failed. Say so instead of guessing at the missing part.
 - **Recordings.** *New recording* on the Recordings page, or the command
   "Talk: Start or stop a recording", records without inserting anywhere.
   Suited to meetings and hours-long sessions.
+- **Recordings page.** A table the user can search, filter by kind, and sort.
+  Selected rows can start one thread that mentions them all, have their
+  transcripts copied as one Markdown document, have failed pieces retried,
+  or be deleted together. The recording Talk is capturing can't be selected.
 - **Recording pill.** A small pill at the top of every page shows the clock,
   input level, and pause/stop controls. Expand it to read the live transcript.
   It follows the user between threads, and it can be dragged anywhere in the

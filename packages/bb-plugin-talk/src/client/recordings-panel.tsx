@@ -18,13 +18,23 @@ import {
   formatClock,
   formatLength,
   joinTranscript,
-  recordingHref,
 } from "../shared/format";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { talk, useTalkState } from "./controller";
+import {
+  DEFAULT_SORT,
+  mentionPrompt,
+  nextSort,
+  sortRecordings,
+  toggleSelection,
+  transcriptBundle,
+  type Sort,
+  type SortKey,
+} from "./recording-table";
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -65,10 +75,15 @@ function StatusBadge({ recording, live }: { recording: Recording; live: boolean 
   return <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", tone)}>{label}</span>;
 }
 
-function PanelFrame({ children }: { children: ReactNode }) {
+function PanelFrame({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6 pb-[calc(env(safe-area-inset-bottom)+24px)] sm:px-6">
+      <div
+        className={cn(
+          "mx-auto flex w-full flex-col gap-4 px-4 py-6 pb-[calc(env(safe-area-inset-bottom)+24px)] sm:px-6",
+          wide ? "max-w-5xl" : "max-w-3xl",
+        )}
+      >
         {children}
       </div>
     </div>
@@ -76,13 +91,74 @@ function PanelFrame({ children }: { children: ReactNode }) {
 }
 
 // ── List ─────────────────────────────────────────────────────────────────
+type KindFilter = "all" | Recording["kind"];
+
+const KIND_FILTERS: { value: KindFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "recording", label: "Recordings" },
+  { value: "dictation", label: "Dictations" },
+];
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * Copies text that is still being fetched. Handing the clipboard a promise
+ * keeps the click's permission in Safari, which drops it after an await.
+ */
+function copyLater(text: Promise<string>): Promise<void> {
+  if (typeof ClipboardItem === "undefined") return text.then((value) => navigator.clipboard.writeText(value));
+  return navigator.clipboard.write([
+    new ClipboardItem({ "text/plain": text.then((value) => new Blob([value], { type: "text/plain" })) }),
+  ]);
+}
+
+function SortHeader({
+  label,
+  column,
+  sort,
+  onSort,
+  className,
+}: {
+  label: string;
+  column: SortKey;
+  sort: Sort;
+  onSort: (column: SortKey) => void;
+  className?: string;
+}) {
+  const active = sort.key === column;
+  return (
+    <th
+      scope="col"
+      aria-sort={active ? (sort.descending ? "descending" : "ascending") : "none"}
+      className={cn("px-3 py-2 font-medium", className)}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={cn("inline-flex cursor-pointer items-center gap-1 hover:text-foreground", active && "text-foreground")}
+      >
+        {label}
+        {active ? <Icon name={sort.descending ? "ArrowDown" : "ArrowUp"} className="size-3" /> : null}
+      </button>
+    </th>
+  );
+}
+
 function RecordingList() {
   const rpc = useRpc<TalkRpcContract>();
   const navigate = useBbNavigate();
   const state = useTalkState();
   const [query, setQuery] = useState("");
+  const [kind, setKind] = useState<KindFilter>("all");
+  const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
   const [recordings, setRecordings] = useState<Recording[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const anchor = useRef<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [working, setWorking] = useState(false);
   const refetch = useCallback(() => {
     const q = query.trim();
     rpc.call("recordings_list", { ...(q ? { query: q } : {}), limit: 200 }).then(
@@ -97,10 +173,79 @@ function RecordingList() {
     const timer = setTimeout(refetch, query ? 200 : 0);
     return () => clearTimeout(timer);
   }, [refetch, query]);
-  useChangedSignal(refetch);
+  // A bulk delete sends one change per recording; refetch once for the lot.
+  const changeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(changeTimer.current), []);
+  useChangedSignal(() => {
+    clearTimeout(changeTimer.current);
+    changeTimer.current = setTimeout(refetch, 150);
+  });
+
+  // The recording Talk is capturing can't be picked: it is still changing,
+  // and deleting it would pull it out from under the recorder.
+  const liveId = state.phase !== "idle" ? state.recordingId : null;
+  const rows = useMemo(
+    () => sortRecordings((recordings ?? []).filter((r) => kind === "all" || r.kind === kind), sort),
+    [recordings, kind, sort],
+  );
+  const selectableIds = useMemo(() => rows.filter((r) => r.id !== liveId).map((r) => r.id), [rows, liveId]);
+  const chosen = useMemo(() => rows.filter((r) => selected.has(r.id) && r.id !== liveId), [rows, selected, liveId]);
+  // Forget picks that were deleted, filtered out, or went live.
+  useEffect(() => {
+    setSelected((previous) => {
+      const visible = new Set(selectableIds);
+      const next = new Set([...previous].filter((id) => visible.has(id)));
+      return next.size === previous.size ? previous : next;
+    });
+  }, [selectableIds]);
+  useEffect(() => setConfirmDelete(false), [selected]);
+
+  const allChecked = chosen.length > 0 && chosen.length === selectableIds.length;
+  const toggle = (id: string, range: boolean) => {
+    setSelected((previous) => toggleSelection(previous, selectableIds, id, { range, anchor: anchor.current }));
+    anchor.current = id;
+  };
+  const clear = () => setSelected(new Set());
+  const failed = chosen.reduce((sum, r) => sum + r.failedCount, 0);
+
+  const bulk = (action: () => Promise<unknown>) => {
+    setWorking(true);
+    void action()
+      .catch((cause: unknown) => toast.error(message(cause)))
+      .finally(() => setWorking(false));
+  };
+  const copyTranscripts = () =>
+    bulk(async () => {
+      const picked = chosen;
+      await copyLater(
+        Promise.all(picked.map((r) => rpc.call("recording_get", { id: r.id }))).then((results) =>
+          transcriptBundle(
+            results.map(({ recording, segments }) => ({ ...recording, transcript: joinTranscript(segments) })),
+            when,
+          ),
+        ),
+      );
+      toast.success(picked.length === 1 ? "Transcript copied" : `Copied ${picked.length} transcripts`);
+    });
+  const retryFailed = () =>
+    bulk(async () => {
+      await Promise.all(chosen.filter((r) => r.failedCount > 0).map((r) => rpc.call("recording_retry", { id: r.id })));
+      toast.success(`Retrying ${plural(failed, "piece")}`);
+    });
+  const deleteChosen = () =>
+    bulk(async () => {
+      const results = await Promise.allSettled(chosen.map((r) => rpc.call("recording_delete", { id: r.id })));
+      const failures = results.filter((result) => result.status === "rejected");
+      const deleted = results.length - failures.length;
+      if (deleted > 0) toast.success(`Deleted ${plural(deleted, "recording")}`);
+      if (failures.length > 0) {
+        toast.error(`Couldn't delete ${plural(failures.length, "recording")}: ${message(failures[0]!.reason)}`);
+      }
+      clear();
+    });
 
   return (
-    <PanelFrame>
+    <PanelFrame wide>
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-xl font-semibold">Recordings</h1>
         <Button
@@ -129,32 +274,178 @@ function RecordingList() {
             : "No recordings yet. Start one here, or press the composer's microphone to dictate."}
         </div>
       ) : (
-        <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
-          {recordings.map((recording) => (
-            <li key={recording.id}>
-              <button
-                type="button"
-                onClick={() => navigate.toPluginPanel(PANEL_PATH, { subPath: recording.id })}
-                className="flex w-full cursor-pointer flex-col gap-1 px-4 py-3 text-left hover:bg-state-hover"
-              >
-                <div className="flex items-center gap-2">
-                  <Icon
-                    name={recording.kind === "dictation" ? "Mic" : TALK_ICON}
-                    className="size-4 shrink-0 text-muted-foreground"
-                  />
-                  <span className="min-w-0 flex-1 truncate font-medium">{recording.title}</span>
-                  <StatusBadge recording={recording} live={state.recordingId === recording.id && state.phase === "recording"} />
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {when(recording.createdAt)} · {formatLength(recording.durationMs)} · {recording.wordCount} words
-                </div>
-                {recording.preview ? (
-                  <p className="line-clamp-2 text-sm text-muted-foreground">{recording.preview}</p>
+        <div className="flex flex-col">
+          <div
+            role="toolbar"
+            aria-label={chosen.length > 0 ? "Selected recordings" : "Filter recordings"}
+            className="sticky top-0 z-10 -mx-1 flex min-h-11 flex-wrap items-center gap-2 bg-background px-1 py-1.5"
+          >
+            {chosen.length > 0 ? (
+              <>
+                <span className="mr-1 text-sm font-medium">{chosen.length} selected</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={working}
+                  onClick={() => navigate.toCompose({ initialPrompt: mentionPrompt(chosen), focusPrompt: true })}
+                >
+                  <Icon name="MessageSquarePlus" /> New thread
+                </Button>
+                <Button size="sm" variant="outline" disabled={working} onClick={copyTranscripts}>
+                  <Icon name="Copy" /> Copy transcripts
+                </Button>
+                {failed > 0 ? (
+                  <Button size="sm" variant="outline" disabled={working} onClick={retryFailed}>
+                    <Icon name="RotateCcw" /> Retry {failed} failed
+                  </Button>
                 ) : null}
-              </button>
-            </li>
-          ))}
-        </ul>
+                <Button
+                  size="sm"
+                  variant={confirmDelete ? "destructive" : "outline"}
+                  disabled={working}
+                  onBlur={() => setConfirmDelete(false)}
+                  onClick={() => (confirmDelete ? deleteChosen() : setConfirmDelete(true))}
+                >
+                  <Icon name="Trash2" /> {confirmDelete ? `Delete ${chosen.length} for good` : "Delete"}
+                </Button>
+                <Button size="sm" variant="ghost" className="ml-auto" onClick={clear}>
+                  Clear
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="inline-flex rounded-md border border-border p-0.5">
+                  {KIND_FILTERS.map((filter) => (
+                    <button
+                      key={filter.value}
+                      type="button"
+                      aria-pressed={kind === filter.value}
+                      onClick={() => setKind(filter.value)}
+                      className={cn(
+                        "cursor-pointer rounded px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground",
+                        kind === filter.value && "bg-state-hover text-foreground",
+                      )}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+                <span className="ml-auto text-xs text-muted-foreground">{plural(rows.length, "item")}</span>
+              </>
+            )}
+          </div>
+          {rows.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+              {kind === "dictation" ? "No dictations here." : "No recordings here."}
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-border">
+              <table className="w-full table-fixed border-collapse text-sm">
+                <thead className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="w-10 py-2 pl-3">
+                      <Checkbox
+                        aria-label={allChecked ? "Deselect all" : "Select all"}
+                        disabled={selectableIds.length === 0}
+                        checked={allChecked ? true : chosen.length > 0 ? "indeterminate" : false}
+                        onCheckedChange={() => setSelected(allChecked ? new Set() : new Set(selectableIds))}
+                        className="flex"
+                      />
+                    </th>
+                    <SortHeader label="Title" column="title" sort={sort} onSort={(key) => setSort(nextSort(sort, key))} />
+                    <SortHeader
+                      label="Date"
+                      column="createdAt"
+                      sort={sort}
+                      onSort={(key) => setSort(nextSort(sort, key))}
+                      className="w-36 max-sm:hidden"
+                    />
+                    <SortHeader
+                      label="Length"
+                      column="durationMs"
+                      sort={sort}
+                      onSort={(key) => setSort(nextSort(sort, key))}
+                      className="w-24 max-sm:hidden"
+                    />
+                    <SortHeader
+                      label="Words"
+                      column="wordCount"
+                      sort={sort}
+                      onSort={(key) => setSort(nextSort(sort, key))}
+                      className="w-24 max-sm:hidden"
+                    />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rows.map((recording) => {
+                    const live = recording.id === liveId;
+                    const checked = selected.has(recording.id) && !live;
+                    const open = () => navigate.toPluginPanel(PANEL_PATH, { subPath: recording.id });
+                    return (
+                      <tr
+                        key={recording.id}
+                        data-state={checked ? "selected" : undefined}
+                        onClick={open}
+                        className="cursor-pointer align-top hover:bg-state-hover data-[state=selected]:bg-state-hover"
+                      >
+                        {/* The whole cell toggles, so the target is easy to hit. */}
+                        <td
+                          className="select-none py-3 pl-3"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (!live) toggle(recording.id, event.shiftKey);
+                          }}
+                        >
+                          <Checkbox
+                            aria-label={`Select ${recording.title}`}
+                            checked={checked}
+                            disabled={live}
+                            title={live ? "Talk is recording this" : undefined}
+                            className="mt-0.5 flex"
+                          />
+                        </td>
+                        <td className="min-w-0 px-3 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <Icon
+                              name={recording.kind === "dictation" ? "Mic" : TALK_ICON}
+                              className="size-4 shrink-0 text-muted-foreground"
+                            />
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                open();
+                              }}
+                              className="min-w-0 cursor-pointer truncate text-left font-medium focus-visible:underline focus-visible:outline-none"
+                            >
+                              {recording.title}
+                            </button>
+                            <StatusBadge recording={recording} live={live && state.phase === "recording"} />
+                          </div>
+                          <div className="mt-0.5 text-xs text-muted-foreground sm:hidden">
+                            {when(recording.createdAt)} · {formatLength(recording.durationMs)} · {recording.wordCount} words
+                          </div>
+                          {recording.preview ? (
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">{recording.preview}</p>
+                          ) : null}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground max-sm:hidden">
+                          {when(recording.createdAt)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-muted-foreground max-sm:hidden">
+                          {formatLength(recording.durationMs)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-muted-foreground max-sm:hidden">
+                          {recording.wordCount.toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
     </PanelFrame>
   );
@@ -405,7 +696,7 @@ function RecordingDetail({ id }: { id: string }) {
           variant="outline"
           onClick={() =>
             navigate.toCompose({
-              initialPrompt: `[${recording.title.replace(/[[\]]/g, "")}](${recordingHref(id)}) `,
+              initialPrompt: mentionPrompt([recording]),
               focusPrompt: true,
             })
           }

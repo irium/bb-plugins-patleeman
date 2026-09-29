@@ -6,8 +6,9 @@ a titled recording you can open, link to, and @-mention.
 
 - **Dictation from the mic.** The composer mic dictates with Talk and types
   the transcript into the composer when you stop.
-- **A Recordings page.** Recordings for meetings and long sessions, with
-  search, playback, and one-tap copy.
+- **A Recordings page.** A sortable, searchable table of recordings for
+  meetings and long sessions. Select several to start a thread about them,
+  copy their transcripts, or delete them at once.
 - **A recording pill.** It follows you across threads, shows the live
   transcript, and takes you back to where you started. Finish a dictation
   from anywhere and it lands in the right thread when you return.
