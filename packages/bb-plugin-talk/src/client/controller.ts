@@ -24,6 +24,15 @@ import type { Recording, RecordingKind, TalkRpcContract } from "../shared/contra
 import { PANEL_PATH, isEmptyRecording, joinTranscript } from "../shared/format";
 import { findComposer, insertIntoComposer, type MicState } from "./composer-dom";
 import { Outbox, toBase64, type OutboxKey } from "./outbox";
+import {
+  FIELD_PENDING_PREFIX,
+  findField,
+  insertIntoField,
+  parseField,
+  requestOpenField,
+  type FieldRef,
+  type TalkStatus,
+} from "./fields";
 import { PENDING_STORAGE_KEY, addPending, readPending, withoutPending, writePending } from "./pending-inserts";
 import { LevelTracker, pickMimeType, rmsOf, segmentPolicy, shouldCut, type SegmentPolicy } from "./segmenter";
 
@@ -45,6 +54,8 @@ export interface TalkState {
   kind: RecordingKind;
   /** The thread a dictation inserts into; null for the new-thread composer. */
   threadId: string | null;
+  /** Another plugin's field a dictation inserts into, instead of a composer. */
+  field: FieldRef | null;
   /** Recorded time from finished capture sessions. */
   recordedMs: number;
   /** When the live capture session started, for the running clock. */
@@ -61,6 +72,7 @@ interface Persisted {
   kind: RecordingKind;
   phase: "recording" | "paused" | "finalizing" | "transcribing";
   threadId: string | null;
+  field?: FieldRef | null;
   /** Type the transcript into the composer when it is done. */
   insert: boolean;
   composePath?: string | null;
@@ -99,6 +111,7 @@ const INITIAL: TalkState = {
   recordingId: null,
   kind: "recording",
   threadId: null,
+  field: null,
   recordedMs: 0,
   captureStartedAt: null,
   pendingUploads: 0,
@@ -143,6 +156,7 @@ export class TalkController {
   private navigate: BbNavigate | null = null;
   private pendingTimer: number | null = null;
   private pendingComposer: HTMLElement | null = null;
+  private fieldsOnScreen = new Set<string>();
   /** Finished captures still transcribing, to report ones discarded as empty. */
   private readonly settling = new Map<string, RecordingKind>();
   private insertOnDone = false;
@@ -225,6 +239,14 @@ export class TalkController {
     return this.state.phase !== "idle";
   }
 
+  /** What field owners see on `<html data-bb-talk>`. */
+  status(): { status: TalkStatus; field: string | null; phase: Phase } {
+    const { phase, field } = this.state;
+    if (phase === "idle") return { status: "idle", field: null, phase };
+    if (this.isDictating() && field) return { status: "dictating", field: field.key, phase };
+    return { status: "busy", field: null, phase };
+  }
+
   // ── Where it started ─────────────────────────────────────────────────────
   /**
    * The composer a dictation types into, when it is on screen. Thread
@@ -232,8 +254,8 @@ export class TalkController {
    * across threads; new-thread dictations match the composer page.
    */
   private sourceComposer(): HTMLElement | null {
-    const { kind, phase, threadId } = this.state;
-    if (kind !== "dictation" || phase === "idle" || this.context.threadId !== threadId) return null;
+    const { kind, phase, threadId, field } = this.state;
+    if (field || kind !== "dictation" || phase === "idle" || this.context.threadId !== threadId) return null;
     const target = this.target?.deref();
     if (target?.isConnected) return target;
     if (threadId === null && location.pathname !== this.composePath) return null;
@@ -247,12 +269,17 @@ export class TalkController {
     const { kind, phase, threadId, recordingId } = this.state;
     if (phase === "idle") return true;
     if (kind === "recording") return this.viewing === recordingId;
+    if (this.state.field) return findField(this.state.field.key) !== null;
     if (threadId !== null) return this.context.threadId === threadId;
     return this.sourceComposer() !== null;
   }
 
   goToSource(): void {
-    const { kind, threadId, recordingId } = this.state;
+    const { kind, threadId, recordingId, field } = this.state;
+    if (kind === "dictation" && field) {
+      requestOpenField(field.key);
+      return;
+    }
     const navigate = this.navigate;
     if (!navigate) return;
     if (kind === "recording") {
@@ -282,8 +309,9 @@ export class TalkController {
   }
 
   private busyMessage(): string {
-    const { kind, threadId } = this.state;
+    const { kind, threadId, field } = this.state;
     if (kind === "recording") return "Talk is recording. Stop it first.";
+    if (field) return `Talk is already dictating into ${field.label}.`;
     return threadId !== null
       ? "Talk is already dictating in another thread."
       : "Talk is already dictating in the new-thread composer.";
@@ -319,6 +347,7 @@ export class TalkController {
       recordingId: recording.id,
       kind: saved.kind,
       threadId: saved.threadId,
+      field: parseField(saved.field),
       recording,
       recordedMs: recording.durationMs,
       phase: saved.phase === "recording" ? "starting" : saved.phase,
@@ -342,7 +371,11 @@ export class TalkController {
   }
 
   // ── Public actions ───────────────────────────────────────────────────────
-  async startRecording(kind: RecordingKind, promptbox: HTMLElement | null = null): Promise<void> {
+  async startRecording(
+    kind: RecordingKind,
+    promptbox: HTMLElement | null = null,
+    field: FieldRef | null = null,
+  ): Promise<void> {
     if (!this.rpc) throw new Error("Talk is still loading.");
     if (this.state.phase !== "idle") {
       this.showBusy();
@@ -355,7 +388,9 @@ export class TalkController {
     this.target = promptbox ? new WeakRef(promptbox) : null;
     this.composePath = this.context.threadId === null ? location.pathname : null;
     this.insertOnDone = kind === "dictation";
-    this.set({ ...INITIAL, phase: "starting", kind, threadId: this.context.threadId });
+    // A field dictation belongs to the field, not to the open thread.
+    const threadId = field ? null : this.context.threadId;
+    this.set({ ...INITIAL, phase: "starting", kind, threadId, field });
     let stream: MediaStream;
     try {
       stream = await this.openMicrophone();
@@ -369,7 +404,7 @@ export class TalkController {
       const recording = await this.rpc.call("recording_create", {
         kind,
         projectId: this.context.projectId,
-        threadId: this.context.threadId,
+        threadId,
       });
       this.set({ recordingId: recording.id, recording });
       this.persistPhase("recording");
@@ -429,6 +464,16 @@ export class TalkController {
       return;
     }
     await this.startRecording("dictation", promptbox);
+  }
+
+  /** A field's dictate control: start dictating into it, or finish. */
+  async toggleFieldDictation(field: FieldRef): Promise<void> {
+    if (this.isActive()) {
+      if (this.isDictating() && this.state.field?.key === field.key) await this.stop(true);
+      else this.showBusy();
+      return;
+    }
+    await this.startRecording("dictation", null, field);
   }
 
   async pause(): Promise<void> {
@@ -728,9 +773,17 @@ export class TalkController {
    */
   private deliver(): void {
     const text = this.state.transcript.trim();
-    const { threadId } = this.state;
+    const { threadId, field } = this.state;
     if (text === "") {
       this.announceEmpty(this.state.kind);
+    } else if (field) {
+      if (!insertIntoField(field.key, text)) {
+        writePending(addPending(readPending(), `${FIELD_PENDING_PREFIX}${field.key}`, text));
+        toast.success(`Dictation ready. It goes into ${field.label} when you go back.`, {
+          action: { label: "Go back", onClick: () => requestOpenField(field.key) },
+        });
+        this.onPendingChanged();
+      }
     } else if (insertIntoComposer(this.sourceComposer(), text)) {
       // Typed where it started.
     } else if (threadId !== null) {
@@ -788,6 +841,7 @@ export class TalkController {
    * own unsent text before Talk adds to it.
    */
   private flushPending(): void {
+    this.flushPendingFields();
     const threadId = this.context.threadId;
     const composer = threadId && document.visibilityState === "visible" ? findComposer() : null;
     const settled = composer !== null && composer === this.pendingComposer;
@@ -806,10 +860,33 @@ export class TalkController {
     this.onPendingChanged();
   }
 
+  /**
+   * Hands waiting dictations to their fields. Like composers, a field must be
+   * on screen for a full poll first, so its owner has loaded its content.
+   */
+  private flushPendingFields(): void {
+    const visible = document.visibilityState === "visible";
+    const seen = new Set<string>();
+    for (const [pendingKey, text] of Object.entries(readPending())) {
+      if (!pendingKey.startsWith(FIELD_PENDING_PREFIX)) continue;
+      const key = pendingKey.slice(FIELD_PENDING_PREFIX.length);
+      if (!visible || !findField(key)) continue;
+      seen.add(key);
+      if (!this.fieldsOnScreen.has(key)) continue;
+      // Claim it before inserting, so a second window skips it.
+      writePending(withoutPending(readPending(), pendingKey));
+      if (insertIntoField(key, text)) toast.success("Added your dictation.");
+      else writePending(addPending(readPending(), pendingKey, text));
+      this.onPendingChanged();
+    }
+    this.fieldsOnScreen = seen;
+  }
+
   /** Sidebar decorations: where Talk is dictating, and waiting dictations. */
   threadRowStatuses(): Map<string, PluginComposerThreadRowStatus> {
     const statuses = new Map<string, PluginComposerThreadRowStatus>();
     for (const threadId of Object.keys(readPending())) {
+      if (threadId.startsWith(FIELD_PENDING_PREFIX)) continue;
       statuses.set(threadId, { icon: "Mic", label: "Talk dictation ready to insert", tone: "success" });
     }
     const { phase, threadId } = this.state;
@@ -938,9 +1015,9 @@ export class TalkController {
   }
 
   private persistPhase(phase: Persisted["phase"]): void {
-    const { recordingId, kind, threadId } = this.state;
+    const { recordingId, kind, threadId, field } = this.state;
     if (recordingId) {
-      this.persist({ recordingId, kind, phase, threadId, insert: this.insertOnDone, composePath: this.composePath });
+      this.persist({ recordingId, kind, phase, threadId, field, insert: this.insertOnDone, composePath: this.composePath });
     }
   }
 

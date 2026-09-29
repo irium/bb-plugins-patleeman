@@ -6,6 +6,8 @@ a titled recording you can open, link to, and @-mention.
 
 - **Dictation from the mic.** The composer mic dictates with Talk and types
   the transcript into the composer when you stop.
+- **Dictation in other plugins.** Plugins such as Pages can let you dictate
+  into their editors with the same pill and durability.
 - **A Recordings page.** A sortable, searchable table of recordings for
   meetings and long sessions. Select several to start a thread about them,
   copy their transcripts, or delete them at once.
