@@ -38,6 +38,7 @@ export const recordingSchema = z.object({
   wordCount: z.number(),
   /** The last few hundred characters of transcript, for list rows. */
   preview: z.string(),
+  archived: z.boolean(),
 });
 export type Recording = z.infer<typeof recordingSchema>;
 

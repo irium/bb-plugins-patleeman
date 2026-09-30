@@ -4,6 +4,9 @@
 /** Realtime channel: payload `{ id }` of the recording that changed. */
 export const RECORDING_CHANGED = "recording-changed";
 
+/** Studio's "New recording" dispatches this on window; Talk's overlay starts one. */
+export const NEW_RECORDING_EVENT = "bb-studio:talk:new-recording";
+
 /** The plugin's declared icon (`bb.branding.experimental_icons`). */
 export const TALK_ICON = "talk/talk";
 
@@ -112,4 +115,19 @@ export function titleExcerpt(text: string, max = 4000): string {
   if (text.length <= max) return text;
   const head = Math.floor(max * 0.7);
   return `${text.slice(0, head)}\n[…]\n${text.slice(text.length - (max - head))}`;
+}
+
+export type RecordingTone = "neutral" | "live" | "progress" | "warning" | "danger" | "success";
+
+/** A recording's state as a badge, or null once it's simply done. */
+export function recordingBadge(
+  recording: { status: string; pendingCount: number; failedCount: number },
+  live = false,
+): { label: string; tone: RecordingTone } | null {
+  if (live || recording.status === "recording") return { label: "Recording", tone: "live" };
+  if (recording.status === "paused") return { label: "Paused", tone: "neutral" };
+  if (recording.status === "interrupted") return { label: "Interrupted", tone: "warning" };
+  if (recording.pendingCount > 0 || recording.status === "finishing") return { label: "Transcribing", tone: "progress" };
+  if (recording.failedCount > 0) return { label: `${recording.failedCount} failed`, tone: "danger" };
+  return null;
 }

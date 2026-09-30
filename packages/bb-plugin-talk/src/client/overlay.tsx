@@ -10,7 +10,7 @@ import {
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import type { TalkRpcContract } from "../shared/contract";
-import { PANEL_PATH, RECORDING_CHANGED, formatClock, tail } from "../shared/format";
+import { NEW_RECORDING_EVENT, PANEL_PATH, RECORDING_CHANGED, formatClock, tail } from "../shared/format";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { talk, useTalkState, type TalkState } from "./controller";
@@ -35,6 +35,20 @@ function useControllerWiring(): void {
     });
   }, [values]);
   useEffect(() => talk.setContext({ projectId, threadId }), [projectId, threadId]);
+  // Studio's "New recording": start one in the chosen project and open its page.
+  useEffect(() => {
+    const onNew = (event: Event) => {
+      event.preventDefault();
+      const detail = (event as CustomEvent<{ projectId?: unknown }>).detail;
+      const projectId = typeof detail?.projectId === "string" ? detail.projectId : null;
+      void talk.startRecording("recording", null, null, { projectId }).then(() => {
+        const { recordingId, phase } = talk.getState();
+        if (recordingId && phase !== "idle") navigate.toPluginPanel(PANEL_PATH, { subPath: recordingId });
+      });
+    };
+    window.addEventListener(NEW_RECORDING_EVENT, onNew);
+    return () => window.removeEventListener(NEW_RECORDING_EVENT, onNew);
+  }, [navigate]);
   useRealtime(RECORDING_CHANGED, (payload) => {
     const id = (payload as { id?: unknown } | null)?.id;
     if (typeof id === "string") void talk.refresh(id);

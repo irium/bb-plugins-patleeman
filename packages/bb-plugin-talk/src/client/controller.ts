@@ -384,6 +384,7 @@ export class TalkController {
     kind: RecordingKind,
     promptbox: HTMLElement | null = null,
     field: FieldRef | null = null,
+    options: { projectId?: string | null } = {},
   ): Promise<void> {
     if (!this.rpc) throw new Error("Talk is still loading.");
     if (this.state.phase !== "idle") {
@@ -412,7 +413,7 @@ export class TalkController {
     try {
       const recording = await this.rpc.call("recording_create", {
         kind,
-        projectId: this.context.projectId,
+        projectId: options.projectId !== undefined ? options.projectId : this.context.projectId,
         threadId,
       });
       this.set({ recordingId: recording.id, recording });

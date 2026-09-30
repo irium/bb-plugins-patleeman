@@ -19,6 +19,7 @@ const recording: Recording = {
   failedCount: 0,
   wordCount: 9000,
   preview: "",
+  archived: false,
 };
 
 describe("mentions", () => {

@@ -8,12 +8,16 @@
 // a durable object: a page at /plugins/talk/recordings/<id>, a mention in the
 // composer's @ menu, and `bb talk` on the command line.
 import { randomBytes } from "node:crypto";
+import { studioSchemas } from "@bb-studio/kit/contract";
+import { createStudioNotifier } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { z } from "zod";
 import { rpcContract } from "./src/shared/contract";
 import { RECORDING_CHANGED, formatLength } from "./src/shared/format";
 import { AudioFiles, pluginDataDirectory } from "./src/server/audio-files";
 import { MENTION_TRANSCRIPT_CHARS, mentionContext, mentionSubtitle } from "./src/server/mentions";
 import { MIGRATIONS, TalkStore } from "./src/server/store";
+import { registerStudio } from "./src/server/studio";
 import { generateTitle } from "./src/server/titles";
 import { Transcriber } from "./src/server/transcriber";
 
@@ -75,9 +79,18 @@ export default async function plugin(bb: BbPluginApi) {
   const files = new AudioFiles(pluginDataDirectory(db));
 
   const lifetime = new AbortController();
-  bb.onDispose(() => lifetime.abort());
+  const studio = studioSchemas(z);
+  // Transcription touches a recording every few seconds; Studio only needs to hear about it now and then.
+  const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: "talk", schemas: studio, delayMs: 1500 });
+  bb.onDispose(() => {
+    lifetime.abort();
+    studioNotifier.dispose();
+  });
 
-  const changed = (id: string) => bb.realtime.publish(RECORDING_CHANGED, { id });
+  const changed = (id: string) => {
+    bb.realtime.publish(RECORDING_CHANGED, { id });
+    studioNotifier.changed();
+  };
 
   // Empty recordings are never kept: one that finishes without a word
   // (a mic tapped by accident, silence, noise) is deleted with its audio.
@@ -221,6 +234,8 @@ export default async function plugin(bb: BbPluginApi) {
       return { deleted };
     },
   });
+
+  registerStudio(bb, studio, { store, removeAudio: (id) => files.removeRecording(id), changed });
 
   // Segment audio for the recording page's player. Same-origin GET only.
   bb.http.route("GET", "/audio", async (context) => {

@@ -48,6 +48,8 @@ export const MIGRATIONS = [
    CREATE INDEX segments_order ON segments(recording_id, started_at, idx);
    CREATE INDEX segments_pending ON segments(status, next_attempt_at);
    CREATE INDEX recordings_updated ON recordings(updated_at);`,
+  // BB Studio: archiving, as for every Studio item.
+  `ALTER TABLE recordings ADD COLUMN archived_at INTEGER;`,
 ];
 
 interface RecordingRow {
@@ -63,6 +65,7 @@ interface RecordingRow {
   updated_at: number;
   ended_at: number | null;
   heartbeat_at: number;
+  archived_at: number | null;
 }
 
 interface SegmentRow {
@@ -143,21 +146,23 @@ export class TalkStore {
     return row ? this.toRecording(row) : null;
   }
 
-  list(options: { query?: string; limit?: number } = {}): Recording[] {
+  /** Newest first. Archived recordings are left out unless asked for. */
+  list(options: { query?: string; limit?: number; includeArchived?: boolean } = {}): Recording[] {
     const limit = options.limit ?? 50;
     const query = options.query?.trim();
+    const live = options.includeArchived ? "" : "AND r.archived_at IS NULL";
     const rows = query
       ? (this.db
           .prepare(
             `SELECT r.* FROM recordings r
-             WHERE r.title LIKE @like ESCAPE '\\'
+             WHERE (r.title LIKE @like ESCAPE '\\'
                 OR EXISTS (SELECT 1 FROM segments s
-                           WHERE s.recording_id = r.id AND s.text LIKE @like ESCAPE '\\')
+                           WHERE s.recording_id = r.id AND s.text LIKE @like ESCAPE '\\')) ${live}
              ORDER BY r.updated_at DESC LIMIT @limit`,
           )
           .all({ like: `%${query.replace(/[\\%_]/g, "\\$&")}%`, limit }) as RecordingRow[])
       : (this.db
-          .prepare(`SELECT * FROM recordings ORDER BY updated_at DESC LIMIT ?`)
+          .prepare(`SELECT * FROM recordings r WHERE 1 ${live} ORDER BY updated_at DESC LIMIT ?`)
           .all(limit) as RecordingRow[]);
     return rows.map((row) => this.toRecording(row));
   }
@@ -396,6 +401,16 @@ export class TalkStore {
     return rows.map((row) => row.id);
   }
 
+  setProject(id: string, projectId: string | null): boolean {
+    return this.db.prepare(`UPDATE recordings SET project_id = ?, updated_at = ? WHERE id = ?`).run(projectId, this.now(), id).changes > 0;
+  }
+
+  setArchived(id: string, archived: boolean): boolean {
+    return (
+      this.db.prepare(`UPDATE recordings SET archived_at = ? WHERE id = ?`).run(archived ? this.now() : null, id).changes > 0
+    );
+  }
+
   delete(id: string): boolean {
     this.db.prepare(`DELETE FROM segments WHERE recording_id = ?`).run(id);
     return this.db.prepare(`DELETE FROM recordings WHERE id = ?`).run(id).changes > 0;
@@ -471,6 +486,7 @@ export class TalkStore {
       failedCount: stats.failed,
       wordCount: countWords(transcript),
       preview: tail(transcript, 240),
+      archived: row.archived_at !== null,
     };
   }
 }
