@@ -58,7 +58,7 @@ export function PageChat({
   return (
     <div
       className={cn(
-        "pages-chat pointer-events-none absolute right-4 bottom-4 z-30 flex w-[min(460px,calc(100%-2rem))] flex-col gap-2 max-md:inset-x-2 max-md:bottom-2 max-md:w-auto",
+        "pages-chat pointer-events-none absolute right-6 bottom-4 z-30 flex w-[min(460px,calc(100%-2.5rem))] flex-col gap-2 max-md:inset-x-2 max-md:bottom-2 max-md:w-auto",
         besideComments && "md:right-[344px] md:w-[min(460px,calc(100%-360px))] max-md:hidden",
       )}
     >
