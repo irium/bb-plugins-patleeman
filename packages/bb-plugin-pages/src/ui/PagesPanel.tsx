@@ -96,8 +96,9 @@ export function PagesPanel({ subPath }: { subPath: string }) {
       openUrl: (url) => {
         if (!navigate.openUrl(url)) window.open(url, "_blank", "noopener");
       },
+      linkPreview: (url) => rpc.call("linkPreview", { url }),
     }),
-    [pages, bots.bots, openPage, navigate],
+    [pages, bots.bots, openPage, navigate, rpc],
   );
 
   const createPage = async (projectId: string | null, parentId: string | null = null) => {

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { BotDirectory } from "./src/bots";
 import { FILES_PATH, HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, SYNC_PATH, UPLOAD_PATH } from "./src/constants";
 import { rpcContract } from "./src/contract";
+import { fetchPreview } from "./src/unfurl";
 import { applyEdits, readMarkdown } from "./src/doc";
 import type { Socket } from "./src/hub";
 import { errorText, pageUrl, PagesService, requestView, toView, truncate, validateCron } from "./src/service";
@@ -151,6 +152,7 @@ export default async function plugin(bb: BbPluginApi) {
       const meta = store.meta(id);
       return { page: meta ? toView(meta) : null };
     },
+    linkPreview: ({ url }) => fetchPreview(url),
     markdown: ({ id }) => {
       requireMeta(id);
       return { markdown: readMarkdown(service.hub.open(id).doc) };

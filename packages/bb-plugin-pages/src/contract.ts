@@ -127,6 +127,11 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: pageId }),
     output: z.object({ page: pageMetaSchema.nullable() }),
   },
+  /** Title, description and image for a bookmark embed. */
+  linkPreview: {
+    input: z.object({ url: z.string().url().max(2000) }),
+    output: z.object({ title: z.string(), description: z.string(), image: z.string() }),
+  },
   markdown: {
     input: z.object({ id: pageId }),
     output: z.object({ markdown: z.string() }),

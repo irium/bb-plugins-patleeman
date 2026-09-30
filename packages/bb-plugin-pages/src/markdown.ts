@@ -209,6 +209,7 @@ function embedBlock(value: string): PageBlock {
       target: str("target") || str("url") || str("id"),
       title: str("title"),
       description: str("description"),
+      image: str("image"),
     },
   };
 }
@@ -393,7 +394,7 @@ function renderBlock(block: PageBlock, indent: string, number: number, options: 
         "embed",
         JSON.stringify(
           Object.fromEntries(
-            ["kind", "target", "title", "description"]
+            ["kind", "target", "title", "description", "image"]
               .map((key) => [key, props[key]])
               .filter(([, value]) => value !== undefined && value !== ""),
           ),

@@ -17,6 +17,7 @@ import { Icon } from "@/components/ui/icon";
 import { HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, UPLOAD_PATH } from "../constants";
 import type { BotView, PageMetaView } from "../contract";
 import { DOCUMENT_FRAGMENT, THREADS_MAP } from "../schema-config";
+import { linkEmbed } from "./links";
 import { pageSchema } from "./blocks";
 import type { PageConnection } from "./connection";
 import { authorInfo } from "./context";
@@ -170,6 +171,17 @@ export function PageEditor({
         }),
       ],
       uploadFile: (file: File) => uploadFile(page.id, file),
+      // BlockNote eases nesting changes over 0.3s, which makes Tab feel slow.
+      animations: false,
+      pasteHandler: ({ event, editor, defaultPasteHandler }) => {
+        const embed = linkEmbed(event.clipboardData?.getData("text/plain") ?? "", window.location.origin);
+        const block = editor.getTextCursorPosition().block;
+        if (!embed || block.type !== "paragraph" || !Array.isArray(block.content) || block.content.length > 0) return defaultPasteHandler();
+        editor.updateBlock(block, { type: "embed", props: embed });
+        const [next] = editor.insertBlocks([{ type: "paragraph" }], block, "after");
+        if (next) editor.setTextCursorPosition(next, "start");
+        return true;
+      },
     }),
     [connection, threadStore],
   );

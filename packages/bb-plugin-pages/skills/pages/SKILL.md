@@ -54,6 +54,8 @@ Pages reads and writes GitHub-flavoured Markdown plus:
   `[{"label":"ARR","value":"$1.2M","delta":"+8%","trend":"up","caption":"vs last month"}]`.
 - **Embeds:** a fenced ` ```embed ` block:
   `{"kind":"bookmark|thread|page|drawing","target":"https://… or an id","title":"…"}`.
+  Bookmarks may also carry `description` and `image`; leave them out and the
+  editor fetches the link's preview when the page opens.
 - **Mentions:** `@[Name](bot:bot_id)`, `@[Title](page:pg_id)`,
   `@[Title](thread:thr_id)`, `@[2026-10-01](date:2026-10-01)`.
 

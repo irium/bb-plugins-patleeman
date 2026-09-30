@@ -51,7 +51,9 @@ afterwards.
   WebSocket. Agents and bots edit the same document from the server, so their
   changes stream into your editor, with cursors, while you keep typing.
 - **Custom blocks.** Callouts, charts (bar, line, area, pie), stat rows, and
-  embed cards for links, BB threads, and other pages.
+  embed cards for links, BB threads, and other pages. Paste a link on an
+  empty line to turn it into a card; web links fetch their title,
+  description, and preview image.
   Charts and stats are edited as JSON, which makes them easy for agents to
   write.
 - **Mentions.** Type `@` to mention a bot, another page, a BB thread, or a

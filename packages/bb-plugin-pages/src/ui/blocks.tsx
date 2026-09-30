@@ -1,6 +1,6 @@
 import { BlockNoteSchema, defaultBlockSpecs, defaultInlineContentSpecs } from "@blocknote/core";
 import { createReactBlockSpec, createReactInlineContentSpec } from "@blocknote/react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Area,
   AreaChart,
@@ -289,14 +289,73 @@ function hostOf(url: string): string {
   }
 }
 
-function EmbedView({ kind, target, title, description, onEdit }: {
+/** Fetches a bookmark's title, description and image once, when it has none. */
+function usePreview(target: string, missing: boolean, onPreview?: (preview: { title: string; description: string; image: string }) => void) {
+  const ui = usePagesUi();
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!missing || !onPreview || !/^https?:\/\//.test(target)) return;
+    let live = true;
+    setLoading(true);
+    ui.linkPreview(target)
+      .then((preview) => live && (preview.title || preview.description || preview.image) && onPreview(preview))
+      .catch(() => {})
+      .finally(() => live && setLoading(false));
+    return () => {
+      live = false;
+    };
+    // Once per link: the callback changes on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, missing]);
+  return loading;
+}
+
+function BookmarkCard({ target, title, description, image, loading, onEdit }: {
+  target: string;
+  title: string;
+  description: string;
+  image: string;
+  loading: boolean;
+  onEdit?: () => void;
+}) {
+  const ui = usePagesUi();
+  const [imageFailed, setImageFailed] = useState(false);
+  const host = hostOf(target).replace(/^www\./, "");
+  return (
+    <button
+      type="button"
+      className="flex w-full cursor-pointer items-stretch overflow-hidden text-left"
+      onClick={() => /^https?:\/\//.test(target) && ui.openUrl(target)}
+      onDoubleClick={onEdit}
+    >
+      <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-3 py-2.5">
+        <span className={cn("line-clamp-1 text-sm font-medium text-foreground", !title && "text-muted-foreground")}>
+          {title || (loading ? "Loading preview…" : host)}
+        </span>
+        {description ? <span className="line-clamp-2 text-xs text-muted-foreground">{description}</span> : null}
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <Icon name="Globe" className="size-3 shrink-0" />
+          <span className="truncate">{title ? host : target}</span>
+        </span>
+      </span>
+      {image && !imageFailed ? (
+        <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" className="w-40 shrink-0 border-l border-border object-cover max-sm:w-24" onError={() => setImageFailed(true)} />
+      ) : null}
+    </button>
+  );
+}
+
+function EmbedView({ kind, target, title, description, image, onEdit, onPreview }: {
   kind: keyof typeof EMBED_ICONS;
   target: string;
   title: string;
   description: string;
+  image: string;
   onEdit?: (target: string) => void;
+  onPreview?: (preview: { title: string; description: string; image: string }) => void;
 }) {
   const ui = usePagesUi();
+  const loading = usePreview(target, kind === "bookmark" && !title && !description && !image, onPreview);
   const [editing, setEditing] = useState(!target);
   const [draft, setDraft] = useState(target);
   const page = kind === "page" ? ui.pages.find((candidate) => candidate.id === target) : undefined;
@@ -327,6 +386,9 @@ function EmbedView({ kind, target, title, description, onEdit }: {
       </form>
     );
   }
+  if (kind === "bookmark") {
+    return <BookmarkCard target={target} title={title} description={description} image={image} loading={loading} onEdit={onEdit ? () => setEditing(true) : undefined} />;
+  }
   return (
     <button
       type="button"
@@ -352,13 +414,18 @@ function EmbedView({ kind, target, title, description, onEdit }: {
 
 const EmbedBlock = createReactBlockSpec(embedConfig, {
   render: ({ block, editor }) => (
-    <div className="pages-embed my-1 w-full rounded-lg border border-border bg-card/50 p-2" contentEditable={false}>
+    <div
+      className={cn("pages-embed my-1 w-full rounded-lg border border-border bg-card/50", block.props.kind === "bookmark" && block.props.target ? "overflow-hidden" : "p-2")}
+      contentEditable={false}
+    >
       <EmbedView
         kind={block.props.kind}
         target={block.props.target}
         title={block.props.title}
         description={block.props.description}
-        onEdit={editor.isEditable ? (target) => editor.updateBlock(block, { props: { target, title: "", description: "" } }) : undefined}
+        image={block.props.image}
+        onEdit={editor.isEditable ? (target) => editor.updateBlock(block, { props: { target, title: "", description: "", image: "" } }) : undefined}
+        onPreview={editor.isEditable ? (preview) => editor.updateBlock(block, { props: preview }) : undefined}
       />
     </div>
   ),

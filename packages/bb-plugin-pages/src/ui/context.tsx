@@ -8,6 +8,7 @@ export interface PagesUi {
   openPage(pageId: string): void;
   openThread(threadId: string): void;
   openUrl(url: string): void;
+  linkPreview(url: string): Promise<{ title: string; description: string; image: string }>;
 }
 
 export const PagesUiContext = createContext<PagesUi>({
@@ -16,6 +17,7 @@ export const PagesUiContext = createContext<PagesUi>({
   openPage: () => {},
   openThread: () => {},
   openUrl: (url) => void window.open(url, "_blank", "noopener"),
+  linkPreview: () => Promise.reject(new Error("No link previews here.")),
 });
 
 export const usePagesUi = () => useContext(PagesUiContext);

@@ -39,6 +39,8 @@ export const embedConfig = {
     target: { default: "" },
     title: { default: "" },
     description: { default: "" },
+    /** A bookmark's preview image URL. */
+    image: { default: "" },
   },
   content: "none",
 } as const;
