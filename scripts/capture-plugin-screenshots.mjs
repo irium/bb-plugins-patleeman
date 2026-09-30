@@ -398,6 +398,85 @@ async function seedPages() {
   return { page, cleanup };
 }
 
+/** A "Checkout flow" diagram: three labelled steps joined by arrows. */
+async function seedDrawing() {
+  let seed = 1;
+  const base = (type, x, y, width, height, extra = {}) => ({
+    id: `capture-${type}-${seed}`,
+    type,
+    x,
+    y,
+    width,
+    height,
+    angle: 0,
+    strokeColor: "#1e1e1e",
+    backgroundColor: "transparent",
+    fillStyle: "solid",
+    strokeWidth: 2,
+    strokeStyle: "solid",
+    roughness: 1,
+    opacity: 100,
+    groupIds: [],
+    frameId: null,
+    roundness: null,
+    seed: seed++,
+    version: 1,
+    versionNonce: seed * 7,
+    isDeleted: false,
+    boundElements: null,
+    updated: 1,
+    link: null,
+    locked: false,
+    ...extra,
+  });
+  const steps = [
+    ["Cart", "#a5d8ff"],
+    ["Payment", "#ffec99"],
+    ["Confirmation", "#b2f2bb"],
+  ];
+  const elements = [];
+  steps.forEach(([label, fill], index) => {
+    const x = index * 260;
+    elements.push(base("rectangle", x, 0, 180, 90, { backgroundColor: fill, roundness: { type: 3 } }));
+    elements.push(
+      base("text", x + 20, 30, 140, 25, {
+        text: label,
+        originalText: label,
+        fontSize: 20,
+        fontFamily: 5,
+        textAlign: "center",
+        verticalAlign: "middle",
+        containerId: null,
+        lineHeight: 1.25,
+        autoResize: false,
+      }),
+    );
+    if (index < steps.length - 1) {
+      elements.push(base("arrow", x + 190, 45, 60, 0, { points: [[0, 0], [60, 0]], startArrowhead: null, endArrowhead: "arrow" }));
+    }
+  });
+  elements.push(
+    base("text", 0, 130, 420, 25, {
+      text: "Retry payment on failure",
+      originalText: "Retry payment on failure",
+      fontSize: 16,
+      fontFamily: 5,
+      textAlign: "left",
+      verticalAlign: "top",
+      containerId: null,
+      lineHeight: 1.25,
+      autoResize: true,
+      strokeColor: "#868e96",
+    }),
+  );
+  const { drawing } = await pluginRpc("excalidraw", "createDrawing", { name: "Checkout flow", projectId });
+  await pluginRpc("excalidraw", "saveDrawing", {
+    id: drawing.id,
+    data: JSON.stringify({ type: "excalidraw", version: 2, source: "bb-capture", elements, appState: { viewBackgroundColor: "#ffffff" }, files: {} }),
+  });
+  return { drawing, cleanup: () => pluginRpc("excalidraw", "deleteDrawing", { id: drawing.id }).catch(() => {}) };
+}
+
 async function findPageTarget() {
   const targets = await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`)).json();
   const target = targets.find((candidate) => candidate.type === "page" && !candidate.url.startsWith("chrome://"));
@@ -1292,26 +1371,26 @@ const captures = [
   {
     id: "excalidraw",
     packageDir: "bb-plugin-excalidraw",
+    privateSidebar: true,
     setup: async (client) => {
-      await client.navigate("/plugins/excalidraw/drawings");
-      await client.waitForText("Drawings");
-      if (await client.hasText("Plugin screenshot staging map")) return;
-
-      // Some BB versions keep the Excalidraw gallery unavailable when a
-      // persisted preview cannot be rendered. Use the real editor as the
-      // fallback surface: create a temporary drawing through the UI, draw a
-      // rectangle through Excalidraw's own canvas, capture it, then remove the
-      // temporary fixture in cleanup.
-      const before = await pluginRpc("excalidraw", "listDrawings", null);
-      await client.clickButtonText("New drawing");
-      await client.waitForText("Canvas actions");
-      await client.drawRectangle();
-      const after = await pluginRpc("excalidraw", "listDrawings", null);
-      const beforeIds = new Set(before.drawings.map((drawing) => drawing.id));
-      const created = after.drawings.find((drawing) => !beforeIds.has(drawing.id));
-      return async () => {
-        if (created) await pluginRpc("excalidraw", "deleteDrawing", { id: created.id });
-      };
+      const { drawing, cleanup } = await seedDrawing();
+      try {
+        await client.navigate(`/plugins/excalidraw/drawings/${drawing.id}`);
+        await client.waitForInputValue("Drawing name", "Checkout flow");
+        await client.waitForAriaButton("Copy image");
+        await client.waitForAriaButton("More");
+        await client.waitForText("New thread");
+        await client.waitForText("Saved");
+        await client.waitForSelector("canvas.excalidraw__canvas");
+        // The staged scene is on the canvas, not a blank one.
+        const count = await client.evaluate(`(async () => (await (await fetch("/api/v1/plugins/excalidraw/rpc/getDrawing", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: ${JSON.stringify(drawing.id)} }) })).json()).result.drawing.data)()`, true);
+        if (JSON.parse(count).elements.filter((element) => !element.isDeleted).length !== 9) throw new Error("The staged drawing lost its elements");
+        await sleep(1500);
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
     },
   },
   {
@@ -1602,18 +1681,55 @@ const captures = [
     setup: async (client) => {
       const { cleanup } = await seedPages();
       try {
+        // With Studio installed, Pages' collection hands over to Studio,
+        // filtered to pages. Shows the list view across every project.
         await client.navigate("/plugins/pages/pages");
-        // Shows the list view across every project, whatever an earlier run left behind.
-        await client.evaluate(`localStorage.setItem("bb-pages:view", "list"); localStorage.removeItem("bb-pages:project-filter")`);
-        await client.navigate("/plugins/pages/pages");
-        await client.waitForSelector('input[aria-label="Search pages"]');
-        await client.waitForSelector('[role="table"]');
+        await client.evaluate(`localStorage.setItem("studio:collection:view", "list"); localStorage.removeItem("studio:collection:project"); localStorage.setItem("studio:sidebar-tip-dismissed", "1")`);
+        await client.navigate("/plugins/studio/studio/page");
+        await client.waitForSelector('input[aria-label="Search studio"]');
+        await client.waitForSelector('[role="grid"]');
         await client.waitForText("New page");
-        await client.waitForText("Edited by agents");
         await client.waitForText("Offline mode launch");
         await client.waitForText("Rollout risks");
         await client.waitForText("Release notes: October");
         await sleep(800);
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
+  {
+    id: "studio",
+    packageDir: "bb-plugin-studio",
+    privateSidebar: true,
+    setup: async (client) => {
+      const pages = await seedPages();
+      const drawing = await seedDrawing();
+      let recordingId = null;
+      const cleanup = async () => {
+        await pages.cleanup();
+        await drawing.cleanup();
+        if (recordingId) await talkRpc("recording_delete", { id: recordingId }).catch(() => {});
+      };
+      try {
+        recordingId = await seedTalkRecording(projectId);
+        await client.navigate("/plugins/studio/studio");
+        await client.evaluate(`localStorage.setItem("studio:collection:view", "grid"); localStorage.setItem("studio:collection:project", ${JSON.stringify(projectId)}); localStorage.setItem("studio:sidebar-tip-dismissed", "1")`);
+        await client.navigate("/plugins/studio/studio");
+        await client.waitForSelector('input[aria-label="Search studio"]');
+        await client.waitForText("Pages");
+        await client.waitForText("Recordings");
+        await client.waitForText("Drawings");
+        await client.waitForText("Offline mode launch");
+        await client.waitForText("Weekly product sync");
+        await client.waitForText("Checkout flow");
+        // The drawing's card shows its server-rendered thumbnail.
+        await client.waitForSelector('img[src*="/plugins/excalidraw/http/thumbnail"]');
+        const loaded = await client.evaluate(`(async () => { const img = document.querySelector('img[src*="/plugins/excalidraw/http/thumbnail"]'); await img.decode(); return img.naturalWidth > 0; })()`, true);
+        if (!loaded) throw new Error("The drawing thumbnail didn't load");
+        await sleep(1000);
       } catch (error) {
         await cleanup();
         throw error;

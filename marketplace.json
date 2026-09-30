@@ -204,7 +204,7 @@
     {
       "id": "excalidraw",
       "displayName": "Studio Draw",
-      "description": "Part of BB Studio. Sketch Excalidraw drawings with your agents, then attach them to conversations.",
+      "description": "Part of BB Studio. Sketch Excalidraw drawings with your agents, keep them in Studio's collection, and attach them to conversations.",
       "icon": {
         "url": "./packages/bb-plugin-excalidraw/assets/icon.svg"
       },
@@ -376,6 +376,31 @@
         "git": {
           "url": "https://github.com/patleeman/bb-plugins.git",
           "subdir": "packages/bb-plugin-spool",
+          "ref": "main"
+        }
+      }
+    },
+    {
+      "id": "studio",
+      "displayName": "Studio",
+      "description": "The home of BB Studio. One collection for your pages, Talk recordings and drawings: search, filter by project, and hand anything to an agent. Add-ons plug in.",
+      "icon": {
+        "url": "./packages/bb-plugin-studio/icons/studio.svg"
+      },
+      "tags": [
+        "productivity",
+        "documents",
+        "collaboration",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-plugins.git",
+          "subdir": "packages/bb-plugin-studio",
           "ref": "main"
         }
       }
