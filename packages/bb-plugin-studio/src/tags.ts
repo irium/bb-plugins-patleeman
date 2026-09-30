@@ -4,29 +4,6 @@
 import { randomBytes } from "node:crypto";
 import type Database from "better-sqlite3";
 
-/**
- * Append-only: statement index is the migration id, and BB checks each
- * statement against the hash it recorded, so never edit one (not even its
- * whitespace).
- */
-export const MIGRATIONS = [
-  `CREATE TABLE IF NOT EXISTS tags (
-       id TEXT PRIMARY KEY,
-       name TEXT NOT NULL,
-       color TEXT NOT NULL,
-       created_at INTEGER NOT NULL
-     );
-   CREATE UNIQUE INDEX IF NOT EXISTS tags_name ON tags (name COLLATE NOCASE);
-   CREATE TABLE IF NOT EXISTS item_tags (
-       plugin_id TEXT NOT NULL,
-       item_id TEXT NOT NULL,
-       tag_id TEXT NOT NULL,
-       created_at INTEGER NOT NULL,
-       PRIMARY KEY (plugin_id, item_id, tag_id)
-     );
-   CREATE INDEX IF NOT EXISTS item_tags_tag ON item_tags (tag_id);`,
-];
-
 /** Tag colours, picked in turn; each reads on light and dark backgrounds. */
 export const TAG_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6", "#ef4444", "#64748b"];
 export const MAX_TAG_NAME = 40;

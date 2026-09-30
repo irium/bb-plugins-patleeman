@@ -2,6 +2,7 @@ import {
   definePluginApp,
   type PluginThreadListProps,
 } from "@get-bb/plugin-sdk/app";
+import { SidebarAnchors } from "@bb-studio/kit/app";
 import { CompactViewportOverrideProvider } from "@/components/ui/hooks/use-compact-viewport";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PreferencesSync } from "./app/preferences/PreferencesSync.js";
@@ -18,6 +19,8 @@ function ThreadList({
     <CompactViewportOverrideProvider isCompactViewport={isCompactViewport}>
       <TooltipProvider>
         <PreferencesSync />
+        {/* Studio apps' sections, above the threads and in the same scroll area. */}
+        <SidebarAnchors onNavigate={onNavigate} />
         <ProjectList
           activeThreadId={activeThreadId}
           onProjectSelect={onNavigate}
@@ -30,9 +33,9 @@ function ThreadList({
 export default definePluginApp((app) => {
   app.slots.experimental_threadList({
     id: "thread-list",
-    title: "Thread List Plus",
+    title: "Studio Sidebar",
     description:
-      "Pinned threads, custom sections, projects, machines, and nested threads.",
+      "Studio apps' sections above your threads: pinned threads, custom sections, projects, machines, and nested threads.",
     component: ThreadList,
   });
 });

@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
-import { MIGRATIONS, TagStore, tagName } from "./tags";
+import { MIGRATIONS } from "./migrations";
+import { TagStore, tagName } from "./tags";
 
 function store() {
   const db = new Database(":memory:");

@@ -7,14 +7,17 @@
 // - Studio can hide the add-ons' own sidebar entries, since its collection
 //   lists their items (src/sidebar.ts).
 // - Studio keeps tags, which group items across add-ons (src/tags.ts).
+// - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { relativeTime, untitled } from "@bb-studio/kit/format";
 import { z } from "zod";
-import { rpcContract, type SidebarView } from "./src/contract";
+import { rpcContract, TABS_CHANNEL, type SidebarView, type TabView } from "./src/contract";
 import { errorText, StudioHub, type HubItem } from "./src/hub";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
-import { MIGRATIONS, TagStore, type ItemRef, type Tag } from "./src/tags";
+import { MIGRATIONS } from "./src/migrations";
+import { itemAtPath, TabStore } from "./src/tabs";
+import { TagStore, type ItemRef, type Tag } from "./src/tags";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
@@ -25,14 +28,24 @@ export default async function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
+  const tabs = new TabStore(db);
+  /** Every window's sidebar refetches its tabs. */
+  const tabsChanged = () => bb.realtime.publish(TABS_CHANNEL, {});
 
-  /** Every item with its tag ids; tags on items a provider no longer lists are dropped. */
+  /**
+   * Every item with its tag ids. Tags and tabs of items a provider no longer
+   * lists are dropped; a provider that is down keeps them.
+   */
   const overview = async () => {
     const result = await hub.overview();
+    let closed = false;
     for (const provider of result.providers) {
       if (provider.state !== "ready") continue;
-      tags.prune(provider.pluginId, new Set(result.items.filter((item) => item.pluginId === provider.pluginId).map((item) => item.id)));
+      const live = new Set(result.items.filter((item) => item.pluginId === provider.pluginId).map((item) => item.id));
+      tags.prune(provider.pluginId, live);
+      closed = tabs.prune(provider.pluginId, live) || closed;
     }
+    if (closed) tabsChanged();
     const assigned = tags.assignments();
     return {
       providers: result.providers,
@@ -42,6 +55,17 @@ export default async function plugin(bb: BbPluginApi) {
   };
   /** Open collections refetch, as when an add-on's items change. */
   const tagsChanged = () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
+
+  const tabViews = ({ providers, items }: Awaited<ReturnType<typeof overview>>): TabView[] => {
+    const kindIcons = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.icon])));
+    const byKey = new Map(items.map((item) => [`${item.pluginId}:${item.id}`, item]));
+    // A tab whose add-on is down stays open but isn't shown until it's back.
+    return tabs.list().flatMap((ref) => {
+      const item = byKey.get(`${ref.pluginId}:${ref.id}`);
+      if (!item) return [];
+      return [{ pluginId: item.pluginId, id: item.id, title: untitled(item.title), icon: item.icon, kindIcon: kindIcons.get(`${item.pluginId}:${item.kind}`) ?? "File", href: item.href }];
+    });
+  };
 
   const addonPanels = async () =>
     (await hub.providers())
@@ -64,6 +88,7 @@ export default async function plugin(bb: BbPluginApi) {
     remove: async ({ pluginId, ids }) => {
       const result = await hub.call(pluginId, "studio_delete", { ids });
       tags.forget(pluginId, result.done);
+      if (tabs.forget(pluginId, result.done)) tabsChanged();
       return result;
     },
     action: ({ pluginId, action, ids }) => hub.call(pluginId, "studio_action", { action, ids }),
@@ -92,6 +117,21 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true };
     },
     sidebar: () => readSidebar(),
+    tabs: async () => ({ tabs: tabViews(await overview()) }),
+    visitTab: async ({ path }) => {
+      if (!path.startsWith("/plugins/") || path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`)) return { tab: null };
+      const data = await overview();
+      const item = itemAtPath(data.items, path);
+      if (!item) return { tab: null };
+      if (tabs.open(item)) tabsChanged();
+      return { tab: tabViews(data).find((each) => each.pluginId === item.pluginId && each.id === item.id) ?? null };
+    },
+    closeTabs: ({ items }) => {
+      let closed = false;
+      for (const item of items) closed = tabs.close(item) || closed;
+      if (closed) tabsChanged();
+      return { ok: true };
+    },
     setSidebar: async ({ visible: show }) => {
       const ids = (await addonPanels()).map((panel) => panel.id);
       // Another window can change the sidebar between our read and write; a

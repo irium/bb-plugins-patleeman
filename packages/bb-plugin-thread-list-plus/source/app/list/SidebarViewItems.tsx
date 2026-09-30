@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { showSidebarSection, useHiddenSidebarSections } from "@bb-studio/kit/app";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Icon } from "@/components/ui/icon";
 import {
@@ -86,6 +87,7 @@ export function SidebarHeaderMenuContents({
         <Icon name="SectionAdd" />
         New section
       </DropdownMenuItem>
+      <HiddenStudioSectionItems />
       <DropdownMenuSeparator />
       {(
         [
@@ -136,6 +138,20 @@ export function SidebarHeaderMenuContents({
       )}
     </>
   );
+}
+
+/** Studio sections the user hid from their own ⋯ menu. */
+function HiddenStudioSectionItems() {
+  const hidden = useHiddenSidebarSections();
+  return hidden.map((section) => (
+    <DropdownMenuItem
+      key={section.key}
+      onSelect={() => showSidebarSection(section.key)}
+    >
+      <Icon name="Eye" />
+      Show {section.title}
+    </DropdownMenuItem>
+  ));
 }
 
 function SidebarViewItems({ page }: { page: SidebarViewPage }) {

@@ -2,5 +2,4 @@ node_modules/
 .pnpm-store/
 pnpm-debug.log*
 packages/*/dist/
-!packages/bb-plugin-thread-list-plus/dist/
 .DS_Store

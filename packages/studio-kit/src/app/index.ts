@@ -1,5 +1,5 @@
-// The Studio frontend kit: the shared collection, item header, and the
-// pieces both are built from.
+// The Studio frontend kit: the shared collection, item header, sidebar
+// sections, and the pieces they are built from.
 export {
   CollectionPage,
   itemKey,
@@ -34,6 +34,24 @@ export {
   type Project,
 } from "./pieces";
 export { useStudioPresent } from "./presence";
+export {
+  SIDEBAR_ROW,
+  SIDEBAR_ROW_SELECTED,
+  SidebarAnchors,
+  SidebarDisplayMenuItems,
+  SidebarGroupHeading,
+  SidebarNote,
+  SidebarPortal,
+  SidebarSection,
+  showSidebarSection,
+  useHiddenSidebarSections,
+  useSidebarDisplay,
+  useSidebarHosted,
+  useSidebarNavigated,
+  type SidebarDirection,
+  type SidebarDisplay,
+  type SidebarSectionAction,
+} from "./sidebar";
 export {
   DropdownMenu,
   DropdownMenuContent,

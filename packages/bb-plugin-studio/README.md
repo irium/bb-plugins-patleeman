@@ -28,6 +28,12 @@ the kind filters and New menu in the header.
   **New thread** that mentions them, move them to a project, archive, or
   delete. Actions an add-on defines, like Talk's "Copy transcripts" or Draw's
   "Copy text", appear when the selection is all that kind.
+- **Tabs in the sidebar.** With [Studio Sidebar](../bb-plugin-thread-list-plus)
+  as the thread list, each Studio item you open gets a tab in a Studio section
+  above your threads. × or middle-click closes a tab; closing the one on
+  screen opens the next. The section's ⋯ menu groups tabs by app, sorts them,
+  and closes other or all tabs. Studio keeps the tabs, so every window shows
+  the same ones, and closes tabs of deleted items.
 - **New ▾** creates any kind an installed add-on offers, in the current
   project.
 - **Takes over from the add-ons.** With Studio installed, each add-on's own
@@ -55,7 +61,7 @@ bb studio providers
   relays that over realtime and the open collection refetches.
 - A stopped or failing add-on shows up as unavailable instead of breaking the
   collection.
-- Studio stores only tags, keyed by `<plugin id>:<item id>`, so add-ons
+- Studio stores only tags and open tabs, keyed by `<plugin id>:<item id>`, so add-ons
   don't need to know about them. Tags on items an add-on no longer lists are
   dropped. Each add-on owns its data, editors, tools, CLI and mentions.
 

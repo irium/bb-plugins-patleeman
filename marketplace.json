@@ -480,11 +480,12 @@
     },
     {
       "id": "thread-list-plus",
-      "displayName": "Thread List Plus",
-      "description": "BB's thread list with project creation in its actions menu.",
+      "displayName": "Studio Sidebar",
+      "description": "BB's thread list with a section for each Studio app above your threads, and New project in its menu.",
       "icon": "ListView",
       "tags": [
         "sidebar",
+        "studio",
         "threads",
         "projects"
       ],
