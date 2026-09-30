@@ -644,12 +644,13 @@ async function ensureChrome() {
     const started = Date.now();
     while (Date.now() - started < 20000) {
       try {
-        return { webSocketUrl: await findPageTarget(), process: chromeProcess };
+        return { webSocketUrl: await findPageTarget(), process: chromeProcess, profileDir };
       } catch {
         await sleep(250);
       }
     }
     chromeProcess.kill();
+    await rm(profileDir, { recursive: true, force: true });
     throw new Error(`Timed out waiting for Chrome DevTools on port ${cdpPort}`);
   }
 }
@@ -1757,7 +1758,7 @@ const captures = [
   },
 ];
 
-const { webSocketUrl, process: chromeProcess } = await ensureChrome();
+const { webSocketUrl, process: chromeProcess, profileDir } = await ensureChrome();
 const client = new CdpClient(webSocketUrl);
 await client.connect();
 await client.command("Emulation.setDeviceMetricsOverride", {
@@ -1794,5 +1795,11 @@ try {
   }
 } finally {
   client.socket?.close();
-  if (chromeProcess) chromeProcess.kill();
+  if (chromeProcess) {
+    // Chrome holds its profile open until it exits.
+    const exited = new Promise((resolve) => chromeProcess.once("exit", resolve));
+    chromeProcess.kill();
+    await Promise.race([exited, sleep(5000)]);
+  }
+  if (profileDir) await rm(profileDir, { recursive: true, force: true });
 }
