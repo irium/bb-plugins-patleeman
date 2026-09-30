@@ -5,21 +5,22 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "lib": ["ES2022", "DOM"],
-    "types": ["node"],
-    "paths": {
-      "@bb/plugin-sdk": ["./types/bb-plugin-sdk.d.ts"],
-      "@bb/plugin-sdk/app": ["./types/bb-plugin-sdk-app.d.ts"],
-      "@/*": ["./*"]
-    },
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node"
+    ],
     "noEmit": true,
     "skipLibCheck": true
   },
   "include": [
     "server.ts",
     "app.tsx",
-    "types",
     "components",
-    "lib"
+    "lib",
+    "src"
   ]
 }

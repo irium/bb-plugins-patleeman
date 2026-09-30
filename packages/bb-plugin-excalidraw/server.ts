@@ -1,17 +1,20 @@
-// bb-plugin-excalidraw — create, edit, and attach Excalidraw drawings.
+// Studio Draw (plugin id `excalidraw`): create, edit, and attach Excalidraw
+// drawings.
 //
 // Backend entry. Drawings live in the plugin's SQLite database as serialized
-// Excalidraw scenes (the same JSON shape Excalidraw's "save to file" uses).
-// The frontend renders/edits with the real @excalidraw/excalidraw component
-// and autosaves through the rpc contract below.
+// Excalidraw scenes (see src/server/store.ts). The frontend renders and
+// edits them with the real @excalidraw/excalidraw component and autosaves
+// through the rpc contract below. With BB Studio installed, drawings also
+// list in Studio's collection (src/server/studio.ts).
 //
 // Attaching to conversations is supported two ways:
 //   - mention provider `@drawing` — pick a drawing in any composer; at send
 //     time the agent receives the drawing's scene as context.
 //   - `attachDrawingImage` rpc — the frontend renders the scene to a PNG and
 //     the server uploads it as a project prompt attachment.
-import { randomUUID } from "node:crypto";
-import { defineRpcContract, type BbPluginApi } from "@bb/plugin-sdk";
+import { studioSchemas } from "@bb-studio/kit/contract";
+import { createStudioNotifier } from "@bb-studio/kit/server";
+import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { mentionContext as buildMentionContext } from "./lib/mention";
 import {
@@ -24,10 +27,11 @@ import {
   type SceneElement,
   type StoredScene,
 } from "./lib/merge";
+import { DRAWING_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, drawingHref } from "./src/shared";
+import { registerStudio } from "./src/server/studio";
+import { DrawingStore, MIGRATIONS, displayName, toMeta, type DrawingRow, type Writer } from "./src/server/store";
+import { sceneThumbnail } from "./src/server/thumbnail";
 
-/** Realtime channel: the server pushes scene updates to open editors. */
-const REALTIME_CHANNEL = "excalidraw";
-const DRAWING_UPDATE_TYPE = "drawing:updated";
 const MAX_TOOL_SCENE_CHARS = 400_000;
 
 const drawingMetaSchema = z.object({
@@ -36,6 +40,8 @@ const drawingMetaSchema = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   elementCount: z.number(),
+  projectId: z.string().nullable(),
+  archived: z.boolean(),
 });
 
 const drawingFullSchema = z.object({
@@ -43,9 +49,12 @@ const drawingFullSchema = z.object({
   name: z.string(),
   createdAt: z.number(),
   updatedAt: z.number(),
+  projectId: z.string().nullable(),
   /** Serialized Excalidraw scene JSON (elements/appState/files). */
   data: z.string(),
 });
+
+const nameSchema = z.string().trim().max(200);
 
 export const rpcContract = defineRpcContract({
   listDrawings: {
@@ -53,7 +62,12 @@ export const rpcContract = defineRpcContract({
     output: z.object({ drawings: z.array(drawingMetaSchema) }),
   },
   createDrawing: {
-    input: z.object({ name: z.string().min(1).max(200) }),
+    input: z.object({
+      name: nameSchema,
+      projectId: z.string().min(1).max(200).nullable().optional(),
+      /** Files the drawing under this thread's project. */
+      threadId: z.string().min(1).max(200).optional(),
+    }),
     output: z.object({ drawing: drawingMetaSchema }),
   },
   getDrawing: {
@@ -67,9 +81,13 @@ export const rpcContract = defineRpcContract({
   saveDrawing: {
     input: z.object({
       id: z.string(),
-      name: z.string().min(1).max(200).optional(),
+      name: nameSchema.optional(),
       data: z.string(),
     }),
+    output: z.object({ ok: z.boolean(), updatedAt: z.number() }),
+  },
+  renameDrawing: {
+    input: z.object({ id: z.string(), name: nameSchema }),
     output: z.object({ ok: z.boolean(), updatedAt: z.number() }),
   },
   deleteDrawing: {
@@ -95,79 +113,50 @@ export const rpcContract = defineRpcContract({
   },
 });
 
-type DrawingRow = {
-  id: string;
-  name: string;
-  data: string;
-  created_at: number;
-  updated_at: number;
-};
-
-function toMeta(row: DrawingRow) {
-  return {
-    id: row.id,
-    name: row.name,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    elementCount: elementCount(parseSceneData(row.data)),
-  };
-}
-
 export default async function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
-  bb.storage.migrate(db, [
-    `CREATE TABLE IF NOT EXISTS drawings (
-       id TEXT PRIMARY KEY,
-       name TEXT NOT NULL,
-       data TEXT NOT NULL DEFAULT '{}',
-       created_at INTEGER NOT NULL,
-       updated_at INTEGER NOT NULL
-     )`,
-  ]);
+  bb.storage.migrate(db, MIGRATIONS);
+  const store = new DrawingStore(db);
 
-  const getRow = (id: string): DrawingRow | null =>
-    (db.prepare("SELECT * FROM drawings WHERE id = ?").get(id) as
-      | DrawingRow
-      | undefined) ?? null;
+  const studio = studioSchemas(z);
+  // Agents write drawings a few elements at a time; Studio only needs to hear about it now and then.
+  const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: PLUGIN_ID, schemas: studio, delayMs: 1500 });
 
-  /** Write a drawing row, bumping updated_at, and notify open editors. */
-  function writeDrawing(
-    row: DrawingRow,
-    data: string,
-    by: "editor" | "agent" | "cli" | "app",
-    opts: { name?: string } = {},
-  ): number {
-    const now = Date.now();
-    db.prepare(
-      "UPDATE drawings SET name = ?, data = ?, updated_at = ? WHERE id = ?",
-    ).run(opts.name ?? row.name, data, now, row.id);
+  /** Tells open editors, galleries, and Studio that a drawing changed. */
+  function changed(id: string, updatedAt: number, by: Writer | "studio") {
     try {
-      bb.realtime.publish(REALTIME_CHANNEL, {
-        type: DRAWING_UPDATE_TYPE,
-        drawingId: row.id,
-        updatedAt: now,
-        by,
-      });
+      bb.realtime.publish(REALTIME_CHANNEL, { type: DRAWING_UPDATE_TYPE, drawingId: id, updatedAt, by });
     } catch {
       // publishing is best-effort; editors also poll
     }
-    return now;
+    studioNotifier.changed();
   }
 
-  /** New empty scene in Excalidraw's file shape. */
-  function emptySceneData(): string {
-    return serializeSceneData({
-      elements: [],
-      appState: { viewBackgroundColor: "#ffffff" },
-      files: {},
-    });
+  function mustGet(id: string): DrawingRow {
+    const row = store.get(id);
+    if (!row) throw new Error(`Drawing ${id} not found`);
+    return row;
+  }
+
+  function create(name: string, by: Writer, projectId: string | null = null): DrawingRow {
+    const row = store.create({ name, projectId, by });
+    changed(row.id, row.updated_at, by);
+    return row;
+  }
+
+  /** Writes a scene and notifies. Returns the new revision. */
+  function write(row: DrawingRow, scene: StoredScene, by: Writer, options: { name?: string } = {}): number {
+    const updatedAt = store.write(row.id, serializeSceneData(scene), by, options);
+    changed(row.id, updatedAt, by);
+    return updatedAt;
+  }
+
+  function remove(id: string, by: Writer) {
+    if (store.delete(id)) changed(id, Date.now(), by);
   }
 
   /** Human-readable one-line summary of a scene (agent tool results). */
-  function sceneSummary(
-    scene: StoredScene | null,
-    fallback = "empty drawing",
-  ): string {
+  function sceneSummary(scene: StoredScene | null, fallback = "empty drawing"): string {
     const elements = getNonDeletedElements(scene);
     if (!elements.length) return fallback;
     const byType = new Map<string, number>();
@@ -183,23 +172,14 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.rpc.register(rpcContract, {
     listDrawings() {
-      const rows = db
-        .prepare("SELECT * FROM drawings ORDER BY updated_at DESC")
-        .all() as DrawingRow[];
-      return { drawings: rows.map(toMeta) };
+      return { drawings: store.list().map(toMeta) };
     },
-    createDrawing({ name }) {
-      const id = randomUUID();
-      const now = Date.now();
-      const data = emptySceneData();
-      db.prepare(
-        "INSERT INTO drawings (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-      ).run(id, name, data, now, now);
-      writeDrawing(getRow(id)!, data, "app");
-      return { drawing: toMeta(getRow(id)!) };
+    async createDrawing({ name, projectId, threadId }) {
+      const project = threadId ? (await bb.sdk.threads.get({ threadId })).projectId : (projectId ?? null);
+      return { drawing: toMeta(create(name, "app", project)) };
     },
     getDrawing({ id }) {
-      const row = getRow(id);
+      const row = store.get(id);
       if (!row) return { drawing: null };
       return {
         drawing: {
@@ -207,34 +187,35 @@ export default async function plugin(bb: BbPluginApi) {
           name: row.name,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
+          projectId: row.project_id,
           data: row.data,
         },
       };
     },
     /** Cheap per-drawing revision check for the editor's polling fallback. */
     getDrawingUpdatedAt({ id }) {
-      const row = getRow(id);
-      return { updatedAt: row?.updated_at ?? 0 };
+      return { updatedAt: store.get(id)?.updated_at ?? 0 };
     },
     saveDrawing({ id, name, data }) {
-      const row = getRow(id);
-      if (!row) throw new Error(`Drawing ${id} not found`);
+      const row = mustGet(id);
       // Multi-writer merge: element-level union, higher `version` wins,
       // tombstones preserved — so concurrent user edits and agent writes
       // both survive instead of last-writer-wins clobbering.
-      const merged = mergeFullScene(row.data, data);
-      const updatedAt = writeDrawing(row, serializeSceneData(merged), "editor", {
-        name,
-      });
+      const updatedAt = write(row, mergeFullScene(row.data, data), "editor", { name });
+      return { ok: true, updatedAt };
+    },
+    renameDrawing({ id, name }) {
+      mustGet(id);
+      const updatedAt = store.rename(id, name, "editor");
+      changed(id, updatedAt, "editor");
       return { ok: true, updatedAt };
     },
     deleteDrawing({ id }) {
-      db.prepare("DELETE FROM drawings WHERE id = ?").run(id);
+      remove(id, "app");
       return { ok: true };
     },
     async attachDrawingImage({ threadId, drawingId, pngBase64 }) {
-      const row = getRow(drawingId);
-      if (!row) throw new Error(`Drawing ${drawingId} not found`);
+      const row = mustGet(drawingId);
       const bytes = new Uint8Array(Buffer.from(pngBase64, "base64"));
       if (!bytes.length) throw new Error("Empty image payload");
 
@@ -254,20 +235,39 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true };
     },
     async pickDrawing({ threadId }) {
-      const rows = db
-        .prepare("SELECT * FROM drawings ORDER BY updated_at DESC")
-        .all() as DrawingRow[];
       const result = await bb.ui.requestInput({
         threadId,
         rendererId: "excalidraw-picker",
         title: "Attach a drawing",
-        payload: { drawings: rows.map(toMeta) },
+        payload: { drawings: store.list().map(toMeta) },
         timeoutMs: 300_000,
       });
       if (result.outcome === "cancelled") return { drawingId: null };
       const value = result.value as { drawingId?: string };
       return { drawingId: value?.drawingId ?? null };
     },
+  });
+
+  registerStudio(bb, studio, {
+    store,
+    changed: (id) => changed(id, store.get(id)?.updated_at ?? Date.now(), "studio"),
+  });
+
+  // Thumbnails for Studio's cards. The URL carries the revision, so a
+  // response never goes stale.
+  bb.http.route("GET", "/thumbnail", (context) => {
+    const row = store.get(context.req.query("drawing") ?? "");
+    const svg = row ? sceneThumbnail(parseSceneData(row.data)) : null;
+    if (!svg) return context.text("Not found", 404);
+    return new Response(svg, {
+      headers: {
+        "content-type": "image/svg+xml; charset=utf-8",
+        "cache-control": "private, max-age=31536000, immutable",
+        // The SVG is built from scene data; never let it run anything.
+        "content-security-policy": "default-src 'none'; img-src data:; style-src 'unsafe-inline'",
+        "x-content-type-options": "nosniff",
+      },
+    });
   });
 
   // ---------------------------------------------------------------------
@@ -289,15 +289,13 @@ export default async function plugin(bb: BbPluginApi) {
       "List Excalidraw drawings in the user's bb workspace (id, name, element count, last updated). Use when the user asks you to work with or edit an Excalidraw drawing.",
     parameters: z.object({}),
     execute() {
-      const rows = db
-        .prepare("SELECT * FROM drawings ORDER BY updated_at DESC")
-        .all() as DrawingRow[];
+      const rows = store.list();
       if (!rows.length) {
         return "No Excalidraw drawings yet. Use excalidraw_create_drawing to make one.";
       }
       const lines = rows.map((r) => {
         const m = toMeta(r);
-        return `- ${m.name} (id ${m.id}) — ${m.elementCount} element(s), updated ${new Date(m.updatedAt).toISOString()}`;
+        return `- ${displayName(r)} (id ${m.id}) — ${m.elementCount} element(s), updated ${new Date(m.updatedAt).toISOString()}, link ${drawingHref(m.id)}`;
       });
       return `Excalidraw drawings:\n${lines.join("\n")}`;
     },
@@ -309,7 +307,7 @@ export default async function plugin(bb: BbPluginApi) {
       "Read the current scene of an Excalidraw drawing: element JSON, appState, files, plus a text summary. Always call this immediately before editing so you see the user's latest changes. To edit, use excalidraw_update_drawing.",
     parameters: z.object({ drawingId: z.string().min(1) }),
     execute({ drawingId }) {
-      const row = getRow(drawingId);
+      const row = store.get(drawingId);
       if (!row) {
         return {
           content: [{ type: "text", text: `Drawing ${drawingId} not found.` }],
@@ -321,7 +319,7 @@ export default async function plugin(bb: BbPluginApi) {
       const payload = {
         drawing: {
           id: row.id,
-          name: row.name,
+          name: displayName(row),
           elementCount: clean.length,
           updatedAt: row.updated_at,
           summary: sceneSummary(scene, "empty drawing"),
@@ -340,7 +338,7 @@ export default async function plugin(bb: BbPluginApi) {
           .map((el) => (typeof el.id === "string" ? el.id : "?"))
           .join(", ");
         return [
-          `Drawing "${row.name}" (id ${row.id}) has ${clean.length} element(s); scene JSON is ${json.length} bytes — too large to inline.`,
+          `Drawing "${displayName(row)}" (id ${row.id}) has ${clean.length} element(s); scene JSON is ${json.length} bytes — too large to inline.`,
           sceneSummary(scene, "empty drawing"),
           `Element ids (in z-order):\n${ids}`,
           `To edit, pass element ids in excalidraw_update_drawing. Raw scene: bb excalidraw show ${row.id}`,
@@ -353,17 +351,11 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "excalidraw_create_drawing",
     description:
-      "Create a new empty Excalidraw drawing and return its id and name. The user can open it from Drawings.",
+      "Create a new empty Excalidraw drawing and return its id, name, and link. The user can open it from Drawings, or from Studio when it's installed.",
     parameters: z.object({ name: z.string().min(1).max(200) }),
     execute({ name }) {
-      const id = randomUUID();
-      const now = Date.now();
-      const data = emptySceneData();
-      db.prepare(
-        "INSERT INTO drawings (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-      ).run(id, name, data, now, now);
-      writeDrawing(getRow(id)!, data, "agent");
-      return `Created Excalidraw drawing "${name}" (id ${id}).`;
+      const row = create(name, "agent");
+      return `Created Excalidraw drawing "${name}" (id ${row.id}). Link: [${name.replace(/[[\]]/g, "")}](${drawingHref(row.id)})`;
     },
   });
 
@@ -379,7 +371,7 @@ export default async function plugin(bb: BbPluginApi) {
       files: z.record(z.string(), z.unknown()).optional(),
     }),
     execute({ drawingId, elements, deletedElementIds, appState, files }) {
-      const row = getRow(drawingId);
+      const row = store.get(drawingId);
       if (!row) {
         return {
           content: [{ type: "text", text: `Drawing ${drawingId} not found.` }],
@@ -405,10 +397,10 @@ export default async function plugin(bb: BbPluginApi) {
         appState,
         files,
       });
-      const updatedAt = writeDrawing(row, serializeSceneData(merged), "agent");
+      const updatedAt = write(row, merged, "agent");
       const clean = getNonDeletedElements(merged);
       return [
-        `Updated drawing "${row.name}" (id ${row.id}) — now ${clean.length} element(s): ${sceneSummary(merged)}.`,
+        `Updated drawing "${displayName(row)}" (id ${row.id}) — now ${clean.length} element(s): ${sceneSummary(merged)}.`,
         `- upserted ${elements?.length ?? 0} element(s), deleted ${deletedElementIds?.length ?? 0} element(s)`,
         `- saved at ${new Date(updatedAt).toISOString()}`,
         `The user's open editor has been notified and shows the change live.`,
@@ -434,22 +426,20 @@ export default async function plugin(bb: BbPluginApi) {
     id: "drawing",
     label: "Drawings",
     search({ query }) {
-      const rows = db
-        .prepare("SELECT * FROM drawings ORDER BY updated_at DESC LIMIT 50")
-        .all() as DrawingRow[];
       const q = query.trim().toLowerCase();
-      return rows
-        .filter((r) => !q || r.name.toLowerCase().includes(q))
+      return store
+        .list({ limit: 50 })
+        .filter((r) => !q || displayName(r).toLowerCase().includes(q))
         .map((r) => ({
           id: r.id,
-          title: "Drawing",
+          title: displayName(r),
           subtitle: `${toMeta(r).elementCount} elements`,
         }));
     },
     resolve(itemId) {
-      const row = getRow(itemId);
+      const row = store.get(itemId);
       if (!row) throw new Error(`Excalidraw drawing ${itemId} not found`);
-      return { context: buildMentionContext(row) };
+      return { context: buildMentionContext({ ...row, name: displayName(row) }) };
     },
   });
 
@@ -495,13 +485,11 @@ export default async function plugin(bb: BbPluginApi) {
       const [cmd, ...rest] = argv;
       switch (cmd) {
         case "list": {
-          const rows = db
-            .prepare("SELECT * FROM drawings ORDER BY updated_at DESC")
-            .all() as DrawingRow[];
+          const rows = store.list();
           if (!rows.length) return { exitCode: 0, stdout: "No drawings yet.\n" };
           const lines = rows.map((r) => {
             const meta = toMeta(r);
-            return `${meta.id}\t${meta.name}\t${meta.elementCount} elements\t${new Date(meta.updatedAt).toISOString()}`;
+            return `${meta.id}\t${displayName(r)}\t${meta.elementCount} elements\t${new Date(meta.updatedAt).toISOString()}`;
           });
           return { exitCode: 0, stdout: lines.join("\n") + "\n" };
         }
@@ -513,33 +501,28 @@ export default async function plugin(bb: BbPluginApi) {
               stderr: "usage: bb excalidraw create <name>\n",
             };
           }
-          const id = randomUUID();
-          const now = Date.now();
-          const data = emptySceneData();
-          db.prepare(
-            "INSERT INTO drawings (id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-          ).run(id, name, data, now, now);
-          writeDrawing(getRow(id)!, data, "cli");
-          return { exitCode: 0, stdout: `${id}\t${name}\n` };
+          const row = create(name, "cli");
+          return { exitCode: 0, stdout: `${row.id}\t${name}\n` };
         }
         case "show": {
           const [id, flag] = rest;
           if (!id) {
             return { exitCode: 1, stderr: "usage: bb excalidraw show <id> [--raw]\n" };
           }
-          const row = getRow(id);
+          const row = store.get(id);
           if (!row) {
             return { exitCode: 1, stderr: `Drawing ${id} not found\n` };
           }
           // Default view filters tombstones (deleted elements) so agents and
           // humans reason about the live drawing; --raw dumps everything.
+          const scene = parseSceneData(row.data);
           const out =
             flag === "--raw"
               ? row.data
               : serializeSceneData({
-                  elements: getNonDeletedElements(parseSceneData(row.data)),
-                  appState: parseSceneData(row.data)?.appState ?? {},
-                  files: parseSceneData(row.data)?.files ?? {},
+                  elements: getNonDeletedElements(scene),
+                  appState: scene?.appState ?? {},
+                  files: scene?.files ?? {},
                 });
           const printed =
             out.length > 900_000
@@ -556,13 +539,10 @@ export default async function plugin(bb: BbPluginApi) {
               stderr: "usage: bb excalidraw rename <id> <new-name>\n",
             };
           }
-          const row = getRow(id);
-          if (!row) {
+          if (!store.get(id)) {
             return { exitCode: 1, stderr: `Drawing ${id} not found\n` };
           }
-          db.prepare(
-            "UPDATE drawings SET name = ?, updated_at = ? WHERE id = ?",
-          ).run(name, Date.now(), id);
+          changed(id, store.rename(id, name, "cli"), "cli");
           return { exitCode: 0, stdout: `renamed ${id} → ${name}\n` };
         }
         case "delete": {
@@ -570,7 +550,7 @@ export default async function plugin(bb: BbPluginApi) {
           if (!id) {
             return { exitCode: 1, stderr: "usage: bb excalidraw delete <id>\n" };
           }
-          db.prepare("DELETE FROM drawings WHERE id = ?").run(id);
+          remove(id, "cli");
           return { exitCode: 0, stdout: `deleted ${id}\n` };
         }
         case "merge": {
@@ -581,7 +561,7 @@ export default async function plugin(bb: BbPluginApi) {
               stderr: "usage: bb excalidraw merge <id> <scene-file.json>\n",
             };
           }
-          const row = getRow(id);
+          const row = store.get(id);
           if (!row) {
             return { exitCode: 1, stderr: `Drawing ${id} not found\n` };
           }
@@ -609,7 +589,7 @@ export default async function plugin(bb: BbPluginApi) {
               typeof (el as SceneElement).id === "string",
           );
           const merged = applyElementUpserts(row.data, upserts);
-          const updatedAt = writeDrawing(row, serializeSceneData(merged), "cli");
+          const updatedAt = write(row, merged, "cli");
           return {
             exitCode: 0,
             stdout: `merged ${upserts.length} element(s) into ${id}; now ${elementCount(
@@ -626,14 +606,14 @@ export default async function plugin(bb: BbPluginApi) {
                 "usage: bb excalidraw remove-elements <id> <element-id> [<element-id>…]\n",
             };
           }
-          const row = getRow(id);
+          const row = store.get(id);
           if (!row) {
             return { exitCode: 1, stderr: `Drawing ${id} not found\n` };
           }
           const merged = applyElementUpserts(row.data, [], {
             deletedElementIds: elementIds,
           });
-          const updatedAt = writeDrawing(row, serializeSceneData(merged), "cli");
+          const updatedAt = write(row, merged, "cli");
           return {
             exitCode: 0,
             stdout: `deleted ${elementIds.length} element(s) from ${id}; now ${elementCount(
@@ -652,6 +632,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.onDispose(() => {
+    studioNotifier.dispose();
     bb.log.info("disposed");
   });
 }

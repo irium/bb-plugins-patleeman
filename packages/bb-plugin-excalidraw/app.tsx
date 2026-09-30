@@ -1,33 +1,38 @@
 // bb-plugin-excalidraw — frontend entry.
 //
 // Surfaces:
-//   - navPanel "Drawings": full drawing gallery + editor (create/edit).
-//   - threadPanelAction "Drawings": the same gallery/editor inside a
-//     thread's right panel, where "Attach image" attaches the rendered
-//     drawing to that conversation.
+//   - navPanel "Drawings": Studio's collection of drawings, and the editor
+//     at drawings/<id>. With Studio installed, Studio's page takes over.
+//   - threadPanelAction "Drawings": a gallery and editor inside a thread's
+//     right panel, where "Attach" adds the rendered drawing to that
+//     conversation.
 //   - composer `+` menu → "Drawing": pick a drawing (host picker)
 //     and upload it as a rendered image attachment for the current conversation.
 //   - mention provider (server): `@drawing` works in every composer.
 import { useState } from "react";
 import { toast } from "sonner";
+import { errorMessage } from "@bb-studio/kit/format";
 import {
   definePluginApp,
   type PluginComposerScope,
-} from "@bb/plugin-sdk/app";
+} from "@get-bb/plugin-sdk/app";
 import { DrawingGallery } from "./components/drawing-gallery";
 import { DrawingEditor } from "./components/drawing-editor";
+import { DrawingsPanel } from "./components/drawings-panel";
 import { ExcalidrawPicker } from "./components/excalidraw-picker";
 import { createExcalidrawComposerCustomization } from "./lib/composer-registration";
 import { blobToBase64, parseScene, renderSceneToPng } from "./lib/scene";
 import { callRpc } from "./lib/rpc";
+import { DRAW_ICON, PANEL_PATH } from "./src/shared";
 
-function DrawingsSurface({ threadId }: { threadId?: string | null }) {
+function DrawingsSurface({ threadId }: { threadId: string }) {
   const [openId, setOpenId] = useState<string | null>(null);
   if (openId) {
     return (
       <DrawingEditor
         drawingId={openId}
         threadId={threadId}
+        backLabel="Drawings"
         onBack={() => setOpenId(null)}
       />
     );
@@ -54,7 +59,7 @@ async function attachFromComposer(scope: PluginComposerScope) {
     });
     toast.success("Drawing PNG attached");
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : "Attach failed");
+    toast.error(errorMessage(error));
   }
 }
 
@@ -62,17 +67,19 @@ export default definePluginApp((app) => {
   app.slots.navPanel({
     id: "drawings",
     title: "Drawings",
-    icon: "PenTool",
-    path: "drawings",
-    component: () => <DrawingsSurface />,
+    icon: DRAW_ICON,
+    path: PANEL_PATH,
+    component: ({ subPath }) => <DrawingsPanel subPath={subPath ?? ""} />,
   });
 
   app.slots.threadPanelAction({
     id: "excalidraw",
     title: "Drawings",
-    icon: "PenTool",
+    icon: DRAW_ICON,
     layout: "flush",
-    run: async ({ openPanel }) => openPanel({ title: "Drawings" }),
+    run: async ({ openPanel }) => {
+      await openPanel({ title: "Drawings" });
+    },
     component: ({ threadId }) => <DrawingsSurface threadId={threadId} />,
   });
 

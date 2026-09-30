@@ -1,7 +1,7 @@
-// Full Excalidraw editor: loads a drawing, autosaves (debounced, ordered),
-// and offers attach actions — "Attach image" renders the live scene to a
-// PNG and uploads it as an image attachment; outside a thread, "Add to draft"
-// inserts a @drawing mention pill instead.
+// The full Excalidraw editor: loads a drawing, autosaves (debounced,
+// ordered), follows other writers live, and offers the drawing's actions in
+// Studio's item header. In a thread's panel, "Attach" renders the scene to a
+// PNG and attaches it to that conversation.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -17,13 +17,29 @@ import "../assets/excalidraw/excalidraw.css";
 // the vendored css so the overrides win at equal specificity.
 import "../assets/excalidraw-theme.css";
 import {
-  useComposer,
+  DANGER_BUTTON,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  FLOATING,
+  FLOATING_BUTTON,
+  GHOST_BUTTON,
+  ICON_BUTTON,
+  Icon,
+  ItemHeader,
+  cn,
+} from "@bb-studio/kit/app";
+import { mentionPrompt } from "@bb-studio/kit/contract";
+import { errorMessage } from "@bb-studio/kit/format";
+import {
+  useBbNavigate,
+  useRealtime,
   useRealtimeConnectionState,
   useRpc,
-} from "@bb/plugin-sdk/app";
+} from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../server";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
 import {
   blobToBase64,
   parseScene,
@@ -33,19 +49,28 @@ import {
   useIsDark,
 } from "../lib/scene";
 import { useDrawingSync } from "../lib/sync";
+import { DRAWING_UPDATE_TYPE, REALTIME_CHANNEL, drawingHref } from "../src/shared";
+
+const SPIN = "animate-spin motion-reduce:animate-none";
 
 export function DrawingEditor({
   drawingId,
   threadId,
+  backLabel,
   onBack,
 }: {
   drawingId: string;
+  /** Set in a thread's panel, where the drawing can be attached. */
   threadId?: string | null;
-  onBack?: () => void;
+  backLabel: string;
+  /** `replace` when leaving because the drawing is gone. */
+  onBack: (replace?: boolean) => void;
 }) {
   const rpc = useRpc<typeof rpcContract>();
-  const composer = useComposer();
+  const navigate = useBbNavigate();
   const isDark = useIsDark();
+  const [name, setName] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [initialData, setInitialData] = useState<ExcalidrawInitialDataState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,9 +100,10 @@ export function DrawingEditor({
         if (cancelled) return;
         if (!drawing) {
           toast.error("Drawing not found");
-          onBack?.();
+          onBack(true);
           return;
         }
+        setName(drawing.name);
         const scene = parseScene(drawing.data);
         if (scene) {
           // Scenes stored before the appState fix carry the full runtime
@@ -255,11 +281,11 @@ export function DrawingEditor({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "drawing.png";
+      a.download = `${(name.trim() || "drawing").replace(/[\\/:*?"<>|]+/g, "-")}.png`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Export failed");
+      toast.error(errorMessage(error));
     }
   }
 
@@ -274,16 +300,34 @@ export function DrawingEditor({
       ]);
       toast.success("Image copied to clipboard");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Copy failed",
-      );
+      toast.error(errorMessage(error));
     }
   }
 
-  function addToDraft() {
-    composer.insertMention({ provider: "drawing", id: drawingId, label: "Drawing" });
-    composer.focus();
-    toast.success("Added to the draft");
+  // Deleted elsewhere (Studio, the CLI, another window) while open.
+  useRealtime(REALTIME_CHANNEL, (payload) => {
+    const event = payload as { type?: string; drawingId?: string } | null;
+    if (event?.type !== DRAWING_UPDATE_TYPE || event.drawingId !== drawingId) return;
+    void rpc.call("getDrawingUpdatedAt", { id: drawingId }).then(({ updatedAt }) => {
+      if (updatedAt !== 0) return;
+      pendingRef.current = null;
+      toast.info("This drawing was deleted.");
+      onBack(true);
+    });
+  });
+
+  function rename(next: string) {
+    const trimmed = next.trim();
+    if (trimmed === name.trim()) return;
+    setName(trimmed);
+    void rpc.call("renameDrawing", { id: drawingId, name: trimmed }).catch((error) => toast.error(errorMessage(error)));
+  }
+
+  function newThread() {
+    navigate.toCompose({
+      initialPrompt: mentionPrompt([{ title: name.trim() || "Untitled drawing", href: drawingHref(drawingId) }]),
+      focusPrompt: true,
+    });
   }
 
   async function attachAsImage() {
@@ -297,157 +341,149 @@ export function DrawingEditor({
         drawingId,
         pngBase64,
       });
-      toast.success("Drawing PNG attached");
+      toast.success("Drawing attached");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Attach failed");
+      toast.error(errorMessage(error));
     } finally {
       setAttaching(false);
     }
   }
 
   async function deleteDrawing() {
-    if (!window.confirm("Delete this drawing?")) return;
     try {
+      pendingRef.current = null;
       await rpc.call("deleteDrawing", { id: drawingId });
       toast.success("Drawing deleted");
-      onBack?.();
+      onBack(true);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete");
+      toast.error(errorMessage(error));
     }
   }
 
-  if (loading) {
-    return (
-      <div
-        role="status"
-        className="flex h-full min-h-[300px] items-center justify-center gap-2 bg-background text-sm text-muted-foreground"
-      >
-        <Icon name="Loading" aria-hidden="true" className="h-4 w-4" />
-        Loading drawing…
-      </div>
-    );
-  }
+  const status = (
+    <span
+      role="status"
+      aria-live="polite"
+      title={
+        realtimeState === "connected"
+          ? "Live — agent edits appear here automatically"
+          : "Reconnecting to live sync…"
+      }
+      className="flex h-8 shrink-0 items-center gap-1.5 px-1 text-xs text-muted-foreground max-sm:hidden"
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "size-1.5 rounded-full",
+          realtimeState === "connected" ? "bg-success" : "animate-pulse bg-warning motion-reduce:animate-none",
+        )}
+      />
+      {saving ? "Saving…" : syncedAt ? "Synced" : "Saved"}
+    </span>
+  );
+
+  const trailing = confirmDelete ? (
+    <div className={cn(FLOATING, "flex items-center gap-1.5 rounded-md py-1 pr-1 pl-3 text-sm")}>
+      <span className="max-sm:hidden">Delete this drawing?</span>
+      <button type="button" className={DANGER_BUTTON} onClick={() => void deleteDrawing()}>
+        Delete
+      </button>
+      <button type="button" className={GHOST_BUTTON} onClick={() => setConfirmDelete(false)}>
+        Cancel
+      </button>
+    </div>
+  ) : (
+    <>
+      {threadId ? (
+        <button type="button" className={FLOATING_BUTTON} disabled={attaching} onClick={() => void attachAsImage()}>
+          <Icon name={attaching ? "Loading" : "Paperclip"} className={attaching ? SPIN : undefined} /> Attach
+        </button>
+      ) : (
+        <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
+          <Icon name="MessageSquarePlus" /> New thread
+        </button>
+      )}
+      <button type="button" aria-label="Copy image" title="Copy image" className={ICON_BUTTON} onClick={() => void copyImage()}>
+        <Icon name="Copy" className="size-4" />
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" aria-label="More" className={ICON_BUTTON}>
+            <Icon name="MoreHorizontal" className="size-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          {threadId ? null : (
+            <DropdownMenuItem className="md:hidden" onSelect={newThread}>
+              <Icon name="MessageSquarePlus" className="size-4" /> New thread
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onSelect={() => void downloadPng()}>
+            <Icon name="Download" className="size-4" /> Download PNG
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
+            <Icon name="Trash2" className="size-4" /> Delete…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border bg-background px-2.5 py-2 md:px-3">
-        {onBack && (
-          <span title="Back to drawings" className="mr-1 inline-flex">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              aria-label="Back to drawings"
-              onClick={onBack}
-            >
-              <Icon name="ChevronLeft" aria-hidden="true" />
-            </Button>
-          </span>
-        )}
-        <span
-          title={
-            realtimeState === "connected"
-              ? "Live — agent edits appear here automatically"
-              : "Reconnecting to live sync…"
-          }
-          role="status"
-          aria-live="polite"
-          className="inline-flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1 text-xs text-muted-foreground"
-        >
-          <span
-            className={
-              realtimeState === "connected"
-                ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
-                : "h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500"
-            }
-            aria-hidden="true"
+    <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
+      <ItemHeader
+        className="relative shrink-0 items-center border-b border-border/70"
+        backLabel={backLabel}
+        onBack={() => onBack()}
+        leading={
+          <>
+            <input
+              aria-label="Drawing name"
+              key={`${drawingId}:${name}`}
+              defaultValue={name}
+              placeholder="Untitled drawing"
+              maxLength={200}
+              disabled={loading}
+              className="h-8 w-56 min-w-0 rounded-md bg-transparent px-2 text-sm font-medium outline-none placeholder:text-muted-foreground hover:bg-state-hover focus:bg-state-hover max-md:w-32"
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+                if (event.key === "Escape") {
+                  event.currentTarget.value = name;
+                  event.currentTarget.blur();
+                }
+              }}
+              onBlur={(event) => rename(event.currentTarget.value)}
+            />
+            {loading ? null : status}
+          </>
+        }
+        trailing={trailing}
+      />
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-background">
+        {loading ? (
+          <div role="status" className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Icon name="Loading" className={cn("size-4", SPIN)} /> Loading drawing…
+          </div>
+        ) : (
+          <Excalidraw
+            key={drawingId}
+            initialData={initialData}
+            onChange={handleChange}
+            excalidrawAPI={(api) => {
+              apiRef.current = api;
+            }}
+            theme={isDark ? "dark" : "light"}
+            UIOptions={{
+              canvasActions: {
+                toggleTheme: true,
+                export: false,
+                saveToActiveFile: false,
+                loadScene: false,
+              },
+            }}
           />
-          {saving ? "Saving…" : syncedAt ? "Synced" : "Saved"}
-        </span>
-        <div className="ml-auto flex items-center gap-0.5 rounded-md border border-border p-0.5">
-          {threadId ? (
-            <span title="Attach to conversation" className="inline-flex">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                aria-label="Attach to conversation"
-                disabled={attaching}
-                onClick={() => void attachAsImage()}
-              >
-                <Icon
-                  name={attaching ? "Loading" : "Paperclip"}
-                  aria-hidden="true"
-                />
-              </Button>
-            </span>
-          ) : (
-            <span title="Add to draft" className="inline-flex">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                aria-label="Add to draft"
-                onClick={addToDraft}
-              >
-                <Icon name="MessageCirclePlus" aria-hidden="true" />
-              </Button>
-            </span>
-          )}
-          <span title="Copy image to clipboard" className="inline-flex">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              aria-label="Copy image to clipboard"
-              onClick={() => void copyImage()}
-            >
-              <Icon name="Copy" aria-hidden="true" />
-            </Button>
-          </span>
-          <span title="Download PNG" className="inline-flex">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              aria-label="Download PNG"
-              onClick={() => void downloadPng()}
-            >
-              <Icon name="Download" aria-hidden="true" />
-            </Button>
-          </span>
-          <span title="Delete drawing" className="inline-flex">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 hover:text-destructive"
-              aria-label="Delete drawing"
-              onClick={() => void deleteDrawing()}
-            >
-              <Icon name="Trash2" aria-hidden="true" />
-            </Button>
-          </span>
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-hidden bg-background">
-        <Excalidraw
-          key={drawingId}
-          initialData={initialData}
-          onChange={handleChange}
-          excalidrawAPI={(api) => {
-            apiRef.current = api;
-          }}
-          theme={isDark ? "dark" : "light"}
-          UIOptions={{
-            canvasActions: {
-              toggleTheme: true,
-              export: false,
-              saveToActiveFile: false,
-              loadScene: false,
-            },
-          }}
-        />
+        )}
       </div>
     </div>
   );

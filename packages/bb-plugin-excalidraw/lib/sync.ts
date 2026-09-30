@@ -17,7 +17,7 @@
 // ping-pong between writers.
 import { useCallback, useEffect, useRef } from "react";
 import { reconcileElements } from "@excalidraw/excalidraw";
-import { useRealtime } from "@bb/plugin-sdk/app";
+import { useRealtime } from "@get-bb/plugin-sdk/app";
 import { parseScene } from "./scene";
 
 type SyncRpc = {

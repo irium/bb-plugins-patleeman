@@ -1,5 +1,6 @@
 // Pure helper: build the agent-visible context for a drawing mention.
 // Kept free of bb imports so it can be unit-tested standalone.
+import { drawingHref } from "../src/shared";
 
 export type DrawingRowLike = {
   id: string;
@@ -38,9 +39,10 @@ export function mentionContext(row: DrawingRowLike): string {
     }
   }
   const head = [
-    `Excalidraw drawing (id ${row.id}), updated ${new Date(
+    `Excalidraw drawing "${row.name}" (id ${row.id}), updated ${new Date(
       row.updated_at,
     ).toISOString()}.`,
+    `Link to it in replies as [${row.name.replace(/[[\]]/g, "")}](${drawingHref(row.id)}).`,
     `${elements.length} element(s)${
       Object.keys(files).length
         ? `, ${Object.keys(files).length} embedded image file(s)`
