@@ -43,6 +43,7 @@ import {
   serializeEmojiItems,
   type EmojiItem,
 } from "./src/emoji-items";
+import { pickComposer } from "./src/composer-target";
 import {
   composeReactionDraft,
   parseQuotePosition,
@@ -113,19 +114,22 @@ function readSettingsSnapshot(): SettingsSnapshot {
 
 // ---------------------------------------------------------------------------
 // Composer bridge: `messageAction` runs are host chrome (plain callbacks, no
-// hooks), so a banner component captures the bound `useComposer()` API into a
-// module ref. Banners mount in every composer layout (actions do not mount in
-// compact), and the bridge renders nothing.
+// hooks), so a banner component registers the bound `useComposer()` API in a
+// module list. Banners mount in every composer layout (actions do not mount in
+// compact), and the bridge renders nothing. Several composers can be mounted
+// at once (a floating chat over the main view); `pickComposer` finds the one
+// for the reacted-to message's thread.
 // ---------------------------------------------------------------------------
 
-const composerRef: { current: PluginComposerApi | null } = { current: null };
+const mountedComposers: PluginComposerApi[] = [];
 
 function ComposerBridge() {
   const composer = useComposer();
   useEffect(() => {
-    composerRef.current = composer;
+    mountedComposers.push(composer);
     return () => {
-      if (composerRef.current === composer) composerRef.current = null;
+      const index = mountedComposers.indexOf(composer);
+      if (index !== -1) mountedComposers.splice(index, 1);
     };
   }, [composer]);
   return null;
@@ -161,7 +165,7 @@ function draftReaction(
 // raw directive line never shows.
 // ---------------------------------------------------------------------------
 
-function SmartReactions({ attributes }: PluginMessageDirectiveProps) {
+function SmartReactions({ attributes, message }: PluginMessageDirectiveProps) {
   const items = parseSmartReactions(attributes.items);
   if (items.length === 0) return null;
   return (
@@ -178,7 +182,7 @@ function SmartReactions({ attributes }: PluginMessageDirectiveProps) {
           size="sm"
           className="h-7 rounded-full px-2.5 text-xs font-normal"
           onClick={() => {
-            const composer = composerRef.current;
+            const composer = pickComposer(mountedComposers, message.threadId);
             if (composer === null) {
               toast.error(
                 "Emoji reactions need the thread composer open — open this thread in the main view and try again.",
@@ -520,7 +524,7 @@ export default definePluginApp((app) => {
         id: `emoji-react-${index + 1}`,
         title: item.emoji || item.label || item.text,
         run(context: PluginMessageActionContext) {
-          const composer = composerRef.current;
+          const composer = pickComposer(mountedComposers, context.threadId);
           if (composer === null) {
             toast.error(
               "Emoji reactions need the thread composer open — open this thread in the main view and try again.",
