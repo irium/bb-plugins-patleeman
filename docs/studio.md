@@ -44,7 +44,7 @@ contract**, defined once in `packages/studio-kit/src/contract.ts`:
 |---|---|---|
 | `studio_describe` | — | The kinds this plugin provides: id, labels, icon, whether it can create, and where its items open |
 | `studio_list` | — | Every item as a `StudioItem` |
-| `studio_search` | `{ query }` | Ids of items whose content matches (titles are matched by Studio) |
+| `studio_search` | `{ query }` | Ids of items whose content matches (titles are matched by Studio), and optional `snippets` of the matching text by id |
 | `studio_create` | `{ kind, projectId }` | The new item and where to open it |
 | `studio_move` | `{ ids, projectId }` | Per-id results |
 | `studio_archive` | `{ ids, archived }` | Per-id results |

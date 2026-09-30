@@ -55,10 +55,10 @@ export const rpcContract = defineRpcContract({
       tags: z.array(tag),
     }),
   },
-  /** `<plugin>:<id>` keys of items whose content matches. */
+  /** `<plugin>:<id>` keys of items whose content matches, and the matching text by key. */
   search: {
     input: z.object({ query: z.string().min(1).max(200) }),
-    output: z.object({ keys: z.array(z.string()) }),
+    output: z.object({ keys: z.array(z.string()), snippets: z.record(z.string(), z.string()) }),
   },
   create: {
     input: z.object({ pluginId, kind: z.string().min(1).max(100), projectId }),

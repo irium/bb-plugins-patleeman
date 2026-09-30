@@ -2,6 +2,7 @@
 // manage tasks in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioBadge, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { snippets } from "@bb-studio/kit/format";
 import { registerStudioProvider } from "@bb-studio/kit/server";
 import {
   HANDOFF_SHORT,
@@ -110,17 +111,12 @@ export function registerStudio(
     // Studio matches titles itself; this finds descriptions and handoff notes.
     studio_search: ({ query }) => {
       const needle = query.toLowerCase();
-      return {
-        ids: store
-          .list()
-          .filter(
-            (task) =>
-              task.description.toLowerCase().includes(needle) ||
-              store.handoffs(task.id).some((handoff) => handoff.note?.toLowerCase().includes(needle)),
-          )
-          .slice(0, 200)
-          .map((task) => task.id),
-      };
+      const found = store
+        .list()
+        .map((task) => ({ id: task.id, text: [task.description, ...store.handoffs(task.id).map((handoff) => handoff.note)].filter(Boolean).join("\n") }))
+        .filter((task) => task.text.toLowerCase().includes(needle))
+        .slice(0, 200);
+      return { ids: found.map((task) => task.id), snippets: snippets(found, query, (task) => task.text) };
     },
     studio_create: ({ kind, projectId }) => {
       if (kind !== TASK_KIND.id) throw new Error(`Tasks can't make a "${kind}".`);

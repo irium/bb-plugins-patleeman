@@ -57,7 +57,9 @@ describe("the Tasks Studio provider", () => {
     store.addHandoff(b.id, "thr_1", null);
     store.setHandoff("thr_1", "replied", "Rewrote the pricing FAQ");
     store.create({ title: "C", by: "user" });
-    expect((await call("studio_search", { query: "pricing" })).ids.sort()).toEqual([a.id, b.id].sort());
+    const found = await call("studio_search", { query: "pricing" });
+    expect(found.ids.sort()).toEqual([a.id, b.id].sort());
+    expect(found.snippets).toEqual({ [a.id]: "Update the pricing page", [b.id]: "Rewrote the pricing FAQ" });
   });
 
   it("marks tasks done and reopens them through the board's move", async () => {

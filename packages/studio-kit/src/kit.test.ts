@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { eachId, mentionPrompt, studioSchemas } from "./contract";
-import { plural, relativeTime, untitled } from "./format";
+import { plural, relativeTime, snippet, untitled } from "./format";
 import { nextSort, sortItems, toggleSelection, type CollectionItem } from "./app/selection";
 
 // Each Studio plugin bundles the kit from outside its own folder, so esbuild
@@ -55,6 +55,17 @@ describe("format", () => {
     expect(plural(1, "page")).toBe("1 page");
     expect(plural(2, "page")).toBe("2 pages");
     expect(untitled("  ")).toBe("Untitled");
+  });
+  it("excerpts the text around a match", () => {
+    expect(snippet("Ship the\n  offline mode", "OFFLINE")).toBe("Ship the offline mode");
+    expect(snippet("nothing here", "offline")).toBeNull();
+    expect(snippet("anything", "  ")).toBeNull();
+    const words = Array.from({ length: 60 }, (_, i) => `word${i}`);
+    const text = [...words.slice(0, 30), "pricing", ...words.slice(30)].join(" ");
+    const cut = snippet(text, "pricing", 60)!;
+    expect(cut).toMatch(/^…word\d+ .*pricing.* word\d+…$/);
+    expect(cut.length).toBeLessThanOrEqual(62);
+    expect(snippet(`${words.join(" ")} pricing`, "pricing", 40)).toMatch(/^…word\d+ .*pricing$/);
   });
 });
 

@@ -2,6 +2,7 @@
 // manage drawings in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { snippets } from "@bb-studio/kit/format";
 import { registerStudioProvider } from "@bb-studio/kit/server";
 import { getNonDeletedElements, parseSceneData } from "../../lib/merge";
 import { DRAW_ICON, PLUGIN_ID, drawingHref, thumbnailUrl } from "../shared";
@@ -87,13 +88,12 @@ export function registerStudio(
     // Studio matches titles itself; this finds the words written on drawings.
     studio_search: ({ query }) => {
       const needle = query.toLowerCase();
-      return {
-        ids: store
-          .list({ limit: 10_000 })
-          .filter((row) => drawingText(row.data).some((line) => line.toLowerCase().includes(needle)))
-          .slice(0, 200)
-          .map((row) => row.id),
-      };
+      const found = store
+        .list({ limit: 10_000 })
+        .map((row) => ({ id: row.id, text: drawingText(row.data).join("\n") }))
+        .filter((row) => row.text.toLowerCase().includes(needle))
+        .slice(0, 200);
+      return { ids: found.map((row) => row.id), snippets: snippets(found, query, (row) => row.text) };
     },
     studio_create: ({ kind, projectId }) => {
       if (kind !== DRAWING_KIND.id) throw new Error(`Unknown kind "${kind}".`);

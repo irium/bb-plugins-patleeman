@@ -20,6 +20,13 @@ the kind filters and New menu in the header.
   grid, with search over titles and content, kind pills, a project filter,
   and an Archived view. Drawings show thumbnails; recordings show their
   length and word count.
+- **Search from anywhere.** Cmd/Ctrl+Shift+K (or **Studio: Search items**
+  in the command palette, Cmd/Ctrl+Shift+P) opens a quick-open box over any
+  page. Titles match as you type; each add-on also searches its content —
+  page text, transcripts, drawing text, artifact files, task notes, bot
+  descriptions — and the row shows the text that matched. With nothing typed
+  it lists recently changed items. ↑↓ and ↵ open one. (Cmd/Ctrl+K stays
+  BB's thread search; plugins can't add results to it.)
 - **Tags** group items across add-ons: a page, a drawing and a task can all
   be tagged "Launch". Tag from an item's ⋯ menu or the selection bar, filter
   by tag (or Untagged) from the tag menu, and click a chip to filter by it.
@@ -57,6 +64,9 @@ bb studio providers
   [`@bb-studio/kit`](../studio-kit), and publish them for RPC discovery.
   Studio finds them with `bb.sdk.plugins.experimental_discoverRpc` and calls
   them with `callRpc`. Any plugin can join the suite this way.
+- `studio_search` returns the ids whose content matches and, optionally, a
+  snippet of the matching text for each (the kit's `snippets` helper makes
+  them). Studio matches titles itself.
 - An add-on tells Studio when its items change (`studio_changed`); Studio
   relays that over realtime and the open collection refetches.
 - A stopped or failing add-on shows up as unavailable instead of breaking the

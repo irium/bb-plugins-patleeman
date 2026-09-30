@@ -2,6 +2,7 @@
 // manage recordings in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { snippets } from "@bb-studio/kit/format";
 import { registerStudioProvider } from "@bb-studio/kit/server";
 import type { Recording } from "../shared/contract";
 import { NEW_RECORDING_EVENT, TALK_ICON, formatLength, recordingBadge, recordingHref } from "../shared/format";
@@ -86,7 +87,13 @@ export function registerStudio(
     studio_list: () => ({
       items: store.list({ includeArchived: true, limit: 10_000 }).map((recording) => toStudioItem(recording, store.transcript(recording.id))),
     }),
-    studio_search: ({ query }) => ({ ids: store.list({ query, limit: 200 }).map((recording) => recording.id) }),
+    studio_search: ({ query }) => {
+      const found = store.list({ query, limit: 200 });
+      return {
+        ids: found.map((recording) => recording.id),
+        snippets: snippets(found, query, (recording) => store.transcript(recording.id)),
+      };
+    },
     studio_create: () => {
       throw new Error("Start a recording from Talk's microphone.");
     },

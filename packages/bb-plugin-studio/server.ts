@@ -81,7 +81,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.rpc.register(rpcContract, {
     overview: () => overview(),
-    search: async ({ query }) => ({ keys: await hub.search(query) }),
+    search: ({ query }) => hub.search(query),
     create: ({ pluginId, kind, projectId }) => hub.call(pluginId, "studio_create", { kind, projectId }),
     move: ({ pluginId, ids, projectId }) => hub.call(pluginId, "studio_move", { ids, projectId }),
     archive: ({ pluginId, ids, archived }) => hub.call(pluginId, "studio_archive", { ids, archived }),
@@ -180,7 +180,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (options.tag && !tag) throw new Error(`No tag called "${options.tag}". Tags: ${allTags.map((each) => each.name).join(", ") || "none yet"}.`);
     const labels = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.label])));
     const query = options.query?.trim().toLowerCase();
-    const contentKeys = query ? new Set(await hub.search(query)) : null;
+    const contentKeys = query ? new Set((await hub.search(query)).keys) : null;
     const picked = items
       .filter(
         (item) =>

@@ -179,10 +179,14 @@ export function studioSchemas(z: typeof Zod) {
     provider: {
       studio_describe: { input: z.null(), output: info },
       studio_list: { input: z.null(), output: z.object({ items: z.array(item) }) },
-      /** Ids of items whose content matches; Studio matches titles itself. */
+      /**
+       * Ids of items whose content matches; Studio matches titles itself.
+       * `snippets` has the matching text by id, for as many as the add-on
+       * cares to excerpt (see `snippet` in the kit's format module).
+       */
       studio_search: {
         input: z.object({ query: z.string().min(1).max(200) }),
-        output: z.object({ ids: z.array(z.string()) }),
+        output: z.object({ ids: z.array(z.string()), snippets: z.record(z.string(), z.string()).optional() }),
       },
       studio_create: {
         input: z.object({ kind: z.string(), projectId }),

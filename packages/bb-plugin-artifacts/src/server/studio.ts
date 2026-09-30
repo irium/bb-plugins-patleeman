@@ -2,6 +2,7 @@
 // and manage artifacts in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { snippets } from "@bb-studio/kit/format";
 import { registerStudioProvider } from "@bb-studio/kit/server";
 import { ARTIFACT_ICON, PLUGIN_ID, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../shared";
 import { displayTitle, versionType, type ArtifactStore, type ArtifactWithVersion } from "./store";
@@ -104,17 +105,18 @@ export function registerStudio(
     // Studio matches titles itself; this finds descriptions, file names and text.
     studio_search: ({ query }) => {
       const needle = query.toLowerCase();
+      const found = store
+        .list({ limit: 10_000 })
+        .filter(
+          (artifact) =>
+            artifact.description.toLowerCase().includes(needle) ||
+            artifact.version.name.toLowerCase().includes(needle) ||
+            (artifactText(store, artifact)?.toLowerCase().includes(needle) ?? false),
+        )
+        .slice(0, 200);
       return {
-        ids: store
-          .list({ limit: 10_000 })
-          .filter(
-            (artifact) =>
-              artifact.description.toLowerCase().includes(needle) ||
-              artifact.version.name.toLowerCase().includes(needle) ||
-              (artifactText(store, artifact)?.toLowerCase().includes(needle) ?? false),
-          )
-          .slice(0, 200)
-          .map((artifact) => artifact.id),
+        ids: found.map((artifact) => artifact.id),
+        snippets: snippets(found, query, (artifact) => [artifact.description, artifactText(store, artifact)].filter(Boolean).join("\n")),
       };
     },
     studio_create: () => {

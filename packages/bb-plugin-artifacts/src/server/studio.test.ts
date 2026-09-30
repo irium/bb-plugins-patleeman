@@ -66,7 +66,7 @@ describe("the Artifacts Studio provider", () => {
     const a = save("a.md", "the quarterly numbers");
     const b = save("budget.csv", "x,y", { description: "Forecast" });
     save("c.png", "quarterly");
-    expect((await call("studio_search", { query: "quarterly" })).ids).toEqual([a.id]);
+    expect(await call("studio_search", { query: "quarterly" })).toEqual({ ids: [a.id], snippets: { [a.id]: "the quarterly numbers" } });
     expect((await call("studio_search", { query: "forecast" })).ids).toEqual([b.id]);
     expect((await call("studio_search", { query: "budget" })).ids).toEqual([b.id]);
   });

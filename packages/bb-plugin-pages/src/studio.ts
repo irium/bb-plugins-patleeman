@@ -2,6 +2,7 @@
 // manage pages in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { snippets } from "@bb-studio/kit/format";
 import { registerStudioProvider } from "@bb-studio/kit/server";
 import { HUMAN_USER_ID, PLUGIN_ID } from "./constants";
 import { readMarkdown } from "./doc";
@@ -23,26 +24,40 @@ export const PAGE_KIND: StudioKind = {
 
 const PREVIEW_CHARS = 140;
 
+/** A line of Markdown as plain text; empty for rules, tables and images. */
+function plainLine(raw: string): string {
+  const line = raw.trim();
+  if (!line || /^(<!--.*-->|---+|\|.*\||!\[.*\]\(.*\))$/.test(line)) return "";
+  return line
+    .replace(/<!--.*?-->/g, "")
+    .replace(/^(#{1,6}\s+|>\s*(\[!\w+\]\s*)?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, "")
+    .replace(/@\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/(\*\*|__|\*|_|~~|`)(.+?)\1/g, "$2")
+    .trim();
+}
+
 /** The first line of prose in a page, without Markdown syntax. */
 export function excerpt(markdown: string): string | null {
   let fenced = false;
   for (const raw of markdown.split("\n")) {
-    const line = raw.trim();
-    if (line.startsWith("```")) {
+    if (raw.trim().startsWith("```")) {
       fenced = !fenced;
       continue;
     }
-    if (fenced || !line || /^(<!--.*-->|---+|\|.*\||!\[.*\]\(.*\))$/.test(line)) continue;
-    const text = line
-      .replace(/<!--.*?-->/g, "")
-      .replace(/^(#{1,6}\s+|>\s*(\[!\w+\]\s*)?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, "")
-      .replace(/@\[([^\]]*)\]\([^)]*\)/g, "$1")
-      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-      .replace(/(\*\*|__|\*|_|~~|`)(.+?)\1/g, "$2")
-      .trim();
+    const text = fenced ? "" : plainLine(raw);
     if (text) return text.length > PREVIEW_CHARS ? `${text.slice(0, PREVIEW_CHARS - 1).trimEnd()}…` : text;
   }
   return null;
+}
+
+/** A page's text for search snippets: every line, code included, without Markdown syntax. */
+export function plainText(markdown: string): string {
+  return markdown
+    .split("\n")
+    .map((raw) => (raw.trim().startsWith("```") ? "" : plainLine(raw)))
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function toStudioItem(meta: PageMeta, markdown: string | null): StudioItem {
@@ -79,7 +94,13 @@ export function registerStudio(bb: BbPluginApi, service: PagesService, schemas: 
       const markdown = store.markdownHeads();
       return { items: store.list({ includeArchived: true }).map((meta) => toStudioItem(meta, markdown.get(meta.id) ?? null)) };
     },
-    studio_search: ({ query }) => ({ ids: store.search(query, undefined, 200).map((meta) => meta.id) }),
+    studio_search: ({ query }) => {
+      const found = store.search(query, undefined, 200);
+      return {
+        ids: found.map((meta) => meta.id),
+        snippets: snippets(found, query, (meta) => plainText(store.get(meta.id)?.markdown ?? "")),
+      };
+    },
     studio_create: ({ projectId }) => ({
       item: toStudioItem(service.createPage({ projectId, parentId: null, title: "", actor: HUMAN_USER_ID }), ""),
     }),

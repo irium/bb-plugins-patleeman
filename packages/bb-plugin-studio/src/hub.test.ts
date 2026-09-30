@@ -104,14 +104,14 @@ describe("StudioHub", () => {
       plugins: [plugin("pages"), plugin("talk")],
       rpc: {
         "pages.studio_describe": () => ({ pluginId: "pages", version: 1, panel: null, kinds: [] }),
-        "pages.studio_search": () => ({ ids: ["pg_1"] }),
+        "pages.studio_search": () => ({ ids: ["pg_1", "pg_2"], snippets: { pg_1: "…the plan for…" } }),
         "talk.studio_describe": () => ({ pluginId: "talk", version: 1, panel: null, kinds: [] }),
         "talk.studio_search": () => {
           throw new Error("down");
         },
       },
     });
-    expect(await new StudioHub(sdk).search("plan")).toEqual(["pages:pg_1"]);
+    expect(await new StudioHub(sdk).search("plan")).toEqual({ keys: ["pages:pg_1", "pages:pg_2"], snippets: { "pages:pg_1": "…the plan for…" } });
   });
 
   it("refuses to call itself", async () => {

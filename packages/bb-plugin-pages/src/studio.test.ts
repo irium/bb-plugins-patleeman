@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PageMeta } from "./store";
-import { excerpt, toStudioItem } from "./studio";
+import { excerpt, plainText, toStudioItem } from "./studio";
 
 const meta = (overrides: Partial<PageMeta> = {}): PageMeta => ({
   id: "pg_1",
@@ -130,5 +130,13 @@ describe("the Studio provider", async () => {
     const copied = await call("studio_action", { action: "copy-markdown", ids: [item.id] });
     expect(copied.message).toBe("Copied as Markdown");
     await expect(call("studio_action", { action: "nope", ids: [item.id] })).rejects.toThrow('Unknown action "nope"');
+  });
+});
+
+describe("plainText", () => {
+  it("keeps every line's words without Markdown syntax", () => {
+    expect(plainText("# Goals\n\n- **Ship** the [kit](https://x.test)\n\n```ts\nconst pricing = 1;\n```\n\n---")).toBe(
+      "Goals\nShip the kit\nconst pricing = 1;",
+    );
   });
 });

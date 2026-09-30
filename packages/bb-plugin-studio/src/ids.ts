@@ -4,3 +4,6 @@
 
 /** Realtime channel for the sidebar's tabs; payload `{}`. */
 export const TABS_CHANNEL = "studio-tabs";
+
+/** Window event that opens or closes Studio search; no detail. */
+export const QUICK_OPEN_EVENT = "bb-studio:quick-open";

@@ -109,17 +109,24 @@ export class StudioHub {
     return { providers: lists.map((list) => list.provider), items: lists.flatMap((list) => list.items) };
   }
 
-  /** `<plugin>:<id>` keys whose content matches; providers that fail are skipped. */
-  async search(query: string): Promise<string[]> {
+  /**
+   * `<plugin>:<id>` keys whose content matches, and the matching text by key
+   * where the add-on gave it; providers that fail are skipped.
+   */
+  async search(query: string): Promise<{ keys: string[]; snippets: Record<string, string> }> {
     const ready = (await this.providers()).filter((provider) => provider.state === "ready");
     const results = await Promise.all(
       ready.map((provider) =>
         this.call(provider.pluginId, "studio_search", { query }).then(
-          ({ ids }) => ids.map((id) => `${provider.pluginId}:${id}`),
+          ({ ids, snippets = {} }) => ids.map((id) => ({ key: `${provider.pluginId}:${id}`, snippet: snippets[id] })),
           () => [],
         ),
       ),
     );
-    return results.flat();
+    const found = results.flat();
+    return {
+      keys: found.map((match) => match.key),
+      snippets: Object.fromEntries(found.flatMap((match) => (match.snippet ? [[match.key, match.snippet]] : []))),
+    };
   }
 }

@@ -81,7 +81,7 @@ describe("the Draw Studio provider", () => {
     const row = store.create({ name: "", projectId: null, by: "app" });
     store.write(row.id, scene([element("text", { text: "Checkout flow" })]), "editor");
     store.create({ name: "", projectId: null, by: "app" });
-    expect(await call("studio_search", { query: "CHECKOUT" })).toEqual({ ids: [row.id] });
+    expect(await call("studio_search", { query: "CHECKOUT" })).toEqual({ ids: [row.id], snippets: { [row.id]: "Checkout flow" } });
   });
 
   it("copies a drawing's text, and says so when there is none", async () => {

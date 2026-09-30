@@ -3,6 +3,7 @@
 // is archived (retired) rather than deleted.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { snippets } from "@bb-studio/kit/format";
 import { registerStudioProvider } from "@bb-studio/kit/server";
 import type { Bot } from "./contract";
 
@@ -73,12 +74,10 @@ export function registerStudio(
     // Studio matches names itself; this finds descriptions and handles.
     studio_search: ({ query }) => {
       const needle = query.toLowerCase().replace(/^@/, "");
-      return {
-        ids: deps
-          .bots()
-          .filter((bot) => bot.description.toLowerCase().includes(needle) || bot.handle.toLowerCase().includes(needle))
-          .map((bot) => bot.id),
-      };
+      const found = deps
+        .bots()
+        .filter((bot) => bot.description.toLowerCase().includes(needle) || bot.handle.toLowerCase().includes(needle));
+      return { ids: found.map((bot) => bot.id), snippets: snippets(found, needle, (bot) => bot.description) };
     },
     studio_create: () => {
       throw new Error("Bots are created in a setup chat.");
