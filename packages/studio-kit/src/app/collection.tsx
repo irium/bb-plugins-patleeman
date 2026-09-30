@@ -248,7 +248,10 @@ export function CollectionPage({
       setWorking(true);
       copyLater(result.then((value) => value.text ?? ""))
         .then(
-          () => result.then((value) => toast.success(value.message ?? "Copied")),
+          () =>
+            result.then((value) =>
+              value.text ? toast.success(value.message ?? "Copied") : toast.info(value.message ?? "Nothing to copy"),
+            ),
           (cause: unknown) => toast.error(errorMessage(cause)),
         )
         .finally(() => setWorking(false));
