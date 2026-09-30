@@ -78,6 +78,10 @@ export function DrawingEditor({
   const [attaching, setAttaching] = useState(false);
 
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  // Until the user touches the canvas, keep the scene centred as the canvas
+  // resizes (the sidebar or a side panel opening or closing).
+  const touchedRef = useRef(false);
   const loadedRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
@@ -188,6 +192,26 @@ export function DrawingEditor({
     const t = setTimeout(() => setSyncedAt(null), 3000);
     return () => clearTimeout(t);
   }, [syncedAt]);
+
+  useEffect(() => {
+    const element = canvasRef.current;
+    if (!element || loading) return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      if (touchedRef.current) return;
+      cancelAnimationFrame(frame);
+      // After Excalidraw has taken the new size.
+      frame = requestAnimationFrame(() => {
+        const api = apiRef.current;
+        if (api && api.getSceneElements().length > 0) api.scrollToContent();
+      });
+    });
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [loading]);
 
   const flushSave = useCallback(() => {
     if (saveTimerRef.current) {
@@ -474,7 +498,13 @@ export function DrawingEditor({
         }
         trailing={trailing}
       />
-      <div className="relative min-h-0 flex-1 overflow-hidden bg-background">
+      <div
+        ref={canvasRef}
+        className="relative min-h-0 flex-1 overflow-hidden bg-background"
+        onPointerDownCapture={() => (touchedRef.current = true)}
+        onWheelCapture={() => (touchedRef.current = true)}
+        onKeyDownCapture={() => (touchedRef.current = true)}
+      >
         {loading ? (
           <div role="status" className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
             <Icon name="Loading" className={cn("size-4", SPIN)} /> Loading drawing…
