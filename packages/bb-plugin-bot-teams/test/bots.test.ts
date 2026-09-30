@@ -92,10 +92,16 @@ const setup = () => {
         get: async () => makeThreadResponse({ status: "idle" }),
         list: async () => [],
         stop: async () => ({ ok: true }),
+        update: async () => makeThreadResponse({ status: "idle" }),
         queuedMessages: {
           list: async ({ threadId }) => {
             const id = pendingDirectStarts.get(threadId);
-            return id ? [{ id, content: [{ type: "text", text: "" }] }] : [];
+            return id ? [{
+              id,
+              content: [{ type: "text", text: "" }],
+              model: "default-model",
+              reasoningLevel: "medium",
+            }] : [];
           },
           delete: async ({ threadId }) => {
             pendingDirectStarts.delete(threadId);
@@ -2282,6 +2288,15 @@ test("a bot keeps one current direct thread and earlier threads remain usable", 
       assert.equal(spawn.title, undefined);
     }
     assert.equal(x.harness.inspection.sdk.callsTo("threads.queuedMessages.delete").length, 2);
+    // The deleted start message held BB's resolved model, so the thread must keep it.
+    assert.deepEqual(
+      x.harness.inspection.sdk.callsTo("threads.update").map(([args]) => args),
+      [first.threadId, second.threadId].map((threadId) => ({
+        threadId,
+        model: "default-model",
+        reasoningLevel: "medium",
+      })),
+    );
     const history = await x.harness.behavior.callRpc("get", { id: x.a.id }) as { conversations: Conversation[] };
     assert.equal(history.conversations.filter((c: { key: string }) => c.key === "admin").length, 1);
     assert.equal(history.conversations.find((c: { threadId: string }) => c.threadId === first.threadId)?.originalKey, "admin");

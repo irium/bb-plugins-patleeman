@@ -337,6 +337,13 @@ export class Runtime {
             item.content.length === 1 && item.content[0]?.type === "text" &&
             item.content[0].text === "");
           if (start) {
+            // BB resolved the model onto this start message only. Keep it on the
+            // thread, or the owner's first message has no model to run with.
+            await this.bb.sdk.threads.update({
+              threadId: thread.id,
+              model: start.model,
+              reasoningLevel: start.reasoningLevel,
+            });
             await this.bb.sdk.threads.queuedMessages.delete({
               threadId: thread.id,
               queuedMessageId: start.id,

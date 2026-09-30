@@ -428,7 +428,12 @@ test("CLI updates reasoning and starts fresh threads when a model changes", asyn
     });
     x.harness.inspection.sdk.stub("threads.queuedMessages.list", async ({ threadId }) => {
       const id = pendingDirectStarts.get(threadId);
-      return id ? [{ id, content: [{ type: "text", text: "" }] }] : [];
+      return id ? [{
+        id,
+        content: [{ type: "text", text: "" }],
+        model: "default-model",
+        reasoningLevel: "medium",
+      }] : [];
     });
     x.harness.inspection.sdk.stub("threads.queuedMessages.delete", async ({ threadId }) => {
       pendingDirectStarts.delete(threadId);
