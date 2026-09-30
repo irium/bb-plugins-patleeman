@@ -32,7 +32,7 @@ export function isArtifactId(value: string): boolean {
 export type ArtifactType = "image" | "html" | "markdown" | "code" | "text" | "pdf" | "other";
 
 export const TYPE_LABELS: Record<ArtifactType, string> = {
-  image: "artifacts/image",
+  image: "Image",
   html: "HTML",
   markdown: "Markdown",
   code: "Code",
