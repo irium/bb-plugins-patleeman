@@ -20,7 +20,7 @@ export const ARTIFACT_KIND: StudioKind = {
   // Artifacts come from threads: agents save them, or you do from a reply.
   create: null,
   canArchive: true,
-  blurb: "Images, pages, reports and files your agents made, kept here when you or they save them.",
+  blurb: "Files your agents made.",
 };
 
 const PREVIEW_CHARS = 140;

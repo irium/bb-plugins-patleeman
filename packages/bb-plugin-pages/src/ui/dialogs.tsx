@@ -91,7 +91,7 @@ export function KeepUpdatedDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Keep this page updated</DialogTitle>
-          <DialogDescription>A bot revisits the page on a schedule and brings it up to date.</DialogDescription>
+          <DialogDescription>A bot updates the page on a schedule.</DialogDescription>
         </DialogHeader>
         {!bots.available ? <p className="text-sm text-muted-foreground">{bots.reason ?? "Bot Teams is not available."}</p> : null}
         <div className="flex flex-col gap-2">
@@ -212,7 +212,7 @@ export function HistoryDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Version history</DialogTitle>
-          <DialogDescription>Versions are saved before each bot or agent edit. Restoring keeps a copy of the current page.</DialogDescription>
+          <DialogDescription>Saved before each bot or agent edit.</DialogDescription>
         </DialogHeader>
         <div className="max-h-80 overflow-auto rounded-md border border-border">
           {snapshots === null ? (

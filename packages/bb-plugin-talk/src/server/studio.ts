@@ -23,7 +23,7 @@ export const RECORDING_KINDS: StudioKind[] = [
     actions: [COPY_TRANSCRIPT],
     create: { mode: "event", event: NEW_RECORDING_EVENT },
     canArchive: true,
-    blurb: "Talk through an idea for as long as you like. Talk saves the audio as you speak and transcribes it.",
+    blurb: "Long voice notes, transcribed.",
   },
   {
     id: "dictation",
@@ -35,7 +35,7 @@ export const RECORDING_KINDS: StudioKind[] = [
     // Dictations start from a composer or a field's microphone.
     create: null,
     canArchive: true,
-    blurb: "Every dictation into a composer or page is kept here, with its audio.",
+    blurb: "Your dictations, with audio.",
   },
 ];
 

@@ -16,7 +16,7 @@ export const DRAWING_KIND: StudioKind = {
   actions: [{ id: "copy-text", label: "Copy text", icon: "Copy", result: "copy" }],
   create: { mode: "rpc" },
   canArchive: true,
-  blurb: "Sketch diagrams with Excalidraw, and let agents draw alongside you.",
+  blurb: "Diagrams and sketches.",
 };
 
 const PREVIEW_CHARS = 140;

@@ -17,7 +17,7 @@ export const PAGE_KIND: StudioKind = {
   actions: [{ id: "copy-markdown", label: "Copy as Markdown", icon: "Copy", result: "copy" }],
   create: { mode: "rpc" },
   canArchive: true,
-  blurb: "Documents you write with your agents. Mention a bot on a page to hand it work.",
+  blurb: "Documents you write with agents.",
 };
 
 const PREVIEW_CHARS = 140;

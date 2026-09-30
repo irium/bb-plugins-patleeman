@@ -88,7 +88,7 @@ function useSidebar(rpc: ReturnType<typeof useRpc<typeof rpcContract>>) {
       rpc.call("setSidebar", { visible }).then(
         (next) => {
           setSidebar(next);
-          toast.success(visible ? "Add-ons are back in the sidebar" : "Studio now holds everything; add-ons left the sidebar");
+          toast.success(visible ? "Add-ons are back in the sidebar" : "Add-ons hidden from the sidebar");
         },
         (cause: unknown) => toast.error(`Couldn't change the sidebar: ${errorMessage(cause)}`),
       ),
@@ -201,8 +201,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 text-sm max-md:flex-wrap">
           <Icon name="PanelLeft" className="size-4 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1">
-            {shownPanels.map((panel) => panel.label).join(", ")} {shownPanels.length === 1 ? "also has its" : "also have their"} own sidebar{" "}
-            {shownPanels.length === 1 ? "entry" : "entries"}. Studio lists everything here, so you can hide them.
+            {shownPanels.map((panel) => panel.label).join(", ")} {shownPanels.length === 1 ? "is" : "are"} also in the sidebar.
           </span>
           <button type="button" className={OUTLINE_BUTTON} onClick={() => void setVisible(false).then(dismissTip)}>
             Hide from sidebar
@@ -254,8 +253,8 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     return (
       <PageColumn>
         <h1 className="text-[28px] leading-tight font-semibold tracking-tight">Studio</h1>
-        <EmptyState icon="studio/studio" title="Add a Studio add-on to get started">
-          <p>Studio collects your pages, recordings and drawings in one place. Install Studio Pages, Studio Talk or Studio Draw from Extensions.</p>
+        <EmptyState icon="studio/studio" title="No add-ons installed">
+          Install one from Extensions.
         </EmptyState>
       </PageColumn>
     );

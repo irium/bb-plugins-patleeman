@@ -551,13 +551,7 @@ export function CollectionPage({
         {error ? <p className="py-2 text-sm text-destructive">{error}</p> : null}
         {items === null && !error ? <p className="py-2 text-sm text-muted-foreground">Loading…</p> : null}
         {items !== null && noItemsAtAll && !archived ? (
-          <EmptyState icon={emptyKinds.length === 1 ? emptyKinds[0]!.icon : "Layers"} title={`No ${(activeKind?.plural ?? (kinds.length === 1 ? kinds[0]!.plural : "items")).toLowerCase()} yet`} actions={newButton()}>
-            {emptyKinds.map((kind) => (
-              <p key={`${kind.pluginId}:${kind.id}`} className="mt-1">
-                {kind.blurb}
-              </p>
-            ))}
-          </EmptyState>
+          <EmptyState icon={emptyKinds.length === 1 ? emptyKinds[0]!.icon : "Layers"} title={`No ${(activeKind?.plural ?? (kinds.length === 1 ? kinds[0]!.plural : "items")).toLowerCase()} yet`} actions={newButton()} />
         ) : items !== null && !shown.length ? (
           <p className="py-16 text-center text-sm text-muted-foreground">
             {archived ? "Nothing archived." : query.trim() ? "Nothing matches." : activeKind ? `No ${activeKind.plural.toLowerCase()} here.` : "Nothing here."}

@@ -83,9 +83,7 @@ export function DrawingGallery({ threadId, onOpen }: { threadId: string; onOpen:
             Loading drawings…
           </p>
         ) : drawings.length === 0 ? (
-          <EmptyState icon={DRAW_ICON} title="No drawings yet" actions={newButton}>
-            Sketch a diagram, then attach it to this conversation.
-          </EmptyState>
+          <EmptyState icon={DRAW_ICON} title="No drawings yet" actions={newButton} />
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
             {drawings.map((drawing) => (
