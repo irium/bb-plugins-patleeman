@@ -583,7 +583,7 @@ export function CollectionPage({
                 >
                   {/* Every card has the same preview area, so a grid row doesn't
                       stretch around the one card with a thumbnail. */}
-                  <div className="flex h-32 items-center justify-center border-b border-border bg-foreground/[0.03] p-3">
+                  <div className={cn("flex h-32 items-center justify-center border-b border-border bg-foreground/[0.03]", item.thumbnailUrl ? "p-1" : "p-3")}>
                     {item.thumbnailUrl ? (
                       <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
                     ) : (
