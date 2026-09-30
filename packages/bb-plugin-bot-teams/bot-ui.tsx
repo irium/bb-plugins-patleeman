@@ -200,8 +200,11 @@ export function ProfileForm({
   const [pending, setPending] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The model default the picker filled in for a bot saved without one.
+  const [resolved, setResolved] = useState<Partial<ProfileInput> | null>(null);
+  const compared = resolved && !baseline.model ? { ...baseline, ...resolved } : baseline;
   const dirty = (Object.keys(defaults) as (keyof ProfileInput)[]).some(
-    (key) => draft[key] !== baseline[key],
+    (key) => draft[key] !== compared[key],
   );
   const changedProfile = (Object.keys(defaults) as (keyof ProfileInput)[]).some(
     (key) => bot[key] !== baseline[key],
@@ -344,8 +347,12 @@ export function ProfileForm({
                 reasoningLevel: draft.reasoningLevel,
               }}
               onChange={(v) => {
+                // A bot without a model gets the catalog's default filled in
+                // on load. That isn't an edit, so it moves the baseline too.
+                if (!draft.model && !baseline.model && v.providerId === draft.providerId) {
+                  setResolved({ model: v.model, reasoningLevel: v.reasoningLevel });
+                } else setSaved(false);
                 setDraft((d) => ({ ...d, ...v }));
-                setSaved(false);
               }}
               routing={{ kind: "host", hostId: bot.hostId }}
             />

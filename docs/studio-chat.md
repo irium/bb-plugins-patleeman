@@ -18,6 +18,7 @@ All of this is in the stable SDK 0.5.29:
 | The chat itself | `ThreadChat` (`variant: "compact"`), `ThreadTitle`, and `experimental_NewThreadComposer` for a new thread |
 | Pick a sidebar thread | `experimental_useSidebarThreads()` for the list (it works outside the sidebar); `experimental_useSidebarThreadActions().open(id, { split })` to jump to one |
 | Float the current thread | `app.slots.experimental_threadHeaderAction`, one control per visible thread header |
+| Float from the sidebar | Studio Sidebar's own row menu, through the `bb-studio:chat:float` window event |
 | Keyboard and palette | `app.commands.register({ id, title, defaultShortcut, run })` |
 | Tell the agent what's on screen | Our own mention provider (`bb.ui.registerMentionProvider`). BB resolves plugin pills in `threads.spawn` input |
 | Find the item on screen | Studio's new `itemAt` RPC, which matches a path against every add-on's item `href`s |
@@ -37,12 +38,13 @@ It looks the same as Pages' card did, bottom right:
 
 The ⋯ menu lists sidebar threads with a filter box, then "New chat", "Open
 thread" and "Open in split". The card hides while the thread's own view is
-on screen.
+on screen. Drag its top-left corner to resize it; double-click the corner to
+reset. The size is kept across windows and reloads.
 
 State is per window, in session storage: the thread and the mode. The card
 also remembers the last thread used on each item, so reopening a page brings
 its chat back, minimized. That item→thread link lives in the plugin's server
-storage, so a phone could find it too. The card isn't resizable yet.
+storage, so a phone could find it too.
 
 ## Context awareness
 
@@ -61,8 +63,8 @@ storage, so a phone could find it too. The card isn't resizable yet.
    generic hint to use `studio_list_items`.
 4. **Following you.** A floated thread stays when you move to another item,
    and the "Viewing" chip updates. The chip's "Add to message" button would
-   put the new item in the next message, but it's hidden for now (see the
-   third request below).
+   put the new item in the next message, but it's hidden for now (see
+   Limits).
 
 ## Pages
 
@@ -78,50 +80,25 @@ storage, so a phone could find it too. The card isn't resizable yet.
   `--studio-chat-right` so the card sits left of it. Neither plugin imports
   the other.
 
-## Requests to BB
+## Limits
 
-### 1. A slot in the sidebar thread row menu
+We work around BB's gaps rather than wait on BB features.
 
-**Want:** "Float in Studio Chat" next to "Open in split" in a thread row's
-menu.
-
-**Today:** there's no slot for that menu. The thread header's Float button
-and the palette command ("Studio Chat: float this thread") cover it, but
-only for a thread that's already open.
-
-**Ask:** `app.slots.experimental_sidebarThreadMenuItem({ id, title, icon,
-isAvailable?(thread), run(thread) })`, where `thread` is the
-`PluginSidebarThread` for the row. It should be host-rendered like
-`app.commands`, so the host keeps the menu's look and keyboard handling.
-
-### 2. `useRoute()`
-
-**Want:** the current path in an `experimental_appOverlay`, updated on every
-navigation.
-
-**Today:** overlays get no props, and `useBbContext()` has only the project
-and thread. The kit's `usePathname()` (`packages/studio-kit/src/app/route.ts`)
-listens to the Navigation API's `currententrychange` and `popstate`, and also
-polls `location.pathname` every 400ms. Studio's sidebar tabs use it too.
-
-**Ask:** `useRoute(): { pathname: string; threadId: string | null;
-pluginPanel: { pluginId: string; path: string; subPath: string } | null }`,
-driven by the router. The thread id would replace our `/thr_…/` path match.
-
-### 3. `useComposer()` inside a plugin's `ThreadChat`
-
-**Want:** "Add to message" on the Viewing chip, which puts a pill for the
-item on screen into the floated thread's next message.
-
-**Today:** in SDK 0.5.29, `useComposer()` called inside `ThreadChat`'s
-`leadingContent` reports `scope.kind === "new-thread"`, not the thread the
-chat shows. `insertMention` would write to the wrong draft, so the button is
-hidden until the scope is the chat's thread. The `message.dispatch` hook
-can't add input either.
-
-**Ask:** give `ThreadChat` a composer scope, so `useComposer()` inside it
-(in `leadingContent`, or through a render prop) returns
-`{ kind: "thread", threadId }` for that chat's composer.
+- **Sidebar row menu.** BB has no slot in its own row menu, but Studio
+  Sidebar (Thread List Plus) draws its own. It adds "Float in Studio Chat"
+  after "Open in split" while Studio Chat is installed, and dispatches
+  `bb-studio:chat:float`, so neither plugin imports the other.
+- **The current route.** Overlays get no route from BB. The kit's
+  `usePathname()` (`packages/studio-kit/src/app/route.ts`) follows the
+  Navigation API's `currententrychange` and `popstate`, and polls
+  `location.pathname` every 400ms as a fallback. The thread on screen comes
+  from matching `/thr_…/` in the path.
+- **Adding the item to a floated chat.** In SDK 0.5.29, `useComposer()` inside
+  `ThreadChat`'s `leadingContent` reports `scope.kind === "new-thread"`, not
+  the chat's thread, so `insertMention` would write to the wrong draft. The
+  Viewing chip therefore only names the item; typing `@` in the chat finds
+  Studio items. The chip's button shows by itself if a later BB scopes the
+  composer to the chat's thread.
 
 ## Decisions
 

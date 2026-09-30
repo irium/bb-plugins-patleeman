@@ -23,13 +23,17 @@ has no provider credentials, so the thread shows its connection error.
   new-thread composer in the item's project. The message starts with a pill
   for the item, and the agent gets a note saying what it is and which tools
   read and change it.
-- **Any thread, anywhere.** A thread header's **Float** button, or the
-  palette's "Studio Chat: float this thread", puts that thread in the card.
+- **Any thread, anywhere.** A thread header's **Float** button, **Float in
+  Studio Chat** in a sidebar thread's menu (with
+  [Studio Sidebar](../bb-plugin-thread-list-plus)), or the palette's "Studio
+  Chat: float this thread" puts that thread in the card.
   The card stays with you across Studio items, and steps aside while the
   thread's own view is on screen.
 - **Switch threads** from the card's ⋯ menu, which lists your sidebar threads
   with a filter. It also starts a new chat or opens the current one in full
   or in a split.
+- **Resize** the card by dragging its top-left corner. Double-click the
+  corner to reset it.
 - **Mod+Shift+J** shows or hides the card. You can rebind it in BB's
   keyboard settings.
 - **Chats come back.** Each item remembers the last thread used on it, so
@@ -56,16 +60,14 @@ The card's state is per window and survives a reload.
 
 ## Limits
 
-- The "Viewing" chip can't add the item to a message in a floated thread yet.
+- The "Viewing" chip can't add the item to a message in a floated thread.
   A plugin's `ThreadChat` doesn't scope `useComposer()` to its thread on BB's
-  SDK 0.5.29, so the button stays hidden until it does. A new chat always
-  carries the item.
+  SDK 0.5.29, so the button stays hidden. Type `@` in the chat to mention a
+  Studio item instead. A new chat always carries the item.
 - BB doesn't tell plugins the current route. The card follows the Navigation
-  API and polls every 400ms.
-- There's no "Float" item in the sidebar row menu, because BB has no slot for
-  that menu.
+  API and polls every 400ms as a fallback.
 
-The requests to BB are in [docs/studio-chat.md](../../docs/studio-chat.md).
+More in [docs/studio-chat.md](../../docs/studio-chat.md).
 
 ## Develop
 

@@ -16,6 +16,7 @@ import type { rpcContract, Viewed } from "../contract";
 import { MENTION_PROVIDER_ID } from "../ids";
 import { itemKey } from "../context";
 import { floatThread, setChat, useChat } from "./store";
+import { useCardSize } from "./size";
 import { HEADER_BUTTON } from "./styles";
 import { ThreadMenu } from "./ThreadMenu";
 
@@ -81,7 +82,7 @@ function useFloatEvent() {
  * thread's chat so the composer it writes to is that thread's; if BB puts the
  * pill somewhere else, the button isn't offered. On BB's SDK 0.5.29 a
  * plugin's ThreadChat doesn't scope `useComposer()` to its thread, so only
- * the label shows until it does (docs/studio-chat.md, "Requests to BB").
+ * the label shows until it does (docs/studio-chat.md, "Limits").
  */
 function ViewingChip({ threadId, viewed }: { threadId: string; viewed: Viewed }) {
   const composer = useComposer();
@@ -116,6 +117,7 @@ export function ChatOverlay() {
   const { threadId, mode } = useChat();
   const [error, setError] = useState<string | null>(null);
   const [focus, setFocus] = useState(0);
+  const { size, grip } = useCardSize();
   useItemChat(rpc, viewed);
   useFloatEvent();
 
@@ -143,11 +145,24 @@ export function ChatOverlay() {
 
   return (
     <div
-      className="studio-chat pointer-events-none fixed bottom-4 z-40 flex w-[min(460px,calc(100vw-2.5rem))] flex-col gap-2 max-md:inset-x-2 max-md:bottom-2 max-md:w-auto"
-      style={{ right: `var(${STUDIO_CHAT_RIGHT_VAR}, 1.5rem)` }}
+      className="studio-chat pointer-events-none fixed bottom-4 z-40 flex max-w-[calc(100vw-2.5rem)] flex-col gap-2 max-md:inset-x-2 max-md:bottom-2 max-md:!w-auto max-md:max-w-none"
+      style={{ right: `var(${STUDIO_CHAT_RIGHT_VAR}, 1.5rem)`, width: size.width }}
     >
       {showThread && threadId ? (
-        <section aria-label="Studio chat" className={cn(CARD, mode === "thread" && "h-[min(620px,calc(100vh-7rem))] max-md:h-[80vh]")}>
+        <section
+          aria-label="Studio chat"
+          className={cn(CARD, "relative", mode === "thread" && "max-h-[calc(100vh-7rem)] max-md:!h-[80vh]")}
+          style={mode === "thread" ? { height: size.height } : undefined}
+        >
+          {mode === "thread" ? (
+            <div
+              role="separator"
+              aria-label="Resize chat"
+              title="Drag to resize. Double-click to reset."
+              className="studio-chat-resize absolute top-0 left-0 z-10 size-3.5 cursor-nwse-resize touch-none rounded-tl-lg hover:bg-state-hover max-md:hidden"
+              {...grip}
+            />
+          ) : null}
           <header className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
             <button
               type="button"

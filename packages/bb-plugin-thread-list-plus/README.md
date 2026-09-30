@@ -14,6 +14,9 @@ list and its organization controls, and adds:
 - **New project** in the **Threads ⋯** menu. It opens a folder picker or
   accepts a folder path, creates the project through BB's Plugin SDK, and
   opens it.
+- **Float in Studio Chat** in each thread's menu, after **Open in split**,
+  while [Studio Chat](../bb-plugin-studio-chat) is installed. It puts the
+  thread in Studio Chat's floating card.
 
 The bundled Thread List plugin remains installed; selecting Studio Sidebar as
 the thread list provider switches the visible list. Install this package in

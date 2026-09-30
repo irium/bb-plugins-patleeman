@@ -49,6 +49,8 @@ import {
   type ThreadSectionMoveContextValue,
 } from "./ThreadSectionMoveProvider.js";
 import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
+import { useStudioChatPresent } from "@bb-studio/kit/app";
+import { STUDIO_CHAT_FLOAT_EVENT } from "@bb-studio/kit/contract";
 import { useCustomizeThreadRowActions } from "../list/customizeRowActionsContext.js";
 
 interface ThreadActionsMenuBaseProps {
@@ -255,6 +257,7 @@ function ThreadActionsMenuItems({
   const isCompactViewport = useIsCompactViewport();
   const isDrawer = surface === "dropdown" && isCompactViewport;
   const showSeparators = !isDrawer;
+  const studioChat = useStudioChatPresent() === true;
 
   if (isDrawer && compactStep === "move") {
     return (
@@ -324,7 +327,16 @@ function ThreadActionsMenuItems({
             onRename={onRename}
             variant={menuVariant}
           />
-          {id === "split" && onOpenInSplit ? separator : null}
+          {id === "split" && studioChat ? (
+            <ActionMenuItem
+              surface={surface}
+              icon="PictureInPicture2"
+              onSelect={() => floatInStudioChat(thread.id)}
+            >
+              Float in Studio Chat
+            </ActionMenuItem>
+          ) : null}
+          {id === "split" && (onOpenInSplit || studioChat) ? separator : null}
         </Fragment>
       ))}
       <ActionMenuItem
@@ -340,6 +352,13 @@ function ThreadActionsMenuItems({
         Delete
       </ActionMenuItem>
     </>
+  );
+}
+
+// Studio Chat listens for this event; the sidebar doesn't import it.
+function floatInStudioChat(threadId: string) {
+  window.dispatchEvent(
+    new CustomEvent(STUDIO_CHAT_FLOAT_EVENT, { detail: { threadId } }),
   );
 }
 

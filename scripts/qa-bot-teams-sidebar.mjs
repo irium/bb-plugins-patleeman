@@ -1,5 +1,5 @@
 // Live sidebar regression: empty threads only; never sends messages or wakes bots.
-// BB_SIDEBAR_QA_SESSION=<session> [BB_SIDEBAR_QA_BOT_ID=<idle fixture>] [BB_SIDEBAR_QA_ORIGIN=<bb url>] node scripts/qa-bot-teams-sidebar.mjs
+// BB_SIDEBAR_QA_SESSION=<session> [BB_SIDEBAR_QA_BOT_ID=<idle fixture>] [BB_SIDEBAR_QA_ORIGIN=<bb url>] [BB_SIDEBAR_QA_MODEL=<codex model>] node scripts/qa-bot-teams-sidebar.mjs
 // Needs the browser-automation plugin. The sections render through the Studio Sidebar (thread-list-plus).
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -41,7 +41,7 @@ try {
     ? await rpc('get', { id: process.env.BB_SIDEBAR_QA_BOT_ID })
     : JSON.parse(execFileSync('bb', ['bots', 'create', `Sidebar QA ${suffix}`, '--mission',
       'Temporary sidebar verification fixture. No work is requested.', '--provider', 'codex',
-      '--model', 'gpt-6.1-sol', '--interval', '0', '--json'], { encoding: 'utf8' }));
+      '--model', process.env.BB_SIDEBAR_QA_MODEL ?? 'gpt-6.1-sol', '--interval', '0', '--json'], { encoding: 'utf8' }));
   // get returns the profile with documents; use only the bot record.
   bot = bot.bot ?? bot;
   if (!/^Sidebar QA\b/.test(bot.name) || bot.intervalMinutes !== 0)
@@ -58,7 +58,7 @@ try {
   zulu.threadId = (await rpc('openChannelThread', { id: zulu.id })).threadId;
   const direct = await rpc('newConversation', { id: bot.id });
   createdThreads.push(direct.threadId);
-  const section = await api('thread-sections', 'POST', { name: `Sidebar QA ${suffix}` });
+  const section = await api('thread-sections', 'POST', { name: `Sidebar QA Section ${suffix}` });
   sections.push(section.id);
   const fixture = { origin, bot, alpha, zulu, direct, section, suffix };
   for (const group of groups) {
@@ -181,7 +181,8 @@ async function exercise(p, f, group) {
     await p.waitForSelector('[data-split-pane-id]');
     const beforePanes = await p.evaluate(()=>document.querySelectorAll('[data-split-pane-id]').length);
     await p.keyboard.down('Meta'); try { await p.click(`${channelRow(f.alpha.name)} a`); } finally { await p.keyboard.up('Meta'); }
-    await wait('Command-click opens channel',(id)=>location.pathname.endsWith(id),{},f.alpha.threadId);
+    // The split first shows the channel route, which ends in the same id; wait for its thread.
+    await wait('Command-click opens channel',(id)=>location.pathname.endsWith(`/threads/${id}`),{},f.alpha.threadId);
     check(await p.evaluate(()=>window.__sidebarPopups===0), 'Command-click channel stays in BB');
     await p.keyboard.down('Control'); try { await p.click(`${directRow} a`); } finally { await p.keyboard.up('Control'); }
     await p.waitForSelector('[role="menu"]');
@@ -319,10 +320,18 @@ async function exercise(p, f, group) {
     await directMenu(); const label = await p.evaluate(() => [...document.querySelectorAll('[role^="menuitem"]')].find(e => /^Mark /.test(e.textContent.trim()))?.textContent.trim());
     if (label === 'Mark read') { await menuItem('Mark read'); await directMenu(); }
     await menuItem('Mark unread'); await directMenu(); await menuItem('Mark read'); check(true, 'Mark DM unread and read');
+    const sectionOf = async (want) => {
+      for (let tries = 0; tries < 40; tries++) {
+        const sectionId = (await rpc('list', null)).directThreadInfo[f.direct.threadId].sectionId;
+        if (sectionId === want) return sectionId;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      return (await rpc('list', null)).directThreadInfo[f.direct.threadId].sectionId;
+    };
     await directMenu(); await submenu('Move to section'); await menuItem(f.section.name);
-    check((await rpc('list', null)).directThreadInfo[f.direct.threadId].sectionId === f.section.id, 'Move DM to section');
+    check(await sectionOf(f.section.id) === f.section.id, 'Move DM to section');
     await directMenu(); await submenu('Move to section'); await menuItem('Threads');
-    check((await rpc('list', null)).directThreadInfo[f.direct.threadId].sectionId === null, 'Move DM back to Threads');
+    check(await sectionOf(null) === null, 'Move DM back to Threads');
     await p.click(`${directRow} .direct-thread-archive`); await absent(directRow);
     await p.click('button[aria-label="Direct message list options"]'); await menuItem('Show archived threads'); await waitDirect();
     await directMenu(); await menuItem('Unarchive'); await waitDirect();
