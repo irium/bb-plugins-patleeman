@@ -1,14 +1,14 @@
 {
   "name": "bb-plugin-agent-plugins",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "type": "module",
   "files": [
     "dist",
     "schemas"
   ],
   "engines": {
-    "bb": ">=0.39",
-    "bbPluginSdk": ">=0.4.16"
+    "bb": ">=0.44",
+    "bbPluginSdk": ">=0.5.29"
   },
   "bb": {
     "name": "Agent Plugins",
@@ -37,7 +37,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.4.21",
+    "@get-bb/plugin-sdk": "0.5.29",
     "@testing-library/react": "16.3.2",
     "@types/better-sqlite3": "^7.6.12",
     "@types/js-yaml": "^4.0.9",

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { definePluginApp, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./server";
+import { serversNeedingAttention } from "./src/attention";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -102,6 +103,35 @@ function navigateAuthorizationWindow(authWindow: Window | null, url: string | nu
   const opened = window.open(url, "_blank", "noopener,noreferrer");
   if (!opened) {
     throw new Error("BB could not open the authorization window. Allow pop-ups and try again.");
+  }
+}
+
+type AuthMethod = "authenticate" | "reconnect" | "reauthorize";
+
+async function startAuthFlow(
+  rpc: ReturnType<typeof useRpc<typeof rpcContract>>,
+  method: AuthMethod,
+  p: string,
+  s: string,
+): Promise<void> {
+  const key = `mcp-auth:${p}:${s}`;
+  // Open synchronously inside the click so pop-up blockers allow it.
+  const authWindow = window.open("about:blank", "_blank");
+  try {
+    const result = await rpc.call(method, { id: p, serverId: s });
+    navigateAuthorizationWindow(authWindow, result.url);
+    if (result.url) {
+      toast.info("Authorization window opened", {
+        description: "Finish the consent flow, then return to BB.",
+        id: `${key}:started`,
+        duration: 7000,
+      });
+    } else {
+      toast.success(`${s} connected`, { id: `${key}:connected`, duration: 4000 });
+    }
+  } catch (e) {
+    authWindow?.close();
+    throw e;
   }
 }
 
@@ -700,26 +730,13 @@ function AgentPluginsView() {
     }
   };
 
-  const runAuthAction = async (method: "authenticate" | "reconnect" | "reauthorize", p: string, s: string) => {
+  const runAuthAction = async (method: AuthMethod, p: string, s: string) => {
     const key = `mcp-auth:${p}:${s}`;
-    let authWindow: Window | null = null;
     setPendingAction(key);
     setLocalErr(null);
     try {
-      authWindow = window.open("about:blank", "_blank");
-      const result = await rpc.call(method, { id: p, serverId: s });
-      navigateAuthorizationWindow(authWindow, result.url);
-      if (result.url) {
-        toast.info("Authorization window opened", {
-          description: "Finish the consent flow, then return to BB.",
-          id: `${key}:started`,
-          duration: 7000,
-        });
-      } else {
-        toast.success(`${s} connected`, { id: `${key}:connected`, duration: 4000 });
-      }
+      await startAuthFlow(rpc, method, p, s);
     } catch (e) {
-      authWindow?.close();
       const message = errorText(e);
       setLocalErr(message);
       notifyError(message, `agent-plugins:${key}:error`);
@@ -835,7 +852,97 @@ function AgentPluginsView() {
   );
 }
 
+const ATTENTION_POLL_MS = 60_000;
+
+// App-wide panel pinned above the sidebar footer. Renders nothing unless an
+// MCP server needs to sign in again or failed to connect.
+function McpAttentionOverlay() {
+  const { snap, load, rpc } = useSnapshot();
+  const [pending, setPending] = useState<string | null>(null);
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    const timer = setInterval(() => void load(), ATTENTION_POLL_MS);
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [load]);
+
+  const attention = snap ? serversNeedingAttention(snap) : [];
+  // Closing hides the panel until the set of broken servers changes.
+  const attentionKey = attention.map((server) => `${server.pluginId}:${server.serverId}:${server.status}`).join("|");
+  if (attention.length === 0 || attentionKey === dismissedKey) return null;
+
+  const run = async (method: AuthMethod, p: string, s: string) => {
+    const key = `mcp-auth:${p}:${s}`;
+    setPending(key);
+    try {
+      await startAuthFlow(rpc, method, p, s);
+    } catch (e) {
+      notifyError(errorText(e), `agent-plugins:${key}:error`);
+    } finally {
+      setPending(null);
+      await load();
+    }
+  };
+
+  return (
+    <section
+      aria-label="MCP connections"
+      className="fixed bottom-12 left-2 z-50 w-[min(15rem,calc(100vw-1rem))] space-y-2 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xs font-medium">MCP connections</h2>
+        <button
+          type="button"
+          className="text-[11px] text-muted-foreground hover:text-foreground"
+          onClick={() => setDismissedKey(attentionKey)}
+        >
+          Close
+        </button>
+      </div>
+      <ul className="space-y-2">
+        {attention.map((server) => {
+          const key = `mcp-auth:${server.pluginId}:${server.serverId}`;
+          const method: AuthMethod = server.authStatus === "authenticated" ? "reconnect" : "authenticate";
+          return (
+            <li key={key} className="flex items-start gap-2">
+              <span className="mt-1.5"><Dot status={server.status} /></span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-medium">
+                  <span className="font-mono">{server.serverId}</span>
+                  <span className="font-normal text-muted-foreground"> · {server.pluginName}</span>
+                </div>
+                <p className="truncate text-[11px] text-muted-foreground" title={server.lastError ?? undefined}>
+                  {server.lastError ?? (server.status === "needs-auth" ? "Authentication required" : server.status)}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 shrink-0 text-xs"
+                disabled={pending === key}
+                onClick={() => void run(method, server.pluginId, server.serverId)}
+              >
+                {method === "reconnect" ? "Reconnect" : "Sign in"}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 export default definePluginApp((app) => {
+  app.slots.experimental_appOverlay({ id: "mcp-attention", component: McpAttentionOverlay });
   app.slots.settingsSection({
     id: "agent-plugins-status",
     title: "Agent Plugins",
