@@ -360,27 +360,6 @@
       }
     },
     {
-      "id": "spool",
-      "displayName": "Spool",
-      "description": "Give BB agents a read-only, audited Spool context connection and usage skill.",
-      "icon": "Database",
-      "tags": [
-        "context",
-        "integrations"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-plugins.git",
-          "subdir": "packages/bb-plugin-spool",
-          "ref": "main"
-        }
-      }
-    },
-    {
       "id": "studio",
       "displayName": "Studio",
       "description": "The home of BB Studio. One collection for your pages, Talk recordings and drawings: search, filter by project, and hand anything to an agent. Add-ons plug in.",
