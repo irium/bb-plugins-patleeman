@@ -4,7 +4,7 @@
 
 One collection for everything the Studio add-ons make: pages, Talk
 recordings and dictations, drawings, and saved artifacts. Search across all of them, filter by
-kind and project, and hand any of them to an agent.
+kind, project and tag, and hand any of them to an agent.
 
 ## Staged preview
 
@@ -20,6 +20,10 @@ the kind filters and New menu in the header.
   grid, with search over titles and content, kind pills, a project filter,
   and an Archived view. Drawings show thumbnails; recordings show their
   length and word count.
+- **Tags** group items across add-ons: a page, a drawing and a task can all
+  be tagged "Launch". Tag from an item's ⋯ menu or the selection bar, filter
+  by tag (or Untagged) from the tag menu, and click a chip to filter by it.
+  The tag menu also renames and deletes the active tag.
 - **Shared actions**: select items (shift-click for a range) to start a
   **New thread** that mentions them, move them to a project, archive, or
   delete. Actions an add-on defines, like Talk's "Copy transcripts" or Draw's
@@ -30,11 +34,12 @@ the kind filters and New menu in the header.
   collection hands over to Studio filtered to its kind, and item pages lead
   back to Studio. Studio's ⋯ menu can hide the add-ons' sidebar rows, so
   Studio is the only entry. Without Studio, each add-on works on its own.
-- **For agents**: the `studio_list_items` tool, the `bb studio` CLI, and a
-  `studio` skill.
+- **For agents**: the `studio_list_items` and `studio_tag_items` tools, the
+  `bb studio` CLI, and a `studio` skill.
 
 ```sh
-bb studio list [--all] [--kind <kind>] [--query <text>] [--json]
+bb studio list [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]
+bb studio tags
 bb studio providers
 ```
 
@@ -50,8 +55,9 @@ bb studio providers
   relays that over realtime and the open collection refetches.
 - A stopped or failing add-on shows up as unavailable instead of breaking the
   collection.
-- Studio stores nothing. Each add-on owns its data, editors, tools, CLI and
-  mentions.
+- Studio stores only tags, keyed by `<plugin id>:<item id>`, so add-ons
+  don't need to know about them. Tags on items an add-on no longer lists are
+  dropped. Each add-on owns its data, editors, tools, CLI and mentions.
 
 See [`docs/studio.md`](../../docs/studio.md) for the design.
 

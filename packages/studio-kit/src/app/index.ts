@@ -9,6 +9,7 @@ export {
   type CollectionHandlers,
   type CollectionItem,
   type CollectionKind,
+  type CollectionTag,
 } from "./collection";
 export { AddOnCollection, type ProviderCall } from "./add-on";
 export { EditableTitle, ItemHeader } from "./item-header";

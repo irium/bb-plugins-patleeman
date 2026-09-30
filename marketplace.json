@@ -386,7 +386,7 @@
     {
       "id": "studio",
       "displayName": "Studio",
-      "description": "The home of BB Studio. One collection for your pages, Talk recordings and drawings: search, filter by project, and hand anything to an agent. Add-ons plug in.",
+      "description": "The home of BB Studio. One collection for your pages, Talk recordings and drawings: search, group with tags, filter by project, and hand anything to an agent. Add-ons plug in.",
       "icon": {
         "url": "./packages/bb-plugin-studio/icons/studio.svg"
       },

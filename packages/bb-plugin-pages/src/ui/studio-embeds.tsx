@@ -45,7 +45,7 @@ const FALLBACK_ICONS: Record<StudioEmbedKind | "item", string> = {
   artifact: "File",
   recording: "Mic",
   task: "CircleCheck",
-  item: "LayoutGrid",
+  item: "GridView",
 };
 
 function ItemHeader({ item, kind, target, loading, onEdit }: {

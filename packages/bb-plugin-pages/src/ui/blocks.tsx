@@ -291,7 +291,7 @@ const EMBED_ICONS = {
   artifact: "File",
   recording: "Mic",
   task: "CircleCheck",
-  item: "LayoutGrid",
+  item: "GridView",
 } as const;
 
 function hostOf(url: string): string {
@@ -465,7 +465,7 @@ const EmbedBlock = createReactBlockSpec(embedConfig, {
   ),
 });
 
-const MENTION_ICONS = { bot: "Bot", page: "FileText", thread: "MessageSquare", date: "Calendar", agent: "AiBrain01", item: "LayoutGrid" } as const;
+const MENTION_ICONS = { bot: "Bot", page: "FileText", thread: "MessageSquare", date: "Calendar", agent: "AiBrain01", item: "GridView" } as const;
 
 export function formatMentionDate(iso: string): string {
   const date = new Date(`${iso}T00:00:00`);

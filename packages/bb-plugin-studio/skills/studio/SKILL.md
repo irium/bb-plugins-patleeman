@@ -25,17 +25,27 @@ Items belong to a BB project or are global. Every item has a link
 - Agent tool `studio_list_items`: this project's and global items, newest
   first, each with its kind and link. Pass `query` to match titles and
   content, `kind` (`page`, `recording`, `dictation`, `drawing`, `artifact`, `task`) to narrow, and
-  `allProjects: true` to look everywhere. Archived items are left out.
-- CLI: `bb studio list [--all] [--kind <kind>] [--query <text>] [--json]`.
+  `allProjects: true` to look everywhere, and `tag` to list one tag's items.
+  Archived items are left out. Each line shows the item's `#tags`.
+- CLI: `bb studio list [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]`;
+  `bb studio tags` lists the tags and how many items each has.
 - `bb studio providers` shows which add-ons are installed and whether each is
   ready; an add-on that's stopped contributes nothing to the list.
 
 Then read or change the item with its add-on's own tools. Studio doesn't edit
 content itself.
 
+## Tags
+
+Tags group items across add-ons, like a "Launch" tag on a page, a drawing and
+a task. Studio keeps them; add-ons don't. Use `studio_tag_items` with
+`items` (item links, or `<plugin id>:<item id>`), `add` and `remove` (tag
+names). Adding a name that doesn't exist yet creates the tag. Tag when the
+user asks to group, file or label items; don't invent tags on your own.
+
 ## In the app
 
-The Studio panel is the collection: search, kind and project filters, list or
+The Studio panel is the collection: search, kind, project and tag filters, list or
 grid, archive, move to project, delete, **New ▾** for any kind, and
 **New thread** to start a conversation that mentions the selected items. With
 Studio installed, each add-on's own collection hands over to Studio filtered

@@ -25,13 +25,21 @@ const sidebar = z.object({
 });
 export type SidebarView = z.infer<typeof sidebar>;
 
+const tag = z.object({ id: z.string(), name: z.string(), color: z.string() });
+export type TagView = z.infer<typeof tag>;
+const tagId = z.string().min(1).max(100);
+const tagName = z.string().min(1).max(100);
+const itemRef = z.object({ pluginId, id: z.string().min(1).max(200) });
+
 export const rpcContract = defineRpcContract({
   /** Every provider and all of their items. */
   overview: {
     input: z.null(),
     output: z.object({
       providers: z.array(provider),
-      items: z.array(schemas.item.extend({ pluginId: z.string() })),
+      /** Tag ids per item, in tag-name order. */
+      items: z.array(schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()) })),
+      tags: z.array(tag),
     }),
   },
   /** `<plugin>:<id>` keys of items whose content matches. */
@@ -49,6 +57,15 @@ export const rpcContract = defineRpcContract({
   action: {
     input: z.object({ pluginId, action: z.string().min(1).max(100), ids }),
     output: z.object({ message: z.string().nullable(), text: z.string().nullable() }),
+  },
+  /** Makes a tag, or returns the one with this name. */
+  createTag: { input: z.object({ name: tagName }), output: z.object({ tag }) },
+  renameTag: { input: z.object({ id: tagId, name: tagName }), output: z.object({ tag }) },
+  deleteTag: { input: z.object({ id: tagId }), output: z.object({ ok: z.boolean() }) },
+  /** Adds and removes tags on items from any add-on. */
+  tagItems: {
+    input: z.object({ items: z.array(itemRef).min(1).max(500), add: z.array(tagId).max(50), remove: z.array(tagId).max(50) }),
+    output: z.object({ ok: z.boolean() }),
   },
   /** Add-ons call this when their items change. */
   studio_changed: schemas.changed,

@@ -20,15 +20,16 @@ import {
   type CollectionHandlers,
   type CollectionItem,
   type CollectionKind,
+  type CollectionTag,
 } from "@bb-studio/kit/app";
 import { mentionPrompt, STUDIO_REALTIME_CHANNEL, type StudioCreateEventDetail } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { ProviderView, rpcContract, SidebarView } from "../contract";
+import type { ProviderView, rpcContract, SidebarView, TagView } from "../contract";
 
-type Overview = { providers: ProviderView[]; items: CollectionItem[] };
+type Overview = { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[] };
 const TIP_DISMISSED_KEY = "studio:sidebar-tip-dismissed";
 const REFETCH_DEBOUNCE_MS = 300;
 
@@ -75,7 +76,7 @@ function useOverview(rpc: ReturnType<typeof useRpc<typeof rpcContract>>) {
     clearTimeout(timer.current);
     timer.current = setTimeout(refetch, REFETCH_DEBOUNCE_MS);
   });
-  return { data, error, refetch };
+  return { data, error, refetch, setData };
 }
 
 function useSidebar(rpc: ReturnType<typeof useRpc<typeof rpcContract>>) {
@@ -113,7 +114,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   const navigate = useBbNavigate();
   const context = useBbContext();
   const projects = useProjects();
-  const { data, error, refetch } = useOverview(rpc);
+  const { data, error, refetch, setData } = useOverview(rpc);
   const { sidebar, setVisible } = useSidebar(rpc);
   const [tipDismissed, setTipDismissed] = useState(() => {
     try {
@@ -174,8 +175,41 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         return result;
       },
       onSearch: async (query) => new Set((await rpc.call("search", { query })).keys),
+      onTag: async (items, add, remove) => {
+        // Show the change now; the refetch confirms it.
+        const keys = new Set(items.map((item) => `${item.pluginId}:${item.id}`));
+        setData((previous) =>
+          previous && {
+            ...previous,
+            items: previous.items.map((item) =>
+              keys.has(`${item.pluginId}:${item.id}`)
+                ? { ...item, tags: [...new Set([...(item.tags ?? []), ...add])].filter((id) => !remove.includes(id)) }
+                : item,
+            ),
+          },
+        );
+        try {
+          await rpc.call("tagItems", { items: items.map((item) => ({ pluginId: item.pluginId, id: item.id })), add, remove });
+        } finally {
+          refetch();
+        }
+      },
+      onCreateTag: async (name): Promise<CollectionTag> => {
+        const { tag } = await rpc.call("createTag", { name });
+        setData((previous) => previous && { ...previous, tags: previous.tags.some((each) => each.id === tag.id) ? previous.tags : [...previous.tags, tag] });
+        return tag;
+      },
+      onRenameTag: async (tag, name) => {
+        await rpc.call("renameTag", { id: tag.id, name });
+        refetch();
+      },
+      onDeleteTag: async (tag) => {
+        await rpc.call("deleteTag", { id: tag.id });
+        toast.success(`Deleted the tag ${tag.name}`);
+        refetch();
+      },
     }),
-    [nameOf, navigate, refetch, rpc],
+    [nameOf, navigate, refetch, rpc, setData],
   );
 
   const shownPanels = sidebar?.panels.filter((panel) => panel.visible) ?? [];
@@ -269,6 +303,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       projects={projects}
       defaultProjectId={context.projectId ?? null}
       storageKey="studio:collection"
+      tags={data?.tags ?? []}
       kind={kind}
       onKindChange={setKind}
       notice={notice}

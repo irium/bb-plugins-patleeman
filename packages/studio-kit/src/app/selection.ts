@@ -4,7 +4,8 @@ import type { StudioItem, StudioKind } from "../contract";
 import { untitled } from "../format";
 
 export type CollectionKind = StudioKind & { pluginId: string };
-export type CollectionItem = StudioItem & { pluginId: string };
+/** `tags` holds tag ids, when the collection has tags. */
+export type CollectionItem = StudioItem & { pluginId: string; tags?: readonly string[] };
 
 /** Where an item's key is unique: ids are only unique within a plugin. */
 export const itemKey = (item: { pluginId: string; id: string }) => `${item.pluginId}:${item.id}`;
