@@ -30,6 +30,7 @@ import {
   PILL,
   PRIMARY_BUTTON,
   projectName,
+  THUMBNAIL,
   type Project,
 } from "./pieces";
 import {
@@ -580,19 +581,20 @@ export function CollectionPage({
                   onClick={(event) => (chosen.length && pickable ? toggle(item, event.shiftKey) : handlers.onOpen(item))}
                   onKeyDown={(event) => event.key === "Enter" && handlers.onOpen(item)}
                 >
-                  {item.thumbnailUrl ? (
-                    <div className="flex h-32 items-center justify-center border-b border-border bg-foreground/[0.03] p-3">
-                      <img src={item.thumbnailUrl} alt="" loading="lazy" className="max-h-full max-w-full object-contain dark:invert-[0.9]" />
-                    </div>
-                  ) : null}
-                  <div className="flex flex-1 flex-col gap-3 p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      {item.thumbnailUrl ? null : <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} size="lg" />}
-                      <div className={cn("flex items-center gap-1", item.thumbnailUrl && "ml-auto")}>
-                        {item.badge ? <Badge label={item.badge.label} tone={item.badge.tone} /> : null}
-                        {rowMenu(item, revealClass)}
-                      </div>
-                    </div>
+                  {/* Every card has the same preview area, so a grid row doesn't
+                      stretch around the one card with a thumbnail. */}
+                  <div className="flex h-32 items-center justify-center border-b border-border bg-foreground/[0.03] p-3">
+                    {item.thumbnailUrl ? (
+                      <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
+                    ) : (
+                      <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} size="xl" />
+                    )}
+                  </div>
+                  <div className="absolute top-2 right-2 flex items-center gap-1">
+                    {item.badge ? <Badge label={item.badge.label} tone={item.badge.tone} /> : null}
+                    {rowMenu(item, revealClass)}
+                  </div>
+                  <div className="flex flex-1 flex-col p-4">
                     <div className="min-w-0">
                       <div className={cn("truncate font-medium", !item.title && "text-muted-foreground")}>{untitled(item.title)}</div>
                       {item.preview ? <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{item.preview}</div> : null}
@@ -671,7 +673,7 @@ export function CollectionPage({
                   <div role="gridcell" className="flex min-w-0 items-center gap-3">
                     {item.thumbnailUrl ? (
                       <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
-                        <img src={item.thumbnailUrl} alt="" loading="lazy" className="max-h-full max-w-full object-contain dark:invert-[0.9]" />
+                        <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
                       </span>
                     ) : (
                       <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} />

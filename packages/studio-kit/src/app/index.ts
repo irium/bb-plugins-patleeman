@@ -28,6 +28,7 @@ export {
   PILL,
   PRIMARY_BUTTON,
   projectName,
+  THUMBNAIL,
   useProjects,
   type Project,
 } from "./pieces";

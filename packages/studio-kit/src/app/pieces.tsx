@@ -48,15 +48,21 @@ export function PageColumn({ children, className }: { children: ReactNode; class
 }
 
 /** An item's emoji or its kind's icon on a soft tile. */
-export function ItemTile({ icon, kindIcon, size = "md" }: { icon: string | null; kindIcon: string; size?: "sm" | "md" | "lg" }) {
+/**
+ * Classes for a drawing thumbnail. Thumbnails are light SVGs; in dark mode
+ * they're inverted, and hue-rotated back so colours keep their hue.
+ */
+export const THUMBNAIL = "max-h-full max-w-full object-contain dark:invert-[0.9] dark:hue-rotate-180";
+
+export function ItemTile({ icon, kindIcon, size = "md" }: { icon: string | null; kindIcon: string; size?: "sm" | "md" | "lg" | "xl" }) {
   return (
     <span
       className={cn(
         "flex shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06] leading-none",
-        size === "lg" ? "size-10 text-xl" : size === "md" ? "size-8 text-base" : "size-6 text-sm",
+        size === "xl" ? "size-14 rounded-xl text-3xl" : size === "lg" ? "size-10 text-xl" : size === "md" ? "size-8 text-base" : "size-6 text-sm",
       )}
     >
-      {icon || <Icon name={kindIcon} className={cn("text-muted-foreground", size === "lg" ? "size-5" : "size-4")} />}
+      {icon || <Icon name={kindIcon} className={cn("text-muted-foreground", size === "xl" ? "size-7" : size === "lg" ? "size-5" : "size-4")} />}
     </span>
   );
 }

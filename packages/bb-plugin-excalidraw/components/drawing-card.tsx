@@ -1,7 +1,7 @@
 // A drawing's card in the thread panel and the composer picker: the server's
 // thumbnail over its name, in Studio's card style.
 import type { ReactNode } from "react";
-import { Icon, cn } from "@bb-studio/kit/app";
+import { Icon, THUMBNAIL, cn } from "@bb-studio/kit/app";
 import { relativeTime } from "@bb-studio/kit/format";
 import { DRAW_ICON, thumbnailUrl } from "../src/shared";
 
@@ -44,7 +44,7 @@ export function DrawingCard({
             src={thumbnailUrl(drawing.id, drawing.updatedAt)}
             alt=""
             loading="lazy"
-            className="max-h-full max-w-full object-contain dark:invert-[0.9]"
+            className={THUMBNAIL}
           />
         ) : (
           <Icon name={DRAW_ICON} className="size-6 text-muted-foreground/60" />
