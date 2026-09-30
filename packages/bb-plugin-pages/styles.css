@@ -77,6 +77,11 @@
 .pages-editor .bn-block-content[data-content-type="codeBlock"] > pre code {
   font-family: inherit;
 }
+/* BlockNote always uses the dark token colours; ours follow the page theme. */
+.pages-editor.bn-root[data-color-scheme="light"] .shiki,
+.pages-editor .bn-root[data-color-scheme="light"] .shiki {
+  color: var(--shiki-light);
+}
 .pages-editor .bn-block-content[data-content-type="codeBlock"] > div > select {
   color: var(--muted-foreground);
   top: 4px;

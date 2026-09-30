@@ -52,15 +52,23 @@ Pages reads and writes GitHub-flavoured Markdown plus:
   `x` and `series` default to the first text column and the numeric columns.
 - **Stats:** a fenced ` ```stats ` block holding 1–6 items:
   `[{"label":"ARR","value":"$1.2M","delta":"+8%","trend":"up","caption":"vs last month"}]`.
+- **Mermaid:** a fenced ` ```mermaid ` block renders as a diagram.
 - **Embeds:** a fenced ` ```embed ` block:
-  `{"kind":"bookmark|thread|page|drawing","target":"https://… or an id","title":"…"}`.
+  `{"kind":"bookmark|thread|page|drawing|artifact|recording|task|item","target":"https://… or an id","title":"…"}`.
   Bookmarks may also carry `description` and `image`; leave them out and the
-  editor fetches the link's preview when the page opens.
+  editor fetches the link's preview when the page opens. `drawing`,
+  `artifact`, `recording`, and `task` take the item's id in Excalidraw,
+  Artifacts, Talk, or Studio Tasks. `item` embeds anything in Studio, with
+  `plugin:id` as the target (`studio_list_items` lists ids). A drawing shows
+  its picture, an artifact its content, and the rest a card.
 - **Mentions:** `@[Name](bot:bot_id)`, `@[Title](page:pg_id)`,
-  `@[Title](thread:thr_id)`, `@[2026-10-01](date:2026-10-01)`.
+  `@[Title](thread:thr_id)`, `@[Title](item:plugin:id)`,
+  `@[2026-10-01](date:2026-10-01)`.
 
-Tables, checklists (`- [ ]`), headings, quotes, code, and images work as in
-GFM.
+Tables, checklists (`- [ ]`), headings, quotes, and images work as in GFM.
+Code fences keep their language and are highlighted for TypeScript,
+JavaScript, JSON, Python, shell, Go, Rust, SQL, HTML, CSS, YAML, Markdown,
+diffs, Java, Kotlin, Swift, C, C#, TOML, Dockerfile, GraphQL, and XML.
 
 ## Working from a page
 

@@ -11,15 +11,16 @@ import type {
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { gfm } from "micromark-extension-gfm";
-import { MENTION_KINDS, type MentionKind } from "./schema-config";
+import { EMBED_KINDS, MENTION_KINDS, type MentionKind } from "./schema-config";
 
 // Agents read and write pages as markdown. This module converts between
 // markdown and BlockNote blocks without a DOM (BlockNote's own converters need
 // one), and adds the page-specific syntax:
 //
 //   ```chart / ```stats / ```embed   fenced JSON for data blocks
+//   ```mermaid                        Mermaid diagrams
 //   > [!NOTE] text                    callouts (NOTE, TIP, WARNING, CAUTION)
-//   @[Label](bot:bot_…)               mentions (bot, page, thread, date, agent)
+//   @[Label](bot:bot_…)               mentions (bot, page, thread, date, agent, item)
 //   <!-- ^1a2b3c4d -->                block ids in read output; ignored on input
 
 export interface StyledText {
@@ -113,6 +114,7 @@ function convertBlock(node: RootContent): PageBlock[] {
       if (fence === "chart") return [{ type: "chart", props: { spec: node.value.trim() } }];
       if (fence === "stats") return [{ type: "stats", props: { items: node.value.trim() } }];
       if (fence === "embed") return [embedBlock(node.value)];
+      if (lang === "mermaid") return [{ type: "mermaid", content: node.value }];
       return [{ type: "codeBlock", props: { language: node.lang ?? "text" }, content: node.value }];
     }
     case "thematicBreak":
@@ -205,7 +207,7 @@ function embedBlock(value: string): PageBlock {
   return {
     type: "embed",
     props: {
-      kind: str("kind") || "bookmark",
+      kind: (EMBED_KINDS as readonly string[]).includes(str("kind")) ? str("kind") : "bookmark",
       target: str("target") || str("url") || str("id"),
       title: str("title"),
       description: str("description"),
@@ -383,6 +385,9 @@ function renderBlock(block: PageBlock, indent: string, number: number, options: 
       body = fence(language, code, indent);
       break;
     }
+    case "mermaid":
+      body = fence("mermaid", typeof block.content === "string" ? block.content : plainText(content), indent);
+      break;
     case "chart":
       body = fence("chart", prettyJson(String(props.spec ?? "")), indent);
       break;

@@ -137,3 +137,15 @@ export function PageMenu({
     </DropdownMenu>
   );
 }
+
+export function useDarkMode(): boolean {
+  const read = () => document.documentElement.classList.contains("dark") || document.body.classList.contains("dark");
+  const [dark, setDark] = useState(read);
+  useEffect(() => {
+    const observer = new MutationObserver(() => setDark(read()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+  return dark;
+}

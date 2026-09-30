@@ -1,4 +1,4 @@
-import { filterSuggestionItems, insertOrUpdateBlockForSlashMenu } from "@blocknote/core";
+import { filterSuggestionItems, insertOrUpdateBlockForSlashMenu, SyntaxHighlightingExtension } from "@blocknote/core";
 import { CommentsExtension, DefaultThreadStoreAuth } from "@blocknote/core/comments";
 import { withCollaboration, YjsThreadStore } from "@blocknote/core/yjs";
 import {
@@ -16,11 +16,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { Icon } from "@/components/ui/icon";
 import { HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, UPLOAD_PATH } from "../constants";
 import type { BotView, PageMetaView } from "../contract";
-import { DOCUMENT_FRAGMENT, THREADS_MAP } from "../schema-config";
+import { DOCUMENT_FRAGMENT, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
 import { linkEmbed } from "./links";
 import { pageSchema } from "./blocks";
+import { createHighlighter } from "./code";
 import type { PageConnection } from "./connection";
-import { authorInfo } from "./context";
+import { authorInfo, usePagesUi } from "./context";
+import { useDarkMode } from "./shared";
 import {
   dictationParagraphs,
   pageFieldKey,
@@ -34,24 +36,20 @@ import {
 
 const HUMAN_COLOR = "#2563eb";
 
+const STUDIO_EMBED_SUBTEXT: Record<StudioEmbedKind, string> = {
+  drawing: "Embed an Excalidraw drawing",
+  artifact: "Embed an artifact: image, HTML, PDF or text",
+  recording: "Embed a Talk recording",
+  task: "Embed a Studio task",
+};
+const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic", task: "CircleCheck" };
+
 export type SidePanel = "comments" | null;
 
 function avatarUrl(label: string, background: string): string {
   const glyph = [...label.trim()][0] ?? "?";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="${background}"/><text x="32" y="42" font-size="30" text-anchor="middle" font-family="system-ui,sans-serif" fill="white">${glyph.replace(/[<&>"]/g, "")}</text></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-
-function useDarkMode(): boolean {
-  const read = () => document.documentElement.classList.contains("dark") || document.body.classList.contains("dark");
-  const [dark, setDark] = useState(read);
-  useEffect(() => {
-    const observer = new MutationObserver(() => setDark(read()));
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
-    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
-  return dark;
 }
 
 async function uploadFile(pageId: string, file: File): Promise<string> {
@@ -122,6 +120,7 @@ export function PageEditor({
   onCloseSidePanel(): void;
 }) {
   const sdk = useSdk();
+  const ui = usePagesUi();
   const dark = useDarkMode();
   const botsRef = useRef(bots);
   botsRef.current = bots;
@@ -157,6 +156,7 @@ export function PageEditor({
         showCursorLabels: "activity",
       },
       extensions: [
+        SyntaxHighlightingExtension({ createHighlighter }),
         CommentsExtension({
           threadStore,
           resolveUsers: async (ids: string[]) =>
@@ -195,6 +195,14 @@ export function PageEditor({
         group: "Basic blocks",
         icon: <Icon name="Info" className="size-4" />,
         onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "callout" }),
+      },
+      {
+        title: "Mermaid diagram",
+        subtext: "Flowchart, sequence, Gantt and more",
+        aliases: ["mermaid", "diagram", "flowchart", "sequence", "gantt"],
+        group: "Advanced",
+        icon: <Icon name="Workflow" className="size-4" />,
+        onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "mermaid" }),
       },
       {
         title: "Chart",
@@ -236,6 +244,14 @@ export function PageEditor({
         icon: <Icon name="MessageSquare" className="size-4" />,
         onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind: "thread" } }),
       },
+      ...(Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).map((kind) => ({
+        title: STUDIO_EMBEDS[kind].label,
+        subtext: STUDIO_EMBED_SUBTEXT[kind],
+        aliases: [kind, STUDIO_EMBEDS[kind].pluginId, "studio", "embed"],
+        group: "Studio",
+        icon: <Icon name={STUDIO_EMBED_ICONS[kind]} className="size-4" />,
+        onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind } }),
+      })),
     ];
     return mergeGroups(getDefaultReactSlashMenuItems(editor), custom);
   }, [editor]);
@@ -366,8 +382,22 @@ export function PageEditor({
         // Thread suggestions are optional.
       }
     }
-    return uniqueTitles(filterSuggestionItems([...botItems, ...pageItems, ...dates, ...threadItems], query).slice(0, 30));
-  }, [editor, sdk, page.id, page.projectId]);
+    let studioItems: DefaultReactSuggestionItem[] = [];
+    if (query.trim()) {
+      try {
+        studioItems = (await ui.studioItems()).map((item) => ({
+          title: item.title,
+          subtext: item.kindLabel,
+          group: "Studio",
+          icon: item.icon ? <span className="text-base leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />,
+          onItemClick: insert("item", `${item.pluginId}:${item.id}`, item.title),
+        }));
+      } catch {
+        // Studio suggestions are optional.
+      }
+    }
+    return uniqueTitles(filterSuggestionItems([...botItems, ...pageItems, ...dates, ...threadItems, ...studioItems], query).slice(0, 30));
+  }, [editor, sdk, ui, page.id, page.projectId]);
 
   return (
     <BlockNoteView

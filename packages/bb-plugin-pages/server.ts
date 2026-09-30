@@ -1,11 +1,14 @@
+import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { createStudioNotifier } from "@bb-studio/kit/server";
 import * as Y from "yjs";
 import { z } from "zod";
 import { BotDirectory } from "./src/bots";
-import { FILES_PATH, HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, SYNC_PATH, UPLOAD_PATH } from "./src/constants";
+import { FILES_PATH, HUMAN_USER_ID, MAX_UPLOAD_BYTES, MERMAID_PATH, PLUGIN_ID, SYNC_PATH, UPLOAD_PATH } from "./src/constants";
 import { rpcContract } from "./src/contract";
+import { studioEmbeds } from "./src/embeds";
 import { fetchPreview } from "./src/unfurl";
 import { applyEdits, readMarkdown } from "./src/doc";
 import type { Socket } from "./src/hub";
@@ -107,6 +110,31 @@ export default async function plugin(bb: BbPluginApi) {
     { auth: "local" },
   );
 
+  // Mermaid's browser build is 3.5 MB, so it isn't in the app bundle every
+  // window loads; the editor fetches it the first time a page shows a diagram.
+  let mermaidScript: Promise<string> | null = null;
+  bb.http.route(
+    "GET",
+    MERMAID_PATH,
+    async (c) => {
+      mermaidScript ??= readFile(createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js"), "utf8");
+      try {
+        return new Response(await mermaidScript, {
+          headers: {
+            "content-type": "text/javascript; charset=utf-8",
+            "cache-control": "private, max-age=86400",
+            "x-content-type-options": "nosniff",
+          },
+        });
+      } catch (error) {
+        mermaidScript = null;
+        bb.log.warn(`Mermaid's browser build is missing: ${errorText(error)}`);
+        return c.text("Mermaid isn't installed with Pages.", 404);
+      }
+    },
+    { auth: "local" },
+  );
+
   // RPC -----------------------------------------------------------------------
 
   const requireMeta = (id: string) => {
@@ -114,6 +142,9 @@ export default async function plugin(bb: BbPluginApi) {
     if (!meta) throw new Error("Page not found.");
     return meta;
   };
+
+  const studio = studioSchemas(z);
+  const embeds = studioEmbeds(bb.sdk, studio);
 
   bb.rpc.register(rpcContract, {
     tree: ({ projectId }) => ({ pages: store.list({ projectId, includeArchived: true }).map(toView) }),
@@ -153,6 +184,8 @@ export default async function plugin(bb: BbPluginApi) {
       return { page: meta ? toView(meta) : null };
     },
     linkPreview: ({ url }) => fetchPreview(url),
+    studioItems: async () => ({ items: await embeds.items() }),
+    artifactView: async ({ id }) => ({ view: await embeds.artifactView(id) }),
     markdown: ({ id }) => {
       requireMeta(id);
       return { markdown: readMarkdown(service.hub.open(id).doc) };
@@ -252,7 +285,6 @@ export default async function plugin(bb: BbPluginApi) {
 
   // Studio --------------------------------------------------------------------
 
-  const studio = studioSchemas(z);
   registerStudio(bb, service, studio);
   // Typing saves a page every few seconds; Studio only needs to hear about it now and then.
   const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: PLUGIN_ID, schemas: studio, delayMs: 1500 });

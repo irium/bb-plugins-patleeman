@@ -50,14 +50,21 @@ afterwards.
 - **Live collaboration.** Every page is a Yjs document synced over a
   WebSocket. Agents and bots edit the same document from the server, so their
   changes stream into your editor, with cursors, while you keep typing.
+- **Code and diagrams.** Code blocks are syntax-highlighted for about
+  twenty languages, in light and dark. A `mermaid` block renders its
+  diagram; click it to edit the source.
 - **Custom blocks.** Callouts, charts (bar, line, area, pie), stat rows, and
   embed cards for links, BB threads, and other pages. Paste a link on an
   empty line to turn it into a card; web links fetch their title,
   description, and preview image.
+- **Studio embeds.** The `/` menu's Studio group embeds a drawing, artifact,
+  recording, or task, picked by search. Drawings show their picture and
+  artifacts their content (images, HTML, PDFs, code, text); click through to
+  open the item. Pasting a link to a Studio item embeds it too.
   Charts and stats are edited as JSON, which makes them easy for agents to
   write.
-- **Mentions.** Type `@` to mention a bot, another page, a BB thread, or a
-  date. Page and thread mentions open where they point.
+- **Mentions.** Type `@` to mention a bot, another page, a BB thread, a
+  Studio item, or a date. Page and thread mentions open where they point.
 - **Comments.** Select text to comment on it. Threads show in a floating
   card where you can reply, react, edit, and resolve. Agents can read, start,
   reply to, and resolve threads.

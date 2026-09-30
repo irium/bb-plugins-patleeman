@@ -22,8 +22,8 @@ export const TOOL_NAMES = [
 export const AGENT_INSTRUCTIONS = [
   "BB Pages are collaborative documents the user edits live. Read a page with pages_read before changing it; it returns Markdown with a `<!-- ^id -->` marker after each block.",
   "Edit with pages_edit using small, targeted operations that reference those block ids, so you don't overwrite the user's concurrent typing. Use replace_all only when asked to rewrite a whole page.",
-  "Pages Markdown supports GFM plus: ```chart / ```stats / ```embed fenced JSON blocks, `> [!NOTE]` callouts (NOTE, TIP, WARNING, CAUTION, IMPORTANT), and mentions like @[Name](bot:bot_id), @[Title](page:pg_id), @[2026-10-01](date:2026-10-01).",
-  'Chart JSON: {"type":"bar|line|area|pie","title":"…","x":"label","series":["Revenue"],"unit":"$","data":[{"label":"Q1","Revenue":10}]}. Stats JSON: [{"label":"ARR","value":"$1.2M","delta":"+8%","trend":"up"}] (1–6 items). Embed JSON: {"kind":"bookmark|thread|page|drawing","target":"https://… or an id","title":"…"}.',
+  "Pages Markdown supports GFM plus: ```chart / ```stats / ```embed fenced JSON blocks, ```mermaid diagrams, `> [!NOTE]` callouts (NOTE, TIP, WARNING, CAUTION, IMPORTANT), and mentions like @[Name](bot:bot_id), @[Title](page:pg_id), @[Title](item:plugin:id), @[2026-10-01](date:2026-10-01).",
+  'Chart JSON: {"type":"bar|line|area|pie","title":"…","x":"label","series":["Revenue"],"unit":"$","data":[{"label":"Q1","Revenue":10}]}. Stats JSON: [{"label":"ARR","value":"$1.2M","delta":"+8%","trend":"up"}] (1–6 items). Embed JSON: {"kind":"bookmark|thread|page|drawing|artifact|recording|task|item","target":"https://… or an id","title":"…"}; item targets are plugin:id from studio_list_items.',
   "Answer comments with pages_comment_reply in the same thread; start new threads with pages_comment on the text you are discussing.",
 ].join("\n");
 

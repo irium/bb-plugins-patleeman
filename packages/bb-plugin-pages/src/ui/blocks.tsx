@@ -21,8 +21,12 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { chartSpecSchema, parseJsonWith, resolveChart, statItemsSchema, type StatItem } from "../chart-spec";
-import { calloutConfig, chartConfig, embedConfig, mentionConfig, statsConfig } from "../schema-config";
+import { ThreadTitle } from "@get-bb/plugin-sdk/app";
+import { calloutConfig, chartConfig, embedConfig, isStudioEmbed, mentionConfig, statsConfig } from "../schema-config";
+import { codeBlockSpec } from "./code";
 import { usePagesUi } from "./context";
+import { MermaidBlock } from "./mermaid";
+import { StudioEmbed, StudioPicker, useStudioItem } from "./studio-embeds";
 
 // React renderers for the custom blocks. Configs come from schema-config.ts so
 // the editor schema matches the server's (src/schema-server.ts).
@@ -279,7 +283,16 @@ const StatsBlock = createReactBlockSpec(statsConfig, {
   },
 });
 
-const EMBED_ICONS = { thread: "MessageSquare", page: "FileText", bookmark: "ExternalLink", drawing: "Palette" } as const;
+const EMBED_ICONS = {
+  thread: "MessageSquare",
+  page: "FileText",
+  bookmark: "ExternalLink",
+  drawing: "Palette",
+  artifact: "File",
+  recording: "Mic",
+  task: "CircleCheck",
+  item: "LayoutGrid",
+} as const;
 
 function hostOf(url: string): string {
   try {
@@ -358,9 +371,25 @@ function EmbedView({ kind, target, title, description, image, onEdit, onPreview 
   const loading = usePreview(target, kind === "bookmark" && !title && !description && !image, onPreview);
   const [editing, setEditing] = useState(!target);
   const [draft, setDraft] = useState(target);
+
+  if (isStudioEmbed(kind)) {
+    if (editing && onEdit) {
+      return (
+        <StudioPicker
+          kind={kind}
+          onPick={(next) => {
+            onEdit(next);
+            setEditing(false);
+          }}
+          onCancel={target ? () => setEditing(false) : undefined}
+        />
+      );
+    }
+    return <StudioEmbed kind={kind} target={target} onEdit={onEdit ? () => setEditing(true) : undefined} />;
+  }
   const page = kind === "page" ? ui.pages.find((candidate) => candidate.id === target) : undefined;
   const heading = title || page?.title || (kind === "bookmark" ? hostOf(target) : target) || "Embed";
-  const sub = description || (kind === "bookmark" ? target : kind === "page" ? "Page" : kind === "thread" ? "Thread" : "Drawing");
+  const sub = description || (kind === "bookmark" ? target : kind === "page" ? "Page" : "Thread");
 
   if (editing && onEdit) {
     return (
@@ -404,7 +433,9 @@ function EmbedView({ kind, target, title, description, image, onEdit, onPreview 
         {page?.icon ? <span className="text-lg">{page.icon}</span> : <Icon name={EMBED_ICONS[kind]} className="size-4" />}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-foreground">{heading}</span>
+        <span className="block truncate text-sm font-medium text-foreground">
+          {kind === "thread" && !title && target ? <ThreadTitle threadId={target} /> : heading}
+        </span>
         <span className="block truncate text-xs text-muted-foreground">{sub}</span>
       </span>
       <Icon name="ArrowUpRight" className="size-4 text-muted-foreground" />
@@ -415,7 +446,10 @@ function EmbedView({ kind, target, title, description, image, onEdit, onPreview 
 const EmbedBlock = createReactBlockSpec(embedConfig, {
   render: ({ block, editor }) => (
     <div
-      className={cn("pages-embed my-1 w-full rounded-lg border border-border bg-card/50", block.props.kind === "bookmark" && block.props.target ? "overflow-hidden" : "p-2")}
+      className={cn(
+        "pages-embed my-1 w-full rounded-lg border border-border bg-card/50",
+        (block.props.kind === "bookmark" && block.props.target) || isStudioEmbed(block.props.kind) ? "overflow-hidden" : "p-2",
+      )}
       contentEditable={false}
     >
       <EmbedView
@@ -431,7 +465,7 @@ const EmbedBlock = createReactBlockSpec(embedConfig, {
   ),
 });
 
-const MENTION_ICONS = { bot: "Bot", page: "FileText", thread: "MessageSquare", date: "Calendar", agent: "AiBrain01" } as const;
+const MENTION_ICONS = { bot: "Bot", page: "FileText", thread: "MessageSquare", date: "Calendar", agent: "AiBrain01", item: "LayoutGrid" } as const;
 
 export function formatMentionDate(iso: string): string {
   const date = new Date(`${iso}T00:00:00`);
@@ -449,7 +483,8 @@ function MentionChip({ kind, target, label }: { kind: keyof typeof MENTION_ICONS
   const ui = usePagesUi();
   const bot = kind === "bot" ? ui.bots.find((candidate) => candidate.id === target) : undefined;
   const page = kind === "page" ? ui.pages.find((candidate) => candidate.id === target) : undefined;
-  const text = kind === "date" ? formatMentionDate(target) : (bot?.name ?? page?.title ?? label) || target;
+  const { item } = useStudioItem(kind, target);
+  const text = kind === "date" ? formatMentionDate(target) : (bot?.name ?? page?.title ?? item?.title ?? label) || target;
   return (
     <span
       className={cn(
@@ -460,9 +495,18 @@ function MentionChip({ kind, target, label }: { kind: keyof typeof MENTION_ICONS
       onClick={() => {
         if (kind === "page") ui.openPage(target);
         else if (kind === "thread") ui.openThread(target);
+        else if (item) ui.openPath(item.href);
       }}
     >
-      {bot ? <span>{bot.avatar}</span> : page?.icon ? <span>{page.icon}</span> : <Icon name={MENTION_ICONS[kind]} className="size-3.5 opacity-70" />}
+      {bot ? (
+        <span>{bot.avatar}</span>
+      ) : page?.icon ? (
+        <span>{page.icon}</span>
+      ) : item?.icon ? (
+        <span>{item.icon}</span>
+      ) : (
+        <Icon name={item?.kindIcon ?? MENTION_ICONS[kind]} className="size-3.5 opacity-70" />
+      )}
       {kind === "bot" ? `@${text}` : text}
     </span>
   );
@@ -477,6 +521,8 @@ const Mention = createReactInlineContentSpec(mentionConfig, {
 export const pageSchema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
+    codeBlock: codeBlockSpec,
+    mermaid: MermaidBlock(),
     callout: Callout(),
     chart: ChartBlock(),
     stats: StatsBlock(),

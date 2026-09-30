@@ -9,6 +9,24 @@ export * from "./constants";
 const pageId = z.string().regex(/^pg_[a-f0-9]{12}$/);
 const projectId = z.string().min(1).max(200).nullable();
 
+export const studioItemSchema = z.object({
+  pluginId: z.string(),
+  id: z.string(),
+  kind: z.string(),
+  kindLabel: z.string(),
+  kindIcon: z.string(),
+  title: z.string(),
+  icon: z.string().nullable(),
+  preview: z.string().nullable(),
+  facts: z.array(z.string()),
+  badge: z.string().nullable(),
+  thumbnailUrl: z.string().nullable(),
+  href: z.string(),
+  updatedAt: z.number(),
+});
+
+export type StudioEmbedItem = z.infer<typeof studioItemSchema>;
+
 export const refreshSchema = z.object({
   botId: z.string(),
   cron: z.string().min(1).max(120),
@@ -131,6 +149,25 @@ export const rpcContract = defineRpcContract({
   linkPreview: {
     input: z.object({ url: z.string().url().max(2000) }),
     output: z.object({ title: z.string(), description: z.string(), image: z.string() }),
+  },
+  /** Items from the other Studio add-ons, for embeds, mentions and pasted links. */
+  studioItems: {
+    input: z.null(),
+    output: z.object({ items: z.array(studioItemSchema) }),
+  },
+  /** What an artifact embed shows: the latest version's bytes, or its text. */
+  artifactView: {
+    input: z.object({ id: z.string().min(1).max(100) }),
+    output: z.object({
+      view: z
+        .object({
+          type: z.enum(["image", "html", "markdown", "code", "text", "pdf", "other"]),
+          name: z.string(),
+          url: z.string(),
+          text: z.string().nullable(),
+        })
+        .nullable(),
+    }),
   },
   markdown: {
     input: z.object({ id: pageId }),

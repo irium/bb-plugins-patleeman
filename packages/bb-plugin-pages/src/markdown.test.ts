@@ -99,3 +99,43 @@ describe("markdown", () => {
     expect(blocksToMarkdown(markdownToBlocks(annotated))).toBe("# Title\n\n- one\n  - two\n");
   });
 });
+
+describe("diagrams and Studio embeds", () => {
+  const MARKDOWN = `\`\`\`mermaid
+flowchart LR
+  A --> B
+\`\`\`
+
+\`\`\`embed
+{"kind":"drawing","target":"drw_1"}
+\`\`\`
+
+\`\`\`embed
+{"kind":"item","target":"notes:nt_1"}
+\`\`\`
+
+\`\`\`embed
+{"kind":"hologram","target":"x"}
+\`\`\`
+
+See @[Roadmap](item:excalidraw:drw_1).
+`;
+
+  it("round-trips mermaid, Studio embeds and item mentions", () => {
+    const blocks = markdownToBlocks(MARKDOWN);
+    expect(blocks[0]).toMatchObject({ type: "mermaid", content: "flowchart LR\n  A --> B" });
+    expect(blocks[1]).toMatchObject({ type: "embed", props: { kind: "drawing", target: "drw_1" } });
+    expect(blocks[2]).toMatchObject({ type: "embed", props: { kind: "item", target: "notes:nt_1" } });
+    // An unknown kind would break the editor, so it becomes a bookmark.
+    expect(blocks[3]).toMatchObject({ type: "embed", props: { kind: "bookmark", target: "x" } });
+    expect(blocks[4]).toMatchObject({
+      content: [{ text: "See " }, { type: "mention", props: { kind: "item", target: "excalidraw:drw_1", label: "Roadmap" } }, { text: "." }],
+    });
+    const back = throughYjs(blocks);
+    expect(back[0]).toMatchObject({ type: "mermaid", content: [{ text: "flowchart LR\n  A --> B" }] });
+    const markdown = blocksToMarkdown(back);
+    expect(markdown).toContain("```mermaid\nflowchart LR\n  A --> B\n```");
+    expect(markdown).toContain('{"kind":"drawing","target":"drw_1"}');
+    expect(markdown).toContain("@[Roadmap](item:excalidraw:drw_1)");
+  });
+});

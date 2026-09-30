@@ -1,10 +1,10 @@
 import { AddOnCollection, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
-import type { PageMetaView, rpcContract } from "../contract";
+import type { PageMetaView, rpcContract, StudioEmbedItem } from "../contract";
 import { PagesUiContext, type PagesUi } from "./context";
 import { PageView } from "./PageView";
 import { useProjects, type BotsState, type Rpc } from "./shared";
@@ -87,6 +87,7 @@ export function PagesPanel({ subPath }: { subPath: string }) {
   });
 
   const openPage = useCallback((id: string) => navigate.toPluginPanel("pages", { subPath: id }), [navigate]);
+  const studioItems = useRef<{ at: number; items: Promise<StudioEmbedItem[]> } | null>(null);
   const ui = useMemo<PagesUi>(
     () => ({
       pages: pages ?? [],
@@ -96,7 +97,18 @@ export function PagesPanel({ subPath }: { subPath: string }) {
       openUrl: (url) => {
         if (!navigate.openUrl(url)) window.open(url, "_blank", "noopener");
       },
+      openPath: openAppPath,
       linkPreview: (url) => rpc.call("linkPreview", { url }),
+      studioItems: () => {
+        // Every embed on a page asks; one request serves them all for a few seconds.
+        if (!studioItems.current || Date.now() - studioItems.current.at > 5_000) {
+          const items = rpc.call("studioItems", null).then((result) => result.items);
+          studioItems.current = { at: Date.now(), items };
+          items.catch(() => (studioItems.current = null));
+        }
+        return studioItems.current.items;
+      },
+      artifactView: (id) => rpc.call("artifactView", { id }).then((result) => result.view),
     }),
     [pages, bots.bots, openPage, navigate, rpc],
   );
