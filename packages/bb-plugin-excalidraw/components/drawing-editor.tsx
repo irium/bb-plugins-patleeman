@@ -82,9 +82,11 @@ export function DrawingEditor({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
   const pendingRef = useRef<string | null>(null);
-  // Set while a scene change was caused by applying a remote (agent/other
-  // editor) update, so handleChange skips autosaving it back.
-  const applyingRemoteRef = useRef(false);
+  // The scene as last saved or loaded, serialized. Excalidraw calls onChange
+  // for pointer moves, selection and scrolling too; comparing against this
+  // saves only real changes, so the editor doesn't keep rewriting the scene
+  // (and hearing its own write back as a remote update).
+  const savedSceneRef = useRef<string | null>(null);
   // Latest server revision (updated_at) — used to ignore our own writes.
   const serverRevSetterRef = useRef<(rev: number) => void>(() => {});
   const [syncedAt, setSyncedAt] = useState<number | null>(null);
@@ -126,7 +128,9 @@ export function DrawingEditor({
           }
         }
         setInitialData(
-          scene ? (scene as unknown as ExcalidrawInitialDataState) : null,
+          scene
+            ? ({ ...scene, scrollToContent: true } as unknown as ExcalidrawInitialDataState)
+            : null,
         );
         loadedRef.current = true;
         serverRevSetterRef.current(drawing.updatedAt);
@@ -162,9 +166,18 @@ export function DrawingEditor({
           }
         : null;
     },
-    (updatedAt) => setSyncedAt(updatedAt),
-    () => {
-      applyingRemoteRef.current = true;
+    (updatedAt) => {
+      // The server already has the scene we just applied, so the change it
+      // causes isn't saved back (that would ping-pong between writers).
+      const api = apiRef.current;
+      if (api) {
+        savedSceneRef.current = serializeSceneWithTombstones(
+          [...api.getSceneElementsIncludingDeleted()],
+          api.getAppState(),
+          api.getFiles(),
+        );
+      }
+      setSyncedAt(updatedAt);
     },
   );
   serverRevSetterRef.current = sync.setServerRev;
@@ -231,13 +244,6 @@ export function DrawingEditor({
   const handleChange = useCallback(
     (elements: readonly unknown[], appState: unknown, files: unknown) => {
       if (!loadedRef.current) return;
-      if (applyingRemoteRef.current) {
-        // Change came from applying a remote (agent) update — the server
-        // already has that scene, so don't autosave it back (avoids write
-        // ping-pong between writers).
-        applyingRemoteRef.current = false;
-        return;
-      }
       try {
         // Serialize WITH tombstones (deleted elements) so deletions propagate
         // through the server-side merge instead of silently resurrecting.
@@ -250,6 +256,14 @@ export function DrawingEditor({
           appState,
           files,
         );
+        // The first change after mount is Excalidraw normalizing the loaded
+        // scene; record it as the saved scene without writing it back.
+        if (savedSceneRef.current === null) {
+          savedSceneRef.current = serialized;
+          return;
+        }
+        if (serialized === savedSceneRef.current) return;
+        savedSceneRef.current = serialized;
         scheduleSave(serialized);
       } catch (error) {
         console.error("serialize failed", error);
