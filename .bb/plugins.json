@@ -15,6 +15,7 @@
     { "name": "excalidraw", "source": "./packages/bb-plugin-excalidraw" },
     { "name": "gtd-sidebar", "source": "./packages/bb-plugin-gtd-sidebar" },
     { "name": "omp", "source": "./packages/bb-plugin-omp" },
+    { "name": "pages", "source": "./packages/bb-plugin-pages" },
     { "name": "plannotator", "source": "./packages/bb-plugin-plannotator" },
     { "name": "prime-agent", "source": "./packages/bb-plugin-prime-agent" },
     { "name": "smart-queue", "source": "./packages/bb-plugin-smart-queue" },

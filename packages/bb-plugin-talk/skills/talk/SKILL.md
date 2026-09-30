@@ -42,6 +42,14 @@ or failed. Say so instead of guessing at the missing part.
   the dictation is. If the user finishes while away from its thread, the
   text waits and is typed into that thread's composer when they go back. The
   thread's sidebar row shows a mic while it is dictating or has text waiting.
+- **Dictation fields.** Other plugins can mark an editor as a dictation
+  field (Pages does this for each page). A dictation there works like one in a
+  composer. The transcript goes in at the cursor, text finished elsewhere
+  waits for the field (for up to three days), and **Go back** opens the
+  field. If the plugin that owns the field is gone, **Go back** copies the
+  text instead, and it's always kept in Talk recordings. *Talk: Start or
+  finish dictation* works in a focused field. `README.md` documents the DOM
+  contract for plugin authors.
 - **Recordings.** *New recording* on the Recordings page, or the command
   "Talk: Start or stop a recording", records without inserting anywhere.
   Suited to meetings and hours-long sessions.

@@ -354,6 +354,50 @@ class CdpClient {
   }
 }
 
+async function seedPages() {
+  const markdown = [
+    "> [!TIP] Scribe refreshes this page every weekday morning from the release threads.",
+    "",
+    "```stats",
+    JSON.stringify([
+      { label: "Beta teams", value: 42, delta: "+9", trend: "up", caption: "since last week" },
+      { label: "Crash-free sessions", value: "99.4%", delta: "+0.6", trend: "up" },
+      { label: "Open blockers", value: 3, delta: "-2", trend: "down" },
+    ]),
+    "```",
+    "",
+    "```chart",
+    JSON.stringify({
+      type: "bar",
+      title: "Weekly active teams",
+      x: "week",
+      series: ["web", "desktop"],
+      stacked: true,
+      data: [
+        { week: "Sep 1", web: 18, desktop: 7 },
+        { week: "Sep 8", web: 22, desktop: 9 },
+        { week: "Sep 15", web: 27, desktop: 12 },
+        { week: "Sep 22", web: 29, desktop: 13 },
+      ],
+    }),
+    "```",
+    "",
+    "## Launch checklist",
+    "",
+    "- [x] Ship offline sync to beta teams",
+    "- [x] Publish the migration guide",
+    "- [ ] Localise onboarding for Japanese and German",
+    "- [ ] Final go/no-go review",
+  ].join("\n");
+  const { page } = await pluginRpc("pages", "create", { projectId, parentId: null, title: "Offline mode launch", icon: "🚀", markdown });
+  const { page: child } = await pluginRpc("pages", "create", { projectId, parentId: page.id, title: "Rollout risks", icon: "⚠️", markdown: "- Storage quota on older devices" });
+  const { page: notes } = await pluginRpc("pages", "create", { projectId, parentId: null, title: "Release notes: October", icon: "📝", markdown: "## Highlights\n\n- Offline sync for every team" });
+  const cleanup = async () => {
+    for (const id of [child.id, page.id, notes.id]) await pluginRpc("pages", "remove", { id }).catch(() => {});
+  };
+  return { page, cleanup };
+}
+
 async function findPageTarget() {
   const targets = await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`)).json();
   const target = targets.find((candidate) => candidate.type === "page" && !candidate.url.startsWith("chrome://"));
@@ -964,7 +1008,18 @@ const captures = [
     setup: async (client) => {
       await client.navigate("/plugins/spool/spool");
       await client.waitForText("Spool for BB");
-      await client.waitForText("MCP included");
+      // The chip reports the live Agent Plugins bridge; assert it matches.
+      const bridge = await client.evaluate(`fetch("/api/v1/plugins/spool/rpc/bridge", { method: "POST", headers: { "content-type": "application/json" }, body: "null" }).then((response) => response.json()).then((body) => body.result.state)`, true);
+      const chips = {
+        ready: "MCP ready",
+        "no-bridge": "Agent Plugins missing",
+        "not-installed": "MCP not installed",
+        disabled: "MCP disabled",
+        "needs-approval": "Needs approval",
+        error: "MCP error",
+      };
+      if (!chips[bridge]) throw new Error(`Unexpected Spool bridge state: ${bridge}`);
+      await client.waitForText(chips[bridge]);
       await client.waitForText("Connect it once");
       await client.waitForText("MCP surface");
       await client.waitForText("Trust boundaries");
@@ -1503,6 +1558,62 @@ const captures = [
         await client.waitForAriaButton("Stop recording");
         await client.waitForText("Pause");
         await sleep(2500);
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
+  {
+    id: "pages",
+    packageDir: "bb-plugin-pages",
+    privateSidebar: true,
+    setup: async (client) => {
+      const { page, cleanup } = await seedPages();
+      try {
+        await client.navigate(`/plugins/pages/pages/${page.id}`);
+        await client.waitForSelector('nav[aria-label="Breadcrumbs"]');
+        await client.waitForAriaButton("Comments");
+        await client.waitForAriaButton("Page actions");
+        await client.waitForText("Work with this page…");
+        await client.waitForText("Offline mode launch");
+        await client.waitForText("Beta teams");
+        await client.waitForText("Crash-free sessions");
+        await client.waitForText("Weekly active teams");
+        await client.waitForText("Localise onboarding for Japanese and German");
+        await client.waitForSelector(".recharts-bar-rectangle");
+        // Talk is installed in the staged app, so the page offers dictation.
+        await client.waitForSelector('[data-talk-field^="pages:"]');
+        await client.waitForAriaButton("Dictate");
+        await sleep(1000);
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
+  {
+    id: "pages-collection",
+    packageDir: "bb-plugin-pages",
+    fileName: "collection.png",
+    privateSidebar: true,
+    setup: async (client) => {
+      const { cleanup } = await seedPages();
+      try {
+        await client.navigate("/plugins/pages/pages");
+        // Shows the list view across every project, whatever an earlier run left behind.
+        await client.evaluate(`localStorage.setItem("bb-pages:view", "list"); localStorage.removeItem("bb-pages:project-filter")`);
+        await client.navigate("/plugins/pages/pages");
+        await client.waitForSelector('input[aria-label="Search pages"]');
+        await client.waitForSelector('[role="table"]');
+        await client.waitForText("New page");
+        await client.waitForText("Edited by agents");
+        await client.waitForText("Offline mode launch");
+        await client.waitForText("Rollout risks");
+        await client.waitForText("Release notes: October");
+        await sleep(800);
       } catch (error) {
         await cleanup();
         throw error;

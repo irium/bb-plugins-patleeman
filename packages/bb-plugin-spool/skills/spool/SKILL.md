@@ -39,6 +39,11 @@ In BB, the Agent Plugins bridge is the normal MCP path:
 2. If the bridge is unavailable but a direct MCP client is available, call
    `spool_guide` with `{ "topic": "agents" }` first, or read
    `spool://docs/agents`.
+   If neither is available (the `agent_plugins_*` tools are missing, or
+   discovery returns no Spool server), stop: tell the user Spool isn't
+   connected and point them to the **Spool** page in BB, which shows whether
+   Agent Plugins is missing or the `spool` server needs installing, enabling,
+   or approval. Don't answer from memory or claim Spool was checked.
 3. Call `spool_status` before event queries. Confirm whether the selected
    connection is local or remote and whether the Spool service is running.
 4. If the user has not specified local versus remote and both are possible,

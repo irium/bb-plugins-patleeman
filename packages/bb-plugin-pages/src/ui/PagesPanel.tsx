@@ -1,0 +1,143 @@
+import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Icon } from "@/components/ui/icon";
+import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
+import type { PageMetaView, rpcContract } from "../contract";
+import { Collection } from "./Collection";
+import { PagesUiContext, type PagesUi } from "./context";
+import { PageView } from "./PageView";
+import { useProjects, type BotsState, type Rpc } from "./shared";
+
+function usePagesData(rpc: Rpc) {
+  const [pages, setPages] = useState<PageMetaView[] | null>(null);
+  const [bots, setBots] = useState<BotsState>({ available: false, reason: null, bots: [] });
+  const [error, setError] = useState<string | null>(null);
+  const refetch = useCallback(() => {
+    rpc.call("tree", {}).then(
+      (result) => {
+        setPages(result.pages);
+        setError(null);
+      },
+      (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
+    );
+  }, [rpc]);
+  const refetchBots = useCallback(() => {
+    rpc.call("bots", null).then(setBots, () => {});
+  }, [rpc]);
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+  // Polls so the panel notices Bot Teams being installed, enabled or edited;
+  // a hidden tab waits until it's shown again.
+  useEffect(() => {
+    const poll = () => {
+      if (document.visibilityState === "visible") refetchBots();
+    };
+    poll();
+    const timer = setInterval(poll, 30_000);
+    document.addEventListener("visibilitychange", poll);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", poll);
+    };
+  }, [refetchBots]);
+  return { pages, bots, error, refetch };
+}
+
+/** The Pages collection at the panel root, and one page at `<page id>`. */
+export function PagesPanel({ subPath }: { subPath: string }) {
+  const rpc = useRpc<typeof rpcContract>();
+  const navigate = useBbNavigate();
+  const context = useBbContext();
+  const projects = useProjects();
+  // `<page id>/chat/<thread id>` opens the page with that chat's card showing.
+  const [pageId = null, section, chatThreadId = null] = subPath.split("/").filter(Boolean);
+  const { pages, bots, error, refetch } = usePagesData(rpc);
+
+  const [pageMeta, setPageMeta] = useState<PageMetaView | null | undefined>(undefined);
+  const fetchPage = useCallback(() => {
+    if (!pageId) {
+      setPageMeta(undefined);
+      return;
+    }
+    rpc.call("get", { id: pageId }).then(
+      (result) => setPageMeta(result.page),
+      () => setPageMeta(null),
+    );
+  }, [rpc, pageId]);
+  useEffect(() => {
+    fetchPage();
+  }, [fetchPage]);
+
+  const toCollection = useCallback((replace = false) => navigate.toPluginPanel("pages", { subPath: "", replace }), [navigate]);
+  const [requestsVersion, setRequestsVersion] = useState(0);
+  useRealtime(REALTIME_CHANNEL, (payload) => {
+    const event = payload as RealtimeEvent;
+    if (event.type === "tree" || event.type === "deleted" || event.type === "page") refetch();
+    if ((event.type === "page" && event.pageId === pageId) || event.type === "tree") fetchPage();
+    if (event.type === "deleted" && pageId && event.pageIds.includes(pageId)) toCollection(true);
+    if (event.type === "requests" && event.pageId === pageId) setRequestsVersion((version) => version + 1);
+  });
+
+  const openPage = useCallback((id: string) => navigate.toPluginPanel("pages", { subPath: id }), [navigate]);
+  const ui = useMemo<PagesUi>(
+    () => ({
+      pages: pages ?? [],
+      bots: bots.bots,
+      openPage,
+      openThread: (threadId) => navigate.toThread(threadId),
+      openUrl: (url) => {
+        if (!navigate.openUrl(url)) window.open(url, "_blank", "noopener");
+      },
+    }),
+    [pages, bots.bots, openPage, navigate],
+  );
+
+  const createPage = async (projectId: string | null, parentId: string | null = null) => {
+    const result = await rpc.call("create", { projectId, parentId, title: "" });
+    refetch();
+    openPage(result.page.id);
+  };
+
+  return (
+    <PagesUiContext.Provider value={ui}>
+      {!pageId ? (
+        <Collection
+          pages={pages}
+          error={error}
+          projects={projects}
+          defaultProjectId={context.projectId ?? null}
+          bots={bots.bots}
+          rpc={rpc}
+          onOpen={openPage}
+          onCreate={(projectId) => createPage(projectId)}
+          onChanged={refetch}
+        />
+      ) : pageMeta ? (
+        <PageView
+          key={pageId}
+          page={pageMeta}
+          pages={pages ?? []}
+          bots={bots}
+          projects={projects}
+          rpc={rpc}
+          requestsVersion={requestsVersion}
+          chatThreadId={section === "chat" ? chatThreadId : null}
+          // A page inside another shares its project.
+          onCreateInside={() => void createPage(pageMeta.projectId, pageMeta.id)}
+          onDeleted={() => toCollection(true)}
+          onBack={() => toCollection()}
+        />
+      ) : pageMeta === null ? (
+        <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+          <Icon name="FileText" className="size-8 text-muted-foreground" />
+          <h2 className="text-lg font-semibold">Page not found</h2>
+          <p className="max-w-sm text-sm text-muted-foreground">It may have been deleted.</p>
+          <button type="button" className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" onClick={() => toCollection()}>
+            All pages
+          </button>
+        </div>
+      ) : null}
+    </PagesUiContext.Provider>
+  );
+}

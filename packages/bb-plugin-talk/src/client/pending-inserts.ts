@@ -49,3 +49,48 @@ export function writePending(pending: PendingInserts): void {
     // Private mode: the dictation is still in Talk recordings.
   }
 }
+
+// Dictations for another plugin's field also record when they started
+// waiting. If the owner never shows the field again, say because it was
+// uninstalled, the text is dropped after a while; it's still in Talk
+// recordings.
+
+export const FIELD_TIMES_KEY = "bb-plugin-talk:pending-field-times";
+export const FIELD_PENDING_TTL_MS = 3 * 24 * 60 * 60_000;
+
+export type PendingTimes = Record<string, number>;
+
+/**
+ * Splits waiting field keys into those past the TTL and the times to keep.
+ * A key without a time starts its wait now.
+ */
+export function staleFields(keys: string[], times: PendingTimes, now: number): { stale: string[]; times: PendingTimes } {
+  const kept: PendingTimes = {};
+  const stale: string[] = [];
+  for (const key of keys) {
+    const since = times[key];
+    const at = typeof since === "number" && Number.isFinite(since) && since <= now ? since : now;
+    if (now - at > FIELD_PENDING_TTL_MS) stale.push(key);
+    else kept[key] = at;
+  }
+  return { stale, times: kept };
+}
+
+export function readTimes(): PendingTimes {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(FIELD_TIMES_KEY) ?? "null");
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, number] => typeof entry[1] === "number"));
+  } catch {
+    return {};
+  }
+}
+
+export function writeTimes(times: PendingTimes): void {
+  try {
+    if (Object.keys(times).length === 0) localStorage.removeItem(FIELD_TIMES_KEY);
+    else localStorage.setItem(FIELD_TIMES_KEY, JSON.stringify(times));
+  } catch {
+    // Private mode: nothing is waiting in storage either.
+  }
+}
