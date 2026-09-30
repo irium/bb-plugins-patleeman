@@ -1,6 +1,6 @@
 # bb-plugin-pages
 
-> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, and drawing with your agents: [Studio Pages](../bb-plugin-pages), [Studio Talk](../bb-plugin-talk), and [Studio Draw](../bb-plugin-excalidraw).
+> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, and keeping what your agents make: [Studio](../bb-plugin-studio), Studio Pages, [Studio Talk](../bb-plugin-talk), [Studio Draw](../bb-plugin-excalidraw), and [Studio Artifacts](../bb-plugin-artifacts).
 
 Collaborative documents for BB that you write together with your agents.
 Pages gives you a Notion-style block editor with live multiplayer editing,

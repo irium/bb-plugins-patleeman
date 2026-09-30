@@ -35,7 +35,8 @@ Limits that shape the design:
   be re-rendered. We don't try to decorate BB's own tool rows.
 - Plugin HTTP routes get no default CSP. The plugin sets
   `content-security-policy: sandbox allow-scripts` on every artifact response
-  itself.
+  itself, except a real PDF (see The viewer).
+- Plugins get a key-value store and SQLite, but no data directory for files.
 
 ## Capture
 
@@ -63,8 +64,9 @@ a new item. The viewer can step back through versions.
 
 - SQLite for metadata: id, title, description, mime type, size, project,
   source thread, source path, created and updated, archived.
-- Bytes in the plugin's data directory, content-addressed by sha256, so
-  identical versions share one file.
+- Bytes in a SQLite BLOB table keyed by sha256, so identical versions share
+  one copy. (There's no plugin data directory to put files in.) Deleting an
+  artifact drops the bytes no other version uses.
 - 25 MB per file (BB's download cap), with a clear error above it.
 
 ## The viewer
@@ -79,7 +81,7 @@ link.
 | HTML | Sandboxed iframe (`allow-scripts` only) served from the plugin's HTTP route under a sandbox CSP |
 | Markdown | Rendered, with a raw toggle |
 | Code and text | BB's source viewer |
-| PDF | The browser's PDF viewer in an iframe |
+| PDF | The browser's PDF viewer in an iframe. Chrome's viewer refuses sandboxed documents, and a PDF can't run page scripts, so the route leaves out the CSP only when the bytes start with `%PDF-`; a `.pdf` that isn't one is sandboxed and served as `application/octet-stream` |
 | Other | Name, type, size, and Download |
 
 Header actions: **New thread** (mentions it), **Copy** (text types), **Download**,
@@ -112,6 +114,21 @@ Header actions: **New thread** (mentions it), **Copy** (text types), **Download*
 5. **Handoff.** Marketplace and `.bb/plugins.json` entries, a staged
    screenshot, README, compat check.
 6. **Later.** The opt-in suggestions.
+
+## As built
+
+- The tools are `artifacts_save`, `artifacts_list` and `artifacts_read`.
+  `artifacts_save` also takes `artifactId` to add a version to a chosen
+  artifact.
+- The CLI is `bb artifacts save | list | show | export | delete`. `export`
+  copies an artifact into the thread's workspace, so an agent can edit a
+  file and save it back.
+- "Save to Studio" is also in the thread panel launcher, where it lists the
+  latest reply's files. The picker lists the thread's storage files and what
+  the thread has already saved, too.
+- BB returns at most 100 events per request, so the picker reads a reply's
+  history 100 events at a time, back to its turn request (at most 2,000
+  events).
 
 ## Open questions
 

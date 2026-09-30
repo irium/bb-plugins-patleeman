@@ -8,7 +8,7 @@ import type { ProviderView } from "./contract";
 import { schemas } from "./contract";
 
 /** The BB Studio suite, in the order Studio lists it. */
-export const SUITE = ["pages", "talk", "excalidraw"];
+export const SUITE = ["pages", "talk", "excalidraw", "artifacts"];
 const CALL_TIMEOUT_MS = 10_000;
 const LIVE_STATES = new Set(["running", "degraded", "starting"]);
 

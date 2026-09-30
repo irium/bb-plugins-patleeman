@@ -531,6 +531,94 @@ async function bbCli(args) {
   return stdout;
 }
 
+/** A static HTML report; `draft` leaves out the September bar for version 1. */
+function usageReportHtml({ draft }) {
+  const months = [
+    ["July", 312],
+    ["August", 368],
+    ...(draft ? [] : [["September", 431]]),
+  ];
+  const bars = months
+    .map(([month, teams]) => `<div class="row"><span>${month}</span><div class="bar" style="width:${Math.round((teams / 460) * 100)}%"></div><b>${teams}</b></div>`)
+    .join("\n      ");
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Q3 usage report</title>
+  <style>
+    body { margin: 0; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1f2328; background: #f6f8fa; }
+    main { max-width: 760px; margin: 40px auto; padding: 32px 40px; background: #fff; border: 1px solid #d0d7de; border-radius: 12px; }
+    h1 { margin: 0 0 4px; font-size: 26px; }
+    .lede { margin: 0 0 24px; color: #59636e; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+    .stat { padding: 14px 16px; border: 1px solid #d0d7de; border-radius: 10px; }
+    .stat b { display: block; font-size: 24px; }
+    .stat span { color: #59636e; font-size: 13px; }
+    .up { color: #1a7f37; font-size: 13px; }
+    h2 { font-size: 16px; margin: 0 0 12px; }
+    .row { display: grid; grid-template-columns: 90px 1fr 48px; align-items: center; gap: 12px; margin: 8px 0; }
+    .bar { height: 18px; border-radius: 4px; background: linear-gradient(90deg, #6d5dfc, #3b82f6); }
+    .row b { text-align: right; }
+    ul { padding-left: 20px; color: #3d444d; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Q3 usage report</h1>
+    <p class="lede">Acme app · weekly active teams, July to September</p>
+    <section class="stats">
+      <div class="stat"><b>${draft ? 368 : 431}</b><span>Active teams</span> <em class="up">${draft ? "+18%" : "+17%"}</em></div>
+      <div class="stat"><b>99.4%</b><span>Crash-free sessions</span></div>
+      <div class="stat"><b>6.2</b><span>Threads per member / week</span></div>
+    </section>
+    <h2>Active teams by month</h2>
+    <div class="chart">
+      ${bars}
+    </div>
+    <h2>Highlights</h2>
+    <ul>
+      <li>Offline sync reached every beta team in August.</li>
+      <li>Team plans grew fastest in design and research orgs.</li>
+    </ul>
+  </main>
+</body>
+</html>
+`;
+}
+
+/**
+ * Saves "Q3 usage report" to Studio Artifacts twice from the capture thread's
+ * workspace, so the viewer shows the second version of a real HTML artifact.
+ */
+async function seedArtifact() {
+  const thread = JSON.parse(await bbCli(["thread", "get", threadId, "--json"]));
+  const workspace = thread.environment?.path;
+  const hostId = thread.environment?.hostId;
+  if (!workspace || !hostId) throw new Error("The capture thread needs a workspace to stage the report in.");
+  const file = "q3-usage-report.html";
+  const path = join(workspace, file);
+  const write = (content) => bbCli(["file", "write", path, "--host", hostId, "--root", workspace, "--content", content]);
+  let artifactId = null;
+  const cleanup = async () => {
+    if (artifactId) await pluginRpc("artifacts", "delete", { id: artifactId }).catch(() => {});
+    await bbCli(["file", "remove", path, "--yes", "--host", hostId, "--root", workspace]).catch(() => {});
+  };
+  try {
+    for (const draft of [true, false]) {
+      await write(usageReportHtml({ draft }));
+      const { saved, failed } = await pluginRpc("artifacts", "saveFiles", { threadId, paths: [file] });
+      if (failed.length) throw new Error(`Couldn't save the report: ${failed[0].error}`);
+      artifactId = saved[0].artifactId;
+    }
+    await pluginRpc("artifacts", "update", { id: artifactId, title: "Q3 usage report", description: "Weekly active teams, July to September" });
+  } catch (error) {
+    await cleanup();
+    throw error;
+  }
+  return { artifactId, cleanup };
+}
+
 async function talkRpc(method, input) {
   const dir = await mkdtemp(join(tmpdir(), "bb-talk-capture-"));
   const file = join(dir, "input.json");
@@ -1715,6 +1803,38 @@ const captures = [
         const loaded = await client.evaluate(`(async () => { const img = document.querySelector('img[src*="/plugins/excalidraw/http/thumbnail"]'); await img.decode(); return img.naturalWidth > 0; })()`, true);
         if (!loaded) throw new Error("The drawing thumbnail didn't load");
         await sleep(1000);
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
+  {
+    id: "artifacts",
+    packageDir: "bb-plugin-artifacts",
+    privateSidebar: true,
+    setup: async (client) => {
+      const { artifactId, cleanup } = await seedArtifact();
+      try {
+        await client.navigate(`/plugins/artifacts/artifacts/${artifactId}`);
+        await client.waitForInputValue("Artifact title", "Q3 usage report");
+        await client.waitForText("HTML ·");
+        await client.waitForText("· v2");
+        await client.waitForText("Preview");
+        await client.waitForText("Source");
+        await client.waitForText("New thread");
+        await client.waitForAriaButton("Copy");
+        await client.waitForAriaButton("More");
+        // The report renders in its sandboxed frame from the content route.
+        await client.waitForSelector('iframe[sandbox="allow-scripts"][title="q3-usage-report.html"]');
+        const rendered = await client.evaluate(`(async () => {
+          const frame = document.querySelector('iframe[title="q3-usage-report.html"]');
+          const body = await (await fetch(frame.src)).text();
+          return body.includes("Q3 usage report") && body.includes("September");
+        })()`, true);
+        if (!rendered) throw new Error("The viewer isn't showing the report's latest version");
+        await sleep(1500);
       } catch (error) {
         await cleanup();
         throw error;

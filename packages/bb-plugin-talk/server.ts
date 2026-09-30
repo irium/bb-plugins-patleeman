@@ -261,7 +261,7 @@ export default async function plugin(bb: BbPluginApi) {
         id: recording.id,
         title: recording.title,
         subtitle: mentionSubtitle(recording),
-        icon: "AudioLines",
+        icon: "Mic",
       })),
     resolve: (id) => {
       const recording = mustGet(id);

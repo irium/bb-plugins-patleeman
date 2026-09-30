@@ -48,6 +48,30 @@
       }
     },
     {
+      "id": "artifacts",
+      "displayName": "Studio Artifacts",
+      "description": "Part of BB Studio. Keep the images, pages, reports and files your agents make, in Studio's collection.",
+      "icon": {
+        "url": "./packages/bb-plugin-artifacts/assets/icon.svg"
+      },
+      "tags": [
+        "files",
+        "artifacts",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-plugins.git",
+          "subdir": "packages/bb-plugin-artifacts",
+          "ref": "main"
+        }
+      }
+    },
+    {
       "id": "automation-calendar",
       "displayName": "Automation Calendar",
       "description": "Explore and manage BB automations on a calendar.",
