@@ -1,5 +1,8 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { studioSchemas } from "@bb-studio/kit/contract";
+import { createStudioNotifier } from "@bb-studio/kit/server";
 import * as Y from "yjs";
+import { z } from "zod";
 import { BotDirectory } from "./src/bots";
 import { FILES_PATH, HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, SYNC_PATH, UPLOAD_PATH } from "./src/constants";
 import { rpcContract } from "./src/contract";
@@ -7,6 +10,7 @@ import { applyEdits, readMarkdown } from "./src/doc";
 import type { Socket } from "./src/hub";
 import { errorText, pageUrl, PagesService, requestView, toView, truncate, validateCron } from "./src/service";
 import { MIGRATIONS, PageStore } from "./src/store";
+import { registerStudio } from "./src/studio";
 import { registerTools } from "./src/tools";
 
 const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
@@ -244,6 +248,14 @@ export default async function plugin(bb: BbPluginApi) {
     restore: ({ snapshotId }) => ({ ok: service.restore(snapshotId, HUMAN_USER_ID) }),
   });
 
+  // Studio --------------------------------------------------------------------
+
+  const studio = studioSchemas(z);
+  registerStudio(bb, service, studio);
+  // Typing saves a page every few seconds; Studio only needs to hear about it now and then.
+  const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: PLUGIN_ID, schemas: studio, delayMs: 1500 });
+  service.onPublish = () => studioNotifier.changed();
+
   // Agents --------------------------------------------------------------------
 
   registerTools(bb, service);
@@ -356,6 +368,8 @@ export default async function plugin(bb: BbPluginApi) {
   bb.background.schedule("pages-refresh", "* * * * *", () => service.runDueRefreshes());
 
   bb.onDispose(() => {
+    studioNotifier.dispose();
+    service.onPublish = null;
     service.hub.flushAll();
     service.dispose();
   });

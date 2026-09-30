@@ -1,4 +1,5 @@
 import { ThreadTitle, useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { ItemHeader } from "@bb-studio/kit/app";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   DropdownMenu,
@@ -341,6 +342,7 @@ export function PageView({
   chatThreadId,
   onCreateInside,
   onDeleted,
+  backLabel,
   onBack,
 }: {
   page: PageMetaView;
@@ -353,6 +355,8 @@ export function PageView({
   chatThreadId: string | null;
   onCreateInside(): void;
   onDeleted(): void;
+  /** "Studio" when Studio is installed, else "Pages". */
+  backLabel: string;
   onBack(): void;
 }) {
   const { connection, status, synced } = useConnection(page.id);
@@ -468,18 +472,12 @@ export function PageView({
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-3 max-md:p-2">
-        <div className="pointer-events-auto flex min-w-0 items-center gap-1.5">
-          <button
-            type="button"
-            className={cn(FLOATING, "flex h-8 shrink-0 items-center gap-1 rounded-md pr-3 pl-2 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground")}
-            onClick={onBack}
-          >
-            <Icon name="ChevronLeft" className="size-4" /> Pages
-          </button>
-          <Breadcrumbs page={shown} pages={pages} />
-        </div>
-        <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
+      <ItemHeader
+        backLabel={backLabel}
+        onBack={onBack}
+        leading={<Breadcrumbs page={shown} pages={pages} />}
+        trailing={
+          <>
           <ConnectionBadge status={status} />
           <ActivityPill
             page={page}
@@ -540,8 +538,9 @@ export function PageView({
               </>
             }
           />
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <PageChat
         page={page}

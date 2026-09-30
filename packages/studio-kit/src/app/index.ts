@@ -10,6 +10,7 @@ export {
   type CollectionItem,
   type CollectionKind,
 } from "./collection";
+export { AddOnCollection, type ProviderCall } from "./add-on";
 export { EditableTitle, ItemHeader } from "./item-header";
 export { openAppPath, studioPath } from "./nav";
 export {

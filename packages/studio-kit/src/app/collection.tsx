@@ -353,7 +353,7 @@ export function CollectionPage({
     );
   };
   const revealClass =
-    "studio-reveal rounded-md p-1 text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 data-[state=open]:opacity-100";
+    "rounded-md p-1 text-muted-foreground opacity-0 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 data-[state=open]:opacity-100";
 
   const parentLine = (item: CollectionItem) => {
     const parent = item.parentId ? byKey.get(`${item.pluginId}:${item.parentId}`) : undefined;
@@ -601,7 +601,7 @@ export function CollectionPage({
                       checked={checked}
                       label={`Select ${untitled(item.title)}`}
                       onToggle={(event) => toggle(item, event.shiftKey)}
-                      className={cn("absolute top-2 left-2 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100", (checked || chosen.length > 0) && "opacity-100")}
+                      className={cn("absolute top-2 left-2 opacity-0 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100", (checked || chosen.length > 0) && "opacity-100")}
                     />
                   ) : null}
                 </div>
@@ -662,7 +662,7 @@ export function CollectionPage({
                       disabled={reason !== undefined}
                       title={reason}
                       onToggle={(event) => toggle(item, event.shiftKey)}
-                      className={cn(!checked && !chosen.length && "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100")}
+                      className={cn(!checked && !chosen.length && "opacity-0 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100")}
                     />
                   </div>
                   <div role="gridcell" className="flex min-w-0 items-center gap-3">

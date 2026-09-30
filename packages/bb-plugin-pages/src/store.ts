@@ -213,6 +213,12 @@ export class PageStore {
     return rows.map((row) => row.id);
   }
 
+  /** The start of every page's saved Markdown, for previews. */
+  markdownHeads(chars = 2000): Map<string, string> {
+    const rows = this.db.prepare("SELECT id, substr(markdown, 1, ?) AS head FROM pages").all(chars) as { id: string; head: string | null }[];
+    return new Map(rows.map((row) => [row.id, row.head ?? ""]));
+  }
+
   delete(ids: string[]): void {
     const tx = this.db.transaction((all: string[]) => {
       for (const id of all) {

@@ -89,6 +89,8 @@ export class PagesService {
   readonly hub: PageHub;
   private readonly watch = new Map<string, WatchState>();
   private readonly actorNames = new Map<string, string>();
+  /** Called after every realtime event, e.g. to tell Studio. */
+  onPublish: ((event: RealtimeEvent) => void) | null = null;
 
   constructor(
     private readonly bb: BbPluginApi,
@@ -120,6 +122,8 @@ export class PagesService {
     } catch {
       // Best effort; open views refetch on reconnect.
     }
+    // Comment and bot-request traffic doesn't change what Studio lists.
+    if (event.type !== "requests") this.onPublish?.(event);
   }
 
   // Pages -------------------------------------------------------------------

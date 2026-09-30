@@ -23,7 +23,7 @@ function TalkBridge() {
 }
 
 export default definePluginApp((app) => {
-  app.slots.navPanel({ id: "pages", title: "Pages", icon: "FileText", path: "pages", component: PagesPanel });
+  app.slots.navPanel({ id: "pages", title: "Pages", icon: "pages/pages", path: "pages", component: PagesPanel });
   app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
   app.slots.experimental_threadHeaderAction({ id: "page-link", title: "Page", component: ThreadPageLink });
 });

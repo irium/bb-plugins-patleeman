@@ -18,25 +18,9 @@ export type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 export type Project = { id: string; name: string };
 export type BotsState = { available: boolean; reason: string | null; bots: BotView[] };
 
-/** Chrome floating over the page. */
-export const FLOATING =
-  "border border-border/70 bg-background/90 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/75";
-export const ICON_BUTTON = cn(
-  FLOATING,
-  "flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-40 aria-pressed:bg-state-active aria-pressed:text-foreground data-[state=open]:bg-state-active",
-);
-
-export function relativeTime(at: number): string {
-  const seconds = Math.round((Date.now() - at) / 1000);
-  if (seconds < 45) return "just now";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+// Shared with every Studio plugin, so the chrome matches.
+export { FLOATING, ICON_BUTTON } from "@bb-studio/kit/app";
+export { relativeTime } from "@bb-studio/kit/format";
 
 export function actorName(key: string, bots: BotView[]): string {
   if (key === "user") return "you";

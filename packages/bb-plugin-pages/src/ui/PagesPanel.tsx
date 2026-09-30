@@ -1,9 +1,10 @@
-import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { AddOnCollection, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
+import type { StudioSchemas } from "@bb-studio/kit/contract";
+import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import type { PageMetaView, rpcContract } from "../contract";
-import { Collection } from "./Collection";
 import { PagesUiContext, type PagesUi } from "./context";
 import { PageView } from "./PageView";
 import { useProjects, type BotsState, type Rpc } from "./shared";
@@ -47,8 +48,10 @@ function usePagesData(rpc: Rpc) {
 /** The Pages collection at the panel root, and one page at `<page id>`. */
 export function PagesPanel({ subPath }: { subPath: string }) {
   const rpc = useRpc<typeof rpcContract>();
+  const studioRpc = useRpc<StudioSchemas["provider"]>();
+  const callStudio = useCallback<ProviderCall>((method, input) => studioRpc.call(method, input as never) as never, [studioRpc]);
   const navigate = useBbNavigate();
-  const context = useBbContext();
+  const studio = useStudioPresent();
   const projects = useProjects();
   // `<page id>/chat/<thread id>` opens the page with that chat's card showing.
   const [pageId = null, section, chatThreadId = null] = subPath.split("/").filter(Boolean);
@@ -69,7 +72,11 @@ export function PagesPanel({ subPath }: { subPath: string }) {
     fetchPage();
   }, [fetchPage]);
 
-  const toCollection = useCallback((replace = false) => navigate.toPluginPanel("pages", { subPath: "", replace }), [navigate]);
+  // With Studio installed, the collection is Studio's.
+  const toCollection = useCallback(
+    (replace = false) => (studio ? openAppPath(studioPath("page"), { replace }) : navigate.toPluginPanel("pages", { subPath: "", replace })),
+    [navigate, studio],
+  );
   const [requestsVersion, setRequestsVersion] = useState(0);
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = payload as RealtimeEvent;
@@ -102,17 +109,7 @@ export function PagesPanel({ subPath }: { subPath: string }) {
   return (
     <PagesUiContext.Provider value={ui}>
       {!pageId ? (
-        <Collection
-          pages={pages}
-          error={error}
-          projects={projects}
-          defaultProjectId={context.projectId ?? null}
-          bots={bots.bots}
-          rpc={rpc}
-          onOpen={openPage}
-          onCreate={(projectId) => createPage(projectId)}
-          onChanged={refetch}
-        />
+        <AddOnCollection pluginId="pages" title="Pages" kind="page" call={callStudio} refreshKey={pages} />
       ) : pageMeta ? (
         <PageView
           key={pageId}
@@ -126,6 +123,7 @@ export function PagesPanel({ subPath }: { subPath: string }) {
           // A page inside another shares its project.
           onCreateInside={() => void createPage(pageMeta.projectId, pageMeta.id)}
           onDeleted={() => toCollection(true)}
+          backLabel={studio ? "Studio" : "Pages"}
           onBack={() => toCollection()}
         />
       ) : pageMeta === null ? (
@@ -134,7 +132,7 @@ export function PagesPanel({ subPath }: { subPath: string }) {
           <h2 className="text-lg font-semibold">Page not found</h2>
           <p className="max-w-sm text-sm text-muted-foreground">It may have been deleted.</p>
           <button type="button" className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" onClick={() => toCollection()}>
-            All pages
+            {studio ? "Back to Studio" : "All pages"}
           </button>
         </div>
       ) : null}
