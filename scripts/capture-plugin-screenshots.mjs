@@ -556,8 +556,10 @@ async function runText(command, args) {
 /**
  * Seeds a finished Talk recording from speech synthesized with macOS `say`,
  * uploaded and transcribed through the live plugin and BB's voice service.
+ * `transcribe: false` uploads the audio and pauses the recording instead, for
+ * captures that only need it listed where no voice service is configured.
  */
-async function seedTalkRecording(projectId) {
+async function seedTalkRecording(projectId, { transcribe = true } = {}) {
   const pieces = [
     ["sync", "Welcome to the weekly product sync. First up, the offline mode beta shipped to forty teams on Monday, and crash reports are down by half since the storage fix."],
     ["sync", "Onboarding is the next focus. New users still stall at the import step, so design will prototype a guided import this sprint."],
@@ -589,6 +591,11 @@ async function seedTalkRecording(projectId) {
         audioBase64: audio.toString("base64"),
       });
       startedAt += durationMs + (session === "sync" ? 0 : 60_000);
+    }
+    if (!transcribe) {
+      // Paused rather than left "Recording", so the card doesn't show a live badge.
+      await talkRpc("recording_state", { id: recording.id, status: "paused" });
+      return recording.id;
     }
     await talkRpc("recording_state", { id: recording.id, status: "finishing" });
     const started = Date.now();
@@ -1714,7 +1721,8 @@ const captures = [
         if (recordingId) await talkRpc("recording_delete", { id: recordingId }).catch(() => {});
       };
       try {
-        recordingId = await seedTalkRecording(projectId);
+        // Studio only lists the recording, so it needn't be transcribed.
+        recordingId = await seedTalkRecording(projectId, { transcribe: false });
         await client.navigate("/plugins/studio/studio");
         await client.evaluate(`localStorage.setItem("studio:collection:view", "grid"); localStorage.setItem("studio:collection:project", ${JSON.stringify(projectId)}); localStorage.setItem("studio:sidebar-tip-dismissed", "1")`);
         await client.navigate("/plugins/studio/studio");
