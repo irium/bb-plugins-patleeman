@@ -1,5 +1,5 @@
 Write documents together with your agents. Pages is a Notion-style editor
-inside BB where you, your agents, and your Bot Teams bots edit the same page
+inside BB where you, your agents, and your Studio Teams bots edit the same page
 live.
 
 ## What you get
@@ -14,7 +14,7 @@ live.
   of a page. The agent gets the page as context, and the thread opens in a
   card beside your writing.
 - **Comments.** Comment on any text, reply, and resolve threads.
-- **Bots that do the work.** @mention a Bot Teams bot in a page or a comment
+- **Bots that do the work.** @mention a Studio Teams bot in a page or a comment
   and it edits the page and replies. Give a page an owner bot and a schedule,
   and it keeps the page up to date.
 - **Dictation.** With the Talk plugin installed, press **Dictate** or type
@@ -25,8 +25,8 @@ live.
 ## How it works
 
 Pages are stored in this plugin's database on the BB server. Bot requests run
-in each bot's own Bot Teams thread. Pages works without Bot Teams, but you
-need it for the bot features. Page chats are ordinary BB threads. Requests made while Bot Teams is briefly
+in each bot's own Studio Teams thread. Pages works without Studio Teams, but you
+need it for the bot features. Page chats are ordinary BB threads. Requests made while Studio Teams is briefly
 unavailable wait and go out once it's back.
 
 ## For agents

@@ -1,12 +1,9 @@
 import {
   useCallback,
   useEffect,
-  useId,
-  useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 import {
   useBbNavigate,
   useBbContext,
@@ -14,11 +11,26 @@ import {
   useRealtimeConnectionState,
   useRpc,
   experimental_Icon as Icon,
-  experimental_usePluginId,
   type PluginNavPanelProps,
   type PluginThreadListProps,
-  type ExperimentalSidebarNavigationProps,
 } from "@get-bb/plugin-sdk/app";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  SidebarDisplayMenuItems,
+  SidebarGroupHeading,
+  SidebarNote,
+  SidebarPortal,
+  SidebarSection,
+  useExpandSidebarSection,
+  useSidebarDisplay,
+  useSidebarHosted,
+  useSidebarNavigated,
+  type SidebarDisplay,
+} from "@bb-studio/kit/app";
 import type {
   Bot,
   Conversation,
@@ -31,16 +43,6 @@ import type {
 } from "./contract";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "./components/ui/dropdown-menu";
 import { sharedReads } from "./shared-read";
 import { ErrorMessage, message } from "./bot-ui";
 import { ChannelSidebarRow } from "./channel-sidebar-row";
@@ -220,83 +222,31 @@ export function ChannelRedirect({ subPath }: { subPath?: string }) {
   );
   return null;
 }
-export function ChannelsNavigation({
-  experimental_Original: Original,
-  isCompactViewport,
-}: ExperimentalSidebarNavigationProps) {
-  const pluginId = experimental_usePluginId();
+/**
+ * Channels and Direct messages, as two sections of the Studio Sidebar above
+ * the threads. Without Studio Sidebar as the thread list they don't show; the
+ * Channels and Bots panels still reach everything.
+ */
+export function TeamsSidebar() {
+  const hosted = useSidebarHosted();
   const { threadId } = useBbContext();
-  const anchor = useRef<HTMLSpanElement>(null);
-  const [inlineTarget, setInlineTarget] = useState<HTMLElement | null>(null);
-
-  useLayoutEffect(() => {
-    const sidebar = anchor.current?.closest('[data-sidebar="sidebar"]');
-    const content = sidebar?.querySelector<HTMLElement>('[data-sidebar="content"]');
-    if (!content) return;
-
-    const target = document.createElement("div");
-    target.className = "channels-sidebar-inline";
-    // The sidebar sections are portaled outside PluginSlotMount. Keep their
-    // route links in the host delegate's scope, just like portaled menus.
-    target.setAttribute("data-bb-portaled-overlay", "");
-    target.setAttribute("data-bb-plugin", pluginId);
-    content.prepend(target);
-    setInlineTarget(target);
-    return () => target.remove();
-  }, [pluginId]);
-
-  const closeMobileSidebar = () => {
-    if (!isCompactViewport) return;
-    // The navigation slot does not expose the drawer controller in the stable
-    // SDK. Use the host's toggle, which owns focus restoration and dismissal.
-    document.querySelector<HTMLButtonElement>(
-      'button[aria-label^="Toggle sidebar"][aria-expanded="true"]',
-    )?.click();
-  };
-  const sections = <ChannelsSidebar activeThreadId={threadId} onNavigate={closeMobileSidebar} />;
-  return (
-    <>
-      <Original />
-      <span ref={anchor} hidden />
-      {inlineTarget
-        ? createPortal(sections, inlineTarget)
-        : <div className="channels-navigation-list">{sections}</div>}
-    </>
-  );
+  const navigated = useSidebarNavigated();
+  return hosted ? <ChannelsSidebar activeThreadId={threadId ?? null} onNavigate={navigated} /> : null;
 }
 
 type ChannelOrganization = "pinned" | "activity" | "none";
 type ChannelSort = "updated" | "created" | "alpha";
-type ChannelDisplay = {
-  organization: ChannelOrganization;
-  sort: ChannelSort;
-  direction: "ascending" | "descending";
-};
+type ChannelDisplay = SidebarDisplay<ChannelOrganization, ChannelSort>;
 const channelDisplayKey = "bb:bots:channel-sidebar-display";
 const defaultChannelDisplay: ChannelDisplay = {
   organization: "pinned",
   sort: "updated",
   direction: "descending",
 };
-
-function readChannelDisplay(): ChannelDisplay {
-  try {
-    const value = JSON.parse(localStorage.getItem(channelDisplayKey) || "null");
-    return {
-      organization: ["pinned", "activity", "none"].includes(value?.organization)
-        ? value.organization
-        : defaultChannelDisplay.organization,
-      sort: ["updated", "created", "alpha"].includes(value?.sort)
-        ? value.sort
-        : defaultChannelDisplay.sort,
-      direction: ["ascending", "descending"].includes(value?.direction)
-        ? value.direction
-        : defaultChannelDisplay.direction,
-    };
-  } catch {
-    return defaultChannelDisplay;
-  }
-}
+const channelDisplayOptions = {
+  organization: ["pinned", "activity", "none"],
+  sort: ["updated", "created", "alpha"],
+} as const;
 
 function compareChannels(a: Room, b: Room, display: ChannelDisplay): number {
   const order = display.direction === "ascending" ? 1 : -1;
@@ -321,24 +271,16 @@ export function ChannelsSidebar({
     [directSearch, setDirectSearch] = useState(""),
     [channelSearching, setChannelSearching] = useState(false),
     [directSearching, setDirectSearching] = useState(false),
-    [channelsCollapsed, setChannelsCollapsed] = useState(false),
-    [directCollapsed, setDirectCollapsed] = useState(false),
     [archived, setArchived] = useState(false),
     [showArchivedBots, setShowArchivedBots] = useState(false),
     [showArchivedDirectThreads, setShowArchivedDirectThreads] = useState(false),
-    [display, setDisplay] = useState(readChannelDisplay),
+    [display, updateDisplay] = useSidebarDisplay(channelDisplayKey, defaultChannelDisplay, channelDisplayOptions),
     [renaming, setRenaming] = useState<Room | null>(null),
     [deleting, setDeleting] = useState<Room | null>(null),
     [failure, setFailure] = useState<string | null>(null),
     [pending, setPending] = useState(false);
-  const channelListId = useId();
-  const directListId = useId();
-  const updateDisplay = (next: ChannelDisplay) => {
-    setDisplay(next);
-    try {
-      localStorage.setItem(channelDisplayKey, JSON.stringify(next));
-    } catch {}
-  };
+  const expandChannels = useExpandSidebarSection("channels");
+  const expandDirect = useExpandSidebarSection("direct-messages");
   const archive = async (room: Room) => {
     setPending(true);
     setFailure(null);
@@ -451,238 +393,160 @@ export function ChannelsSidebar({
       : [{ label: null, rooms: list }];
   return (
     <>
-      <section className="channels-sidebar" aria-label="Channels">
-        <header>
-          <div className="channels-sidebar-title">
-            <span className="channels-sidebar-heading">
-              {archived ? "Archived channels" : "Channels"}
-            </span>
-            <button type="button" className="channels-sidebar-collapse"
-              aria-label={channelsCollapsed ? "Expand Channels section" : "Collapse Channels section"}
-              aria-expanded={!channelsCollapsed} aria-controls={channelListId}
-              onClick={() => setChannelsCollapsed(!channelsCollapsed)}>
-              <Icon name="ChevronRight" aria-hidden="true" />
-            </button>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Search channels"
-            aria-expanded={channelSearching}
-            onClick={() => {
-              setChannelSearching(!channelSearching);
-              setChannelSearch("");
-              setChannelsCollapsed(false);
-            }}
-          >
-            <Icon name="Search" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="New channel"
-            onClick={() => {
-              // "new" is a panel route, not a channel ID; CreateChannel makes the room.
-              setFailure(null);
-              navigate.toPluginPanel("channels", { subPath: "new" });
-              onNavigate();
-            }}
-          >
-            <Icon name="Plus" />
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Channel list options">
-                <Icon name="MoreHorizontal" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" aria-label="Channel list options">
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger aria-label="Organize by">
-                  <Icon name="Layers" />
-                  Organize by
-                  <Icon name="ChevronRight" className="ml-auto" />
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent aria-label="Organize channels">
-                  {([
-                    ["pinned", "Pinned first"],
-                    ["activity", "By activity"],
-                    ["none", "No grouping"],
-                  ] as const).map(([value, label]) => (
-                    <DropdownMenuItem
-                      key={value}
-                      role="menuitemradio"
-                      aria-checked={display.organization === value}
-                      aria-label={label}
-                      onSelect={(event) => {
-                        event.preventDefault();
-                        updateDisplay({ ...display, organization: value });
-                      }}
-                    >
-                      {label}
-                      {display.organization === value && <Icon name="Check" className="ml-auto" />}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger aria-label="Sort by">
-                  <Icon name="ArrowUpDown" />
-                  Sort by
-                  <Icon name="ChevronRight" className="ml-auto" />
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent aria-label="Sort channels">
-                  {([
-                    ["updated", "Updated at", "descending"],
-                    ["created", "Created at", "descending"],
-                    ["alpha", "Alphabetical", "ascending"],
-                  ] as const).map(([value, label, defaultDirection]) => {
-                    const selected = display.sort === value;
-                    const direction = selected ? display.direction : defaultDirection;
-                    const nextDirection = selected
-                      ? direction === "ascending" ? "descending" : "ascending"
-                      : defaultDirection;
-                    return (
-                      <DropdownMenuItem
-                        key={value}
-                        role="menuitemradio"
-                        aria-checked={selected}
-                        aria-label={selected
-                          ? `${label}, ${direction}. Sort ${nextDirection}`
-                          : label}
-                        onSelect={(event) => {
-                          event.preventDefault();
-                          updateDisplay({ ...display, sort: value, direction: nextDirection });
-                        }}
-                      >
-                        {label}
-                        {selected && (
-                          <Icon
-                            name={direction === "ascending" ? "ArrowUp" : "ArrowDown"}
-                            className="ml-auto"
-                          />
-                        )}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+      <SidebarPortal id="channels" title="Channels" order={10}>
+        <SidebarSection
+          title="Channels"
+          label={archived ? "Archived channels" : "Channels"}
+          menuLabel="Channel list options"
+          actions={[
+            {
+              label: "Search channels",
+              icon: "Search",
+              pressed: channelSearching,
+              onClick: () => {
+                setChannelSearching(!channelSearching);
+                setChannelSearch("");
+                expandChannels();
+              },
+            },
+            {
+              label: "New channel",
+              icon: "Plus",
+              onClick: () => {
+                // "new" is a panel route, not a channel ID; CreateChannel makes the room.
+                setFailure(null);
+                navigate.toPluginPanel("channels", { subPath: "new" });
+                onNavigate();
+              },
+            },
+          ]}
+          menu={
+            <>
+              <SidebarDisplayMenuItems
+                noun="channels"
+                display={display}
+                onChange={updateDisplay}
+                organize={[
+                  ["pinned", "Pinned first"],
+                  ["activity", "By activity"],
+                  ["none", "No grouping"],
+                ]}
+                sort={[
+                  ["updated", "Updated at", "descending"],
+                  ["created", "Created at", "descending"],
+                  ["alpha", "Alphabetical", "ascending"],
+                ]}
+              />
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 aria-label={archived ? "Show active channels" : "Show archived channels"}
                 onSelect={() => {
                   setArchived(!archived);
                   setChannelSearch("");
-                  setChannelsCollapsed(false);
+                  expandChannels();
                 }}
               >
                 <Icon name={archived ? "ListView" : "Archive"} />
                 {archived ? "Show active channels" : "Show archived channels"}
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </header>
-        <div id={channelListId} hidden={channelsCollapsed}>
-        {channelSearching && (
-          <Input
-            autoFocus
-            aria-label="Search channels"
-            placeholder="Search channels…"
-            value={channelSearch}
-            onChange={(e) => setChannelSearch(e.target.value)}
-          />
-        )}
-        {error && <ErrorMessage error={error} />}
-        <ErrorMessage error={failure} />
-        {groups.map((group) => (
-          <div key={group.label ?? "all"} className="channels-sidebar-group">
-            {group.label && <p className="channels-sidebar-group-heading">{group.label}</p>}
-            {group.rooms.map((r) => (
-              <ChannelSidebarRow
-                key={r.id}
-                room={r}
-                selected={!!activeThreadId && r.threadId === activeThreadId}
-                active={activeRoomIds.includes(r.id)}
-                threads={roomThreads[r.id] ?? []}
-                work={roomWork[r.id]}
-                attentionCount={attentionCounts[r.id] ?? 0}
-                approvalCount={approvalCounts[r.id] ?? 0}
-                pending={pending}
-                onOpen={() => open(r.id)}
-                onNavigate={onNavigate}
-                onMarkRead={() => void changeChannelState(r.id,
-                  r.updatedAt > (r.lastReadAt ?? 0)
-                    ? { lastReadAt: r.updatedAt }
-                    : { markUnread: true })}
-                onPin={() => void changeChannelState(r.id, { pinned: !r.pinned })}
-                onRename={(name) => rpc.call("updateRoom", { id: r.id, name })}
-                onCopyLink={() => void copyChannelLink(r.id)}
-                onCopyId={() => void copyChannelId(r.id)}
-                onArchive={() => void archive(r)}
-                onDelete={() => setDeleting(r)}
+            </>
+          }
+        >
+          <div className="channels-sidebar-body">
+            {channelSearching && (
+              <Input
+                autoFocus
+                aria-label="Search channels"
+                placeholder="Search channels…"
+                value={channelSearch}
+                onChange={(e) => setChannelSearch(e.target.value)}
               />
+            )}
+            {error && <ErrorMessage error={error} />}
+            <ErrorMessage error={failure} />
+            {groups.map((group) => (
+              <div key={group.label ?? "all"} className="channels-sidebar-group">
+                {group.label && <SidebarGroupHeading>{group.label}</SidebarGroupHeading>}
+                {group.rooms.map((r) => (
+                  <ChannelSidebarRow
+                    key={r.id}
+                    room={r}
+                    selected={!!activeThreadId && r.threadId === activeThreadId}
+                    active={activeRoomIds.includes(r.id)}
+                    threads={roomThreads[r.id] ?? []}
+                    work={roomWork[r.id]}
+                    attentionCount={attentionCounts[r.id] ?? 0}
+                    approvalCount={approvalCounts[r.id] ?? 0}
+                    pending={pending}
+                    onOpen={() => open(r.id)}
+                    onNavigate={onNavigate}
+                    onMarkRead={() => void changeChannelState(r.id,
+                      r.updatedAt > (r.lastReadAt ?? 0)
+                        ? { lastReadAt: r.updatedAt }
+                        : { markUnread: true })}
+                    onPin={() => void changeChannelState(r.id, { pinned: !r.pinned })}
+                    onRename={(name) => rpc.call("updateRoom", { id: r.id, name })}
+                    onCopyLink={() => void copyChannelLink(r.id)}
+                    onCopyId={() => void copyChannelId(r.id)}
+                    onArchive={() => void archive(r)}
+                    onDelete={() => setDeleting(r)}
+                  />
+                ))}
+              </div>
             ))}
+            {!list.length && (
+              <SidebarNote>
+                {channelQuery
+                  ? "No matching channels"
+                  : archived
+                    ? "No archived channels"
+                    : "No active channels"}
+              </SidebarNote>
+            )}
           </div>
-        ))}
-        {!list.length && (
-          <p className="channel-menu-label">
-            {channelQuery
-              ? "No matching channels"
-              : archived
-                ? "No archived channels"
-                : "No active channels"}
-          </p>
-        )}
-        </div>
-      </section>
-      <section className="channels-sidebar direct-messages-sidebar" aria-label="Direct messages">
-        <header>
-          <div className="channels-sidebar-title">
-            <span className="channels-sidebar-heading">Direct messages</span>
-            <button type="button" className="channels-sidebar-collapse"
-              aria-label={directCollapsed ? "Expand Direct messages section" : "Collapse Direct messages section"}
-              aria-expanded={!directCollapsed} aria-controls={directListId}
-              onClick={() => setDirectCollapsed(!directCollapsed)}>
-              <Icon name="ChevronRight" aria-hidden="true" />
-            </button>
-          </div>
-          <Button variant="ghost" size="icon"
-            aria-label="Search direct messages" aria-expanded={directSearching}
-            onClick={() => {
-              setDirectSearching(!directSearching);
-              setDirectSearch("");
-              setDirectCollapsed(false);
-            }}>
-            <Icon name="Search" />
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="New direct message">
-                <Icon name="Plus" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" aria-label="Choose a bot">
-              {bots.filter((bot) => !bot.retired).sort((a, b) =>
-                a.name.localeCompare(b.name)).map((bot) => (
-                <DropdownMenuItem key={bot.id} disabled={pending}
-                  onSelect={() => void startDirectThread(bot)}>
-                  {bot.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Direct message list options">
-                <Icon name="MoreHorizontal" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" aria-label="Direct message list options">
+        </SidebarSection>
+      </SidebarPortal>
+      <SidebarPortal id="direct-messages" title="Direct messages" order={20}>
+        <SidebarSection
+          title="Direct messages"
+          menuLabel="Direct message list options"
+          actions={[
+            {
+              label: "Search direct messages",
+              icon: "Search",
+              pressed: directSearching,
+              onClick: () => {
+                setDirectSearching(!directSearching);
+                setDirectSearch("");
+                expandDirect();
+              },
+            },
+          ]}
+          trailing={
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="teams-sidebar-control" aria-label="New direct message" title="New direct message">
+                  <Icon name="Plus" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" aria-label="Choose a bot">
+                {bots.filter((bot) => !bot.retired).sort((a, b) =>
+                  a.name.localeCompare(b.name)).map((bot) => (
+                  <DropdownMenuItem key={bot.id} disabled={pending}
+                    onSelect={() => void startDirectThread(bot)}>
+                    {bot.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          }
+          menu={
+            <>
               <DropdownMenuItem
                 aria-label={showArchivedDirectThreads ? "Hide archived threads" : "Show archived threads"}
                 onSelect={() => {
                   setShowArchivedDirectThreads(!showArchivedDirectThreads);
-                  setDirectCollapsed(false);
+                  expandDirect();
                 }}>
                 <Icon name="Archive" />
                 {showArchivedDirectThreads ? "Hide archived threads" : "Show archived threads"}
@@ -691,33 +555,34 @@ export function ChannelsSidebar({
                 aria-label={showArchivedBots ? "Hide archived bots" : "Show archived bots"}
                 onSelect={() => {
                   setShowArchivedBots(!showArchivedBots);
-                  setDirectCollapsed(false);
+                  expandDirect();
                 }}>
                 <Icon name={showArchivedBots ? "ListView" : "Archive"} />
                 {showArchivedBots ? "Hide archived bots" : "Show archived bots"}
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </header>
-        <div id={directListId} hidden={directCollapsed}>
-        {directSearching && (
-          <Input autoFocus aria-label="Search direct messages"
-            placeholder="Search direct messages…" value={directSearch}
-            onChange={(event) => setDirectSearch(event.target.value)} />
-        )}
-        {directRows.map(({ bot, conversation, info }) => (
-          <DirectSidebarThread key={conversation.threadId} bot={bot}
-            conversation={conversation} info={info}
-            status={directThreads[bot.id]?.threadId === conversation.threadId
-              ? directThreads[bot.id] : undefined}
-            onNavigate={onNavigate} onNewThread={() => void startDirectThread(bot)}
-            onChanged={load} selected={activeThreadId === conversation.threadId} />
-        ))}
-        {!directRows.length && <p className="channel-menu-label">
-          {directQuery ? "No matching direct messages" : "No direct messages yet"}
-        </p>}
-        </div>
-      </section>
+            </>
+          }
+        >
+          <div className="channels-sidebar-body">
+            {directSearching && (
+              <Input autoFocus aria-label="Search direct messages"
+                placeholder="Search direct messages…" value={directSearch}
+                onChange={(event) => setDirectSearch(event.target.value)} />
+            )}
+            {directRows.map(({ bot, conversation, info }) => (
+              <DirectSidebarThread key={conversation.threadId} bot={bot}
+                conversation={conversation} info={info}
+                status={directThreads[bot.id]?.threadId === conversation.threadId
+                  ? directThreads[bot.id] : undefined}
+                onNavigate={onNavigate} onNewThread={() => void startDirectThread(bot)}
+                onChanged={load} selected={activeThreadId === conversation.threadId} />
+            ))}
+            {!directRows.length && <SidebarNote>
+              {directQuery ? "No matching direct messages" : "No direct messages yet"}
+            </SidebarNote>}
+          </div>
+        </SidebarSection>
+      </SidebarPortal>
       {renaming && (
         <RenameChannel
           key={renaming.id}

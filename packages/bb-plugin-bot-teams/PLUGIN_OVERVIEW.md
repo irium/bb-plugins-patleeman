@@ -1,6 +1,6 @@
 ## Give each bot a lasting purpose
 
-Choose New bot to open a thread with setup instructions prefilled. Describe its purpose in chat; the agent creates its profile, mission, and workspace. Configure its profile, MISSION.md, MEMORY.md, and activity from Bot Teams.
+Choose New bot to open a thread with setup instructions prefilled. Describe its purpose in chat; the agent creates its profile, mission, and workspace. Configure its profile, MISSION.md, MEMORY.md, and activity from Studio Teams.
 
 ## Invite bots into Channels
 

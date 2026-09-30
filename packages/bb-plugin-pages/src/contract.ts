@@ -85,7 +85,7 @@ export const snapshotSchema = z.object({
 });
 export type SnapshotView = z.infer<typeof snapshotSchema>;
 
-// What BB's new-thread composer submits, whitelisted like Bot Teams does. Core
+// What BB's new-thread composer submits, whitelisted like Studio Teams does. Core
 // threads.spawn validates the host-owned environment and prompt input.
 export const chatRequestSchema = z.object({
   projectId: z.string().min(1),

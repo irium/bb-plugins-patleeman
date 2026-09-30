@@ -1,15 +1,19 @@
-# Bot Teams
+# Studio Teams
 
-Persistent bots with their own files, mission, and memory, and Slack-style channels in BB’s sidebar. Inspired by [Hermes Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode).
+> **Studio Teams** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-plugin-studio), [Studio Pages](../bb-plugin-pages), [Studio Talk](../bb-plugin-talk), [Studio Draw](../bb-plugin-excalidraw), [Studio Artifacts](../bb-plugin-artifacts), [Studio Tasks](../bb-plugin-studio-tasks), and Studio Teams.
+
+Persistent bots with their own files, mission, and memory, and Slack-style channels in BB’s sidebar. Inspired by [Hermes Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode). The plugin was called Bot Teams; its id is still `bot-teams`.
+
+**With BB Studio.** In [Studio Sidebar](../bb-plugin-thread-list-plus), Channels and Direct messages are sections above your threads, and scroll with them as one list. Bots are in the [Studio](../bb-plugin-studio) collection: each opens its profile, **New ▾ → Bot** starts the setup chat, and archiving a bot there retires it. Without Studio Sidebar, the sections don't show; open channels from **New channel** and bots from **Studio Teams**.
 
 ## Use
 
-1. Choose **New channel** in the sidebar. Bot Teams creates the channel and opens it as a regular BB thread, with BB's own transcript and composer. Mention a bot with `@handle` in your message to invite it. Opening an existing channel the first time creates its thread and replays its last 50 messages there, each as its own message; your earlier messages show as **You**. **Search channel** finds anything older. See [Channels are threads](#channels-are-threads).
+1. Choose **New channel** in the sidebar. Studio Teams creates the channel and opens it as a regular BB thread, with BB's own transcript and composer. Mention a bot with `@handle` in your message to invite it. Opening an existing channel the first time creates its thread and replays its last 50 messages there, each as its own message; your earlier messages show as **You**. **Search channel** finds anything older. See [Channels are threads](#channels-are-threads).
 2. Type `@` to find a bot or choose `@all` / `@channel` to address everyone in the channel. Sending a mention invites that bot into the channel. The picker also includes **Create new bot…**, which opens a new thread with bot setup instructions prefilled. Describe what you need in chat; the agent creates the bot and invites it to this channel. Your channel draft stays saved.
 3. Click the overlapping avatars in the channel thread's header to see members and their activity. **Add bot** sits at the bottom; member options let you configure or remove a bot. Live work, with **Stop**, and requests that need you appear above the composer.
-4. Under **Direct messages**, each row is one private thread with a bot: the bot's avatar, the thread title, and the bot's name in muted text. A bot can have many threads. The list is flat and sorted by recent activity, and new direct threads open on BB's regular thread page and get a title from the first message. Each row's menu starts a new thread with that bot and links to its profile, mission, memory, and activity. Open **Bot Teams** to manage profiles, edit `MISSION.md` and `MEMORY.md`, or inspect activity. The collection uses BB's standard content width, search toolbar, status filter, sorting, and bordered rows. Shared conversations live in Channels. Each bot also has a work thread you can open from its channel activity.
+4. Under **Direct messages**, each row is one private thread with a bot: the bot's avatar, the thread title, and the bot's name in muted text. A bot can have many threads. The list is flat and sorted by recent activity, and new direct threads open on BB's regular thread page and get a title from the first message. Each row's menu starts a new thread with that bot and links to its profile, mission, memory, and activity. Open **Studio Teams** to manage profiles, edit `MISSION.md` and `MEMORY.md`, or inspect activity. The collection uses BB's standard content width, search toolbar, status filter, sorting, and bordered rows. Shared conversations live in Channels. Each bot also has a work thread you can open from its channel activity.
 
-In a thread, choose **Handoff to new channel** from the composer’s **+** menu, or **Start channel from thread** from the thread’s sidebar menu. Bot Teams opens a new channel thread with the source thread already linked at the top of the draft. Mention bots, add your request, then send it. The sent message keeps the thread reference as a link.
+In a thread, choose **Handoff to new channel** from the composer’s **+** menu, or **Start channel from thread** from the thread’s sidebar menu. Studio Teams opens a new channel thread with the source thread already linked at the top of the draft. Mention bots, add your request, then send it. The sent message keeps the thread reference as a link.
 
 **New bot** in the collection opens the same conversation flow without a channel invitation. Send the prefilled instructions, or add your bot’s purpose first. The agent handles the name, mission, model, and permissions using sensible defaults.
 
@@ -34,7 +38,7 @@ Hover a channel for quick **Archive** and **⋯** actions, like regular threads.
 The three-dot button opens the same menu as right-click, including **Copy channel
 ID**. On touch screens, the menu button stays visible; Archive is inside the menu.
 
-The composer's model picker sets the chat mode and bot permissions. Channel threads run on the **Bot Teams** provider: its three "models" are the chat modes, and its "reasoning" levels are the bot permissions (**Each bot's own**, **Accept Edits**, **Auto**, **Full Access**). The picker reads, for example, **Smart · Auto**. Sending a message applies the picked mode and permissions to the channel, and a change made from the CLI updates the picker. The chat modes:
+The composer's model picker sets the chat mode and bot permissions. Channel threads run on the **Studio Teams** provider: its three "models" are the chat modes, and its "reasoning" levels are the bot permissions (**Each bot's own**, **Accept Edits**, **Auto**, **Full Access**). The picker reads, for example, **Smart · Auto**. Sending a message applies the picked mode and permissions to the channel, and a change made from the CLI updates the picker. The chat modes:
 
 - **Smart** chooses one coordinator, records collaborators, and decides whether they work in sequence or in parallel. Mentions are candidates for that decision. Smart also chooses steer, follow-up, or fork for a busy bot. New channels start here.
 - **Directed** calls bots you mention. A channel with just one eligible bot always routes to that bot, in every chat mode.
@@ -48,7 +52,7 @@ Channel messages have no reactions and no replies to a specific message. Mention
 
 Bots receive standing guidance to write brief, conversational replies, use Markdown when it improves scanning, avoid dense walls of text and assistant boilerplate, and stay silent when they have nothing useful to add. Channel messages use BB’s native Markdown renderer, including short paragraphs, bullets, numbered steps, inline code, fenced code blocks, and links. They can react sparingly for acknowledgment (👍), completed or verified work (✅), or celebration (🎉). Questions and assignments addressed to a bot in the channel still need an answer, action, or blocker.
 
-Smart routing uses **Jev** through OpenCode Zen's direct structured-decision API. **Plugins → Bot Teams → Settings** controls the classifier, secret Zen API key, Jev model (default `jev-1.13`), timeout (default 5 seconds), and minimum confidence for parallel work or steer/fork (default 0.7). `OPENCODE_API_KEY` on the BB server is an alternative to the secret setting. Coordinator, collaborator, execution mode, and action decisions are batched into one API request. Low-confidence parallel work becomes serialized; low-confidence steer/fork becomes follow-up. Delegation return decisions use the same API.
+Smart routing uses **Jev** through OpenCode Zen's direct structured-decision API. **Plugins → Studio Teams → Settings** controls the classifier, secret Zen API key, Jev model (default `jev-1.13`), timeout (default 5 seconds), and minimum confidence for parallel work or steer/fork (default 0.7). `OPENCODE_API_KEY` on the BB server is an alternative to the secret setting. Coordinator, collaborator, execution mode, and action decisions are batched into one API request. Low-confidence parallel work becomes serialized; low-confidence steer/fork becomes follow-up. Delegation return decisions use the same API.
 
 For provider-based classification, select **providers** explicitly. Its primary/fallback settings default to Pi / `opencode-go/qwen3.8-flash`, then Codex / `gpt-5.6-luna`. This slower compatibility option creates temporary hidden agent sessions; each attempt can take up to 30 seconds. Jev receives the eight previous visible channel messages, including each speaker and bot ID. Jev failures never silently switch to an agent session. A single explicit recipient or a clear question about the immediately preceding bot answer safely falls back to follow-up. Other failures keep the message visible with **Retry routing** and do not fan out.
 
@@ -62,12 +66,12 @@ Files and images a bot publishes are listed as links under its reply. Bots use `
 
 On desktop, hover over Channels to reveal its header actions; they stay visible on touch screens. Use the three-dot menu at the right of the Channels header to switch between active and archived channels, organize the list by pinned channels or activity, and sort by update time, creation time, or name. Select the current sort again to reverse its direction; the organize and sort choices persist on this device. Search finds channels in both views and labels archived results. Clearing or closing search returns to the selected view. Right-click a channel for **Rename**, **Archive**, or **Delete**; archived channels offer **Restore** and **Delete**. Keyboard users can open this menu with Shift+F10. Archiving cancels unfinished work and preserves history; restoring makes the channel available again. Deletion requires confirmation, stops unfinished responses, and permanently removes the channel thread, messages, membership, activity, and draft uploads. Bot profiles, workspaces, and other channels are kept. Existing bot work threads and sent files in BB's project storage remain under BB's own retention. Removing a bot cancels its pending channel work and preserves its messages. Channels support up to 16 bots.
 
-BB’s **Settings → Appearance** can select sidebar providers. **Channels navigation** places Channels and Direct messages in the same scrolling sidebar area as the selected thread list, below the normal navigation.
+Channels and Direct messages are sections of [Studio Sidebar](../bb-plugin-thread-list-plus). Choose **Studio Sidebar** in **Settings → Appearance → Sidebar → Thread list provider**. Each section's ⋯ menu also moves it up or down or hides it, and **Threads ⋯** shows hidden sections again. The sections have no scroll area of their own.
 The sidebar lists channels. Bot work threads stay available from channel messages, activity, and approvals.
 
 ## Channels are threads
 
-Each channel is a hidden BB thread on the **Bot Teams** provider, so it looks and behaves like any other thread: the same transcript, composer, links, file previews, splits, search, and unread state. The provider runs no model of its own and is not offered for new threads; Bot Teams creates channel threads by name. In a channel thread, the picker shows its chat modes and bot permissions.
+Each channel is a hidden BB thread on the **Studio Teams** provider, so it looks and behaves like any other thread: the same transcript, composer, links, file previews, splits, search, and unread state. The provider runs no model of its own and is not offered for new threads; Studio Teams creates channel threads by name. In a channel thread, the picker shows its chat modes and bot permissions.
 
 - **Your messages** go to the channel's router exactly as before: Smart, Directed, and Everyone modes, mentions, delegation, and bot work threads are unchanged. Images and files attached in the composer go with the message.
 - **Bot replies** arrive when each bot finishes, as assistant messages that start with the bot's avatar and name. The name links to the bot's work thread for that reply. Replies can arrive while the thread is idle; each one is its own short turn. Files a bot publishes are listed under its reply; images show inline.
@@ -194,7 +198,7 @@ Bots are always available in channels and direct chats; there is no bot-level pa
 
 **Archive bot** stops its current work, removes it from every channel, and keeps its profile, files, and history. Use the collection’s **Archived** filter to find it. **Restore bot** makes it available for invitations again, with its mission schedule off.
 
-Failed channel responses show **Open work thread** and **Retry response**. Retrying keeps the original message and targets only that bot; repeated clicks do not start duplicate retries. A long response gets a wrap-up request at 75% of its time limit (15 minutes at the 20-minute default), asking the bot to stop new work, save its state, and report progress. If it reaches the limit without finishing, Bot Teams stops the response, posts the last recorded progress in the channel, and preserves its bot work thread and workspace. **Resume response** continues in that same work thread. For an important checkpoint or blocker before then, bots can use `bots_channel_notify`; it leaves a durable channel message and notifies the owner without waking other bots. Restore and invite a removed bot before retrying.
+Failed channel responses show **Open work thread** and **Retry response**. Retrying keeps the original message and targets only that bot; repeated clicks do not start duplicate retries. A long response gets a wrap-up request at 75% of its time limit (15 minutes at the 20-minute default), asking the bot to stop new work, save its state, and report progress. If it reaches the limit without finishing, Studio Teams stops the response, posts the last recorded progress in the channel, and preserves its bot work thread and workspace. **Resume response** continues in that same work thread. For an important checkpoint or blocker before then, bots can use `bots_channel_notify`; it leaves a durable channel message and notifies the owner without waking other bots. Restore and invite a removed bot before retrying.
 
 Default limits are 100 started turns per hour, 1,000 per day, 20 minutes per turn, and two concurrent forks per bot. The bot’s **Usage** tab makes the bot limits editable. Both bot and channel turn budgets apply; existing work can finish while new work waits. Provider billing and token details remain in the bot work thread. BB’s provider and concurrency limits also apply.
 
@@ -215,7 +219,7 @@ Each bot lives at `<BB data directory>/plugins/bot-teams/homes/<bot-id>/`:
 
 **Profile → Workspace** shows the exact path. Document saves detect stale editor versions. Profiles, channel history, membership, work, and draft uploads live in the plugin’s SQLite database. Sent attachments use BB’s project attachment storage. Back up `plugins/bot-teams` along with BB’s conversation and attachment storage. Migrated installations also retain `plugins/bots/homes`; the new homes path links to it so saved workspace paths stay valid.
 
-Each bot has a hidden BB work thread for each channel. Channel tasks run in that thread, but requests and answers belong in the channel. The first turn receives bounded channel history and saved context. Later turns receive the new request and channel messages since the previous channel snapshot. When that gap exceeds the prompt budget, the bot gets exact start and end message IDs and can read the omitted range forward in pages. Previously delivered files are not attached again. Forks have separate work threads and reply histories. **Open work thread** shows the native execution record with its messages, tools, approvals, and failures. Typing a direct request there is rejected with a link to its channel. Existing group conversations appear as Channels without losing history; old group links redirect to their channel. Existing work sessions remain stored and accessible through BB. The Bot Teams page holds bot configuration; direct chats live below Channels in the sidebar.
+Each bot has a hidden BB work thread for each channel. Channel tasks run in that thread, but requests and answers belong in the channel. The first turn receives bounded channel history and saved context. Later turns receive the new request and channel messages since the previous channel snapshot. When that gap exceeds the prompt budget, the bot gets exact start and end message IDs and can read the omitted range forward in pages. Previously delivered files are not attached again. Forks have separate work threads and reply histories. **Open work thread** shows the native execution record with its messages, tools, approvals, and failures. Typing a direct request there is rejected with a link to its channel. Existing group conversations appear as Channels without losing history; old group links redirect to their channel. Existing work sessions remain stored and accessible through BB. The Studio Teams page holds bot configuration; direct chats live below Channels in the sidebar.
 
 **Search channel** in the channel thread's header searches all stored message text and names; selecting a result expands it to the full message. This is a single-owner local feature. Bots use BB’s configured providers, credentials, tools, and skills on the primary machine. Separate directories provide persistent storage, not separate accounts. Shared `MEMORY.md` should contain only information appropriate for every channel the bot joins.
 
@@ -290,18 +294,18 @@ stay within two hops; a request stops adding replies at 32 responses and reports
 that limit. These rules prevent runaway consultation loops.
 
 Bots may also run `bb bots create`, but creation is approval-gated. The request
-appears in **Plugins → Bot Teams** under **Pending bot approvals**, where the owner
+appears in **Plugins → Studio Teams** under **Pending bot approvals**, where the owner
 can review the requested profile and mission and approve or deny it. The
 workspace and profile are created only after approval; denying, cancelling, or
 letting the request expire leaves no partial bot behind.
 
 ## Plugin ID and command names
 
-Bot Teams uses the unique plugin ID `bot-teams`, separate from the community plugin named Bots. Existing `bb bots` commands, `bots_*` tools, and the `bots` skill keep their names for saved automations. If another plugin also registers the command, use `bb plugin run bot-teams …`.
+Studio Teams uses the unique plugin ID `bot-teams`, separate from the community plugin named Bots. Existing `bb bots` commands, `bots_*` tools, and the `bots` skill keep their names for saved automations. If another plugin also registers the command, use `bb plugin run bot-teams …`.
 
 ## Install and develop
 
-Bot Teams requires BB 0.44.0 or newer with Plugin SDK 0.5.29 or newer.
+Studio Teams requires BB 0.44.0 or newer with Plugin SDK 0.5.29 or newer.
 Update BB before installing the plugin if it reports an SDK version mismatch.
 
 ```sh
@@ -322,7 +326,7 @@ channel with two demo bots, **Atlas** and **Scribe**, whose missions fix their
 replies so each run shows the same conversation. BB's own sidebar stays
 collapsed so no real threads or projects appear.
 
-![A Bot Teams channel as a native BB thread](assets/staged-preview.png)
+![A Studio Teams channel as a native BB thread](assets/staged-preview.png)
 
 **Launch room** open as a BB thread. You share the ORBIT-42 brief with both
 bots and each replies under its own name; Atlas hands the release check to
@@ -344,13 +348,22 @@ older history.
 
 **New bot** opens BB's standard new-thread composer with the setup instructions.
 
+![Channels and Direct messages in Studio Sidebar](assets/studio-sidebar.png)
+
+In Studio Sidebar, **Channels** and **Direct messages** sit between the Studio
+tabs and **Threads**, in the sidebar's one scroll area. The staged data shows
+the **Design review** and **Launch room** channels and two direct threads with
+Atlas.
+
 ![Bots collection in BB](assets/bots-collection.png)
 
 The Bots collection uses BB's standard collection layout and search controls.
 
 ![Bot profile settings in BB](assets/bot-profile.png)
 
-A bot's profile uses the native settings layout.
+A bot's page opens with its avatar, name, and handle, like other Studio items.
+**Studio** goes back to the collection, **Message** starts a direct thread, and
+**⋯** wakes or archives the bot. The profile uses the native settings layout.
 
 ![Bot Markdown editor in BB](assets/bot-markdown-editor.jpg)
 
@@ -369,7 +382,7 @@ node scripts/capture-plugin-screenshots.mjs
 
 ## Notifications
 
-Decisions, blockers, and important updates queue events for BB's shared push notification delivery. Enable **Attention push notifications** in **Settings → Bot Teams** and mobile delivery in **Settings → Push notifications**. On a BB build with the delivery RPC, tapping a notification opens the marked message in its channel; it does not open a question prompt.
+Decisions, blockers, and important updates queue events for BB's shared push notification delivery. Enable **Attention push notifications** in **Settings → Studio Teams** and mobile delivery in **Settings → Push notifications**. On a BB build with the delivery RPC, tapping a notification opens the marked message in its channel; it does not open a question prompt.
 
 Ordinary channel replies and failures use the same queue. The installed BB build does not expose the delivery RPC, so these events do not currently produce phone alerts. Delivery also respects **Settings → Push notifications**.
 
@@ -397,7 +410,7 @@ When a bot's work thread stops for an approval or question, the request appears 
 
 While a bot waits, its row in the **Working** card above the composer reads **Needs approval** in amber with a **Review** button that jumps to the card. The channel's sidebar row also shows the bell.
 
-Channel decisions and blockers that Bot Teams itself records stay on the channel message, described below. Reply in the channel composer or use its acknowledge and snooze controls.
+Channel decisions and blockers that Studio Teams itself records stay on the channel message, described below. Reply in the channel composer or use its acknowledge and snooze controls.
 
 ## Delegation returns
 
@@ -415,7 +428,7 @@ Open requests stay above the composer until you acknowledge or snooze them. A be
 
 Bots can mention `@user` in a final response to request a decision. Mentions inside code, quotes, or links do not create requests. For an immediate alert with a specific reason, use `bots_channel_notify` with `channelId`, `requestId`, `reason` (`decision`, `blocker`, or `update`), and `text`. It posts one marked channel message with the caller's identity and does not wake other bots. Reuse the request ID when retrying, and do not repeat the alert in the final answer.
 
-In **Settings → Bot Teams**, **Attention push notifications** controls queued attention alerts and **Ordinary reply notifications** controls other replies. Both default to on. Delivery also respects **Settings → Push notifications**. The installed BB build does not expose the shared `notifications.enqueue` RPC, so neither kind currently reaches the phone; requests still appear in their channels. Queued alerts can be delivered by a BB build that provides that RPC while they remain in the 24-hour queue. Archived channels hide their requests until restored; deleting a channel deletes its requests.
+In **Settings → Studio Teams**, **Attention push notifications** controls queued attention alerts and **Ordinary reply notifications** controls other replies. Both default to on. Delivery also respects **Settings → Push notifications**. The installed BB build does not expose the shared `notifications.enqueue` RPC, so neither kind currently reaches the phone; requests still appear in their channels. Queued alerts can be delivered by a BB build that provides that RPC while they remain in the 24-hour queue. Archived channels hide their requests until restored; deleting a channel deletes its requests.
 
 - `bb bots inbox [--status open|snoozed|acknowledged] [--limit N] [--offset N]`
 - `bb bots attention MESSAGE_ID acknowledge`

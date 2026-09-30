@@ -7,8 +7,8 @@
     "bbPluginSdk": ">=0.5.29"
   },
   "bb": {
-    "name": "Bot Teams",
-    "description": "Persistent bots that collaborate in channels, delegate work, and keep their own workspaces and memory.",
+    "name": "Studio Teams",
+    "description": "Part of BB Studio. Persistent bots that collaborate in channels, delegate work, and keep their own workspaces and memory.",
     "branding": {
       "icon": "Bot"
     },
@@ -17,6 +17,7 @@
     "app": "./app.tsx"
   },
   "dependencies": {
+    "@bb-studio/kit": "file:../studio-kit",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/language": "^6.12.4",

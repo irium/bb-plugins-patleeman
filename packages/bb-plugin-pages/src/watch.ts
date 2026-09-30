@@ -1,6 +1,6 @@
 // Which bot mentions and comments the page watcher has already handled. A
-// mention or comment stays unseen until the watcher has sent it to Bot Teams,
-// so requests made while Bot Teams is unavailable go out once it's back.
+// mention or comment stays unseen until the watcher has sent it to Studio Teams,
+// so requests made while Studio Teams is unavailable go out once it's back.
 
 import { HUMAN_USER_ID } from "./constants";
 
@@ -39,7 +39,7 @@ export function markSeen(seen: Seen, found: Found<{ blockId: string; target: str
 /**
  * Marks what an agent or bot just wrote as handled, so their own mentions and
  * comments don't trigger bots. The user's comments stay pending: they may be
- * waiting on the debounce or on Bot Teams.
+ * waiting on the debounce or on Studio Teams.
  */
 export function absorbAgentChange(seen: Seen, found: Found<{ blockId: string; target: string }, { id: string; author: string }>): void {
   markSeen(seen, { mentions: found.mentions, comments: found.comments.filter((comment) => comment.author !== HUMAN_USER_ID) });

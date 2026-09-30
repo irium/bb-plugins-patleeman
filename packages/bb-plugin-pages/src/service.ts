@@ -13,7 +13,7 @@ import { absorbAgentChange, emptySeen, markSeen, unseen, type Seen } from "./wat
 
 const SNAPSHOT_GAP_MS = 10 * 60_000;
 const WATCH_DELAY_MS = 2500;
-/** How long to wait before retrying requests when Bot Teams is unavailable. */
+/** How long to wait before retrying requests when Studio Teams is unavailable. */
 const BOTS_RETRY_MS = 60_000;
 const MAX_CONTEXT_CHARS = 1200;
 const REASONING_LEVELS = ["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"] as const;
@@ -106,7 +106,7 @@ export class PagesService {
       },
       // Take the watcher's baseline at load, so a page's first human change
       // (say, a comment mentioning a bot) counts as new.
-      // A page reopened with requests still pending (Bot Teams was
+      // A page reopened with requests still pending (Studio Teams was
       // unavailable) gets another scan.
       opened: (page) => (this.watch.has(page.id) ? this.scheduleWatch(page) : void this.state(page)),
       changed: (page, origin) => {
@@ -252,7 +252,7 @@ export class PagesService {
     try {
       const threadId = await this.bots.conversationThread(bot.id);
       this.store.updateRequest(row.id, { thread_id: threadId });
-      // Bot Teams creates a bot's DM without running it, and BB refuses a
+      // Studio Teams creates a bot's DM without running it, and BB refuses a
       // send to a thread with no stored model, so name the bot's own model.
       const reasoningLevel = REASONING_LEVELS.find((level) => level === bot.reasoningLevel);
       await this.bb.sdk.threads.send({
@@ -351,7 +351,7 @@ export class PagesService {
     if (!fresh.mentions.length && !fresh.comments.length) return;
     const directory = await this.bots.list();
     if (!directory.available) {
-      // Leave the requests unseen and try again; they go out once Bot Teams
+      // Leave the requests unseen and try again; they go out once Studio Teams
       // is installed or enabled.
       if (this.hub.has(pageId)) this.scheduleWatch(page, BOTS_RETRY_MS);
       return;
@@ -421,7 +421,7 @@ export class PagesService {
   async refresh(meta: PageMeta, reason: "schedule" | "manual"): Promise<RequestRow | null> {
     if (!meta.refresh_bot_id) throw new Error("This page has no refresh bot.");
     const bot = await this.bots.get(meta.refresh_bot_id);
-    if (!bot) throw new Error("The refresh bot isn't available in Bot Teams.");
+    if (!bot) throw new Error("The refresh bot isn't available in Studio Teams.");
     const now = Date.now();
     this.store.markRefreshed(meta.id, now);
     this.publish({ type: "page", pageId: meta.id });

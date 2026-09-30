@@ -87,7 +87,7 @@ export class SmartQueue {
   }
 
   eligibleThread(thread: ThreadInfo) {
-    // Classifier sessions are ours, and Bot Teams routes its own sessions.
+    // Classifier sessions are ours, and Studio Teams routes its own sessions.
     return (
       thread.visibility !== "hidden" &&
       thread.originPluginId !== this.deps.pluginId &&

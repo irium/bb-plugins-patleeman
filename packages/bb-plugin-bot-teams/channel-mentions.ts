@@ -66,7 +66,7 @@ export function registerChannelMentions(
       if (!bot) return { context: `@${handle}` };
       return {
         context: [
-          `@${bot.handle} is the Bot Teams bot ${bot.name}: ${bot.description}.`,
+          `@${bot.handle} is the Studio Teams bot ${bot.name}: ${bot.description}.`,
           "In a channel, mention it to ask it. Elsewhere, reach it with the bots skill (`bb bots channel send` or its direct messages).",
         ].join("\n"),
       };
@@ -100,7 +100,7 @@ export function registerChannelMentions(
         );
       return {
         context: [
-          `Bot Teams channel ${channelReference(room)} (id ${room.id}).`,
+          `Studio Teams channel ${channelReference(room)} (id ${room.id}).`,
           `Members: ${memberNames(room) || "none"}. Chat mode: ${room.responseBehavior ?? "everyone"}.`,
           recent.length ? `Recent messages, oldest first:\n${recent.join("\n")}` : "No messages yet.",
           `Read more with \`bb bots channel messages ${room.id}\`; post with \`bb bots channel send ${room.id}\`.`,
@@ -152,7 +152,7 @@ export function registerChannelMentions(
       const latest = (await bb.sdk.threads.output({ threadId }).catch(() => null))?.output;
       return {
         context: [
-          `Direct message thread "${title}"${bot ? ` with the Bot Teams bot ${bot.name} (@${bot.handle})` : ""}: [${title}](/threads/${threadId}) (thread ${threadId}).`,
+          `Direct message thread "${title}"${bot ? ` with the Studio Teams bot ${bot.name} (@${bot.handle})` : ""}: [${title}](/threads/${threadId}) (thread ${threadId}).`,
           latest?.trim() ? `Latest reply: ${excerpt(latest)}` : "No replies yet.",
           `Read the whole thread with \`bb thread log ${threadId}\`.`,
         ].join("\n"),

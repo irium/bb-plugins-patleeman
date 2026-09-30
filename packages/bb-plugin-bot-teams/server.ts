@@ -53,6 +53,9 @@ import {
   routerInstructions,
 } from "./smart-router";
 import { registerCli } from "./cli";
+import { studioSchemas } from "@bb-studio/kit/contract";
+import { createStudioNotifier } from "@bb-studio/kit/server";
+import { PLUGIN_ID as STUDIO_PROVIDER_ID, botsSignature, registerStudio } from "./studio-provider";
 import {
   registerChannelTools,
   agentAuthor,
@@ -1212,6 +1215,33 @@ export default async function plugin(bb: BbPluginApi) {
       }),
   };
   bb.rpc.register(rpcContract, handlers);
+  // Bots in the Studio collection. Studio hears about a change only when
+  // something it shows does, not on every message.
+  const studio = studioSchemas(z);
+  const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: STUDIO_PROVIDER_ID, schemas: studio });
+  registerStudio(bb, studio, {
+    bots: () => store.all(),
+    activity: () => store.botActivitySummary(),
+    retire: (id, retired) => runtime.retire(id, retired),
+  });
+  let studioSignature = botsSignature(store.all(), store.botActivitySummary());
+  let studioCheck: ReturnType<typeof setTimeout> | undefined;
+  const notifyStudio = () => {
+    // Changes come in bursts; compare once per burst.
+    studioCheck ??= setTimeout(() => {
+      studioCheck = undefined;
+      const next = botsSignature(store.all(), store.botActivitySummary());
+      if (next === studioSignature) return;
+      studioSignature = next;
+      studioNotifier.changed();
+    }, 500);
+  };
+  runtime.onChanged.add(notifyStudio);
+  bb.onDispose(() => {
+    runtime.onChanged.delete(notifyStudio);
+    clearTimeout(studioCheck);
+    studioNotifier.dispose();
+  });
   bb.http.route("GET", "/attachment", async (context) => {
     try {
       const a = store.attachment(context.req.query("id") ?? "");
@@ -1401,7 +1431,7 @@ export default async function plugin(bb: BbPluginApi) {
   registerChannelMentions(bb, store, channelThreads);
   bb.providers.register({
     id: channelProviderId,
-    displayName: "Bot Teams",
+    displayName: "Studio Teams",
     icon: "Bot",
     strings: {
       signInHint: "Channel threads need no sign-in.",
@@ -1520,7 +1550,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (bot.retired && c.kind === "admin")
       return {
         action: "reject",
-        message: "This bot is archived. Restore it from the Bot Teams page.",
+        message: "This bot is archived. Restore it from the Studio Teams page.",
       };
     // Native owner replies to setup and mission threads remain direct.
     if (context.initiator === "user" && context.originPluginId !== "bot-teams")
@@ -1528,7 +1558,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (bot.retired)
       return {
         action: "reject",
-        message: "This bot is archived. Restore it from the Bot Teams page.",
+        message: "This bot is archived. Restore it from the Studio Teams page.",
       };
     if (c.kind !== "admin") {
       const job = store

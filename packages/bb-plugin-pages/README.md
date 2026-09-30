@@ -1,11 +1,11 @@
 # bb-plugin-pages
 
-> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, and keeping what your agents make: [Studio](../bb-plugin-studio), Studio Pages, [Studio Talk](../bb-plugin-talk), [Studio Draw](../bb-plugin-excalidraw), [Studio Artifacts](../bb-plugin-artifacts), and [Studio Tasks](../bb-plugin-studio-tasks).
+> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-plugin-studio), Studio Pages, [Studio Talk](../bb-plugin-talk), [Studio Draw](../bb-plugin-excalidraw), [Studio Artifacts](../bb-plugin-artifacts), [Studio Tasks](../bb-plugin-studio-tasks), and [Studio Teams](../bb-plugin-bot-teams).
 
 Collaborative documents for BB that you write together with your agents.
 Pages gives you a Notion-style block editor with live multiplayer editing,
 comments, charts, and embeds. It also connects to
-[Bot Teams](../bb-plugin-bot-teams): @mention a bot in a page to hand it
+[Studio Teams](../bb-plugin-bot-teams): @mention a bot in a page to hand it
 work, or give a page an owner bot that keeps it up to date on a schedule.
 
 ## Staged preview
@@ -79,7 +79,7 @@ afterwards.
   that gets the page as context. The thread opens in a card on the page,
   and you can minimize it or open it as a full thread. The full thread's
   header shows the page's name, which takes you back to the page with the
-  chat open. This works without Bot Teams.
+  chat open. This works without Studio Teams.
 - **Version history.** Pages saves a version before an agent's or bot's first
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.
@@ -102,9 +102,9 @@ Talk does the recording, transcription, and durability. Pages only marks the
 editor as a Talk dictation field and inserts the text Talk hands it. Without
 Talk, the dictation controls are hidden.
 
-## Bot Teams integration
+## Studio Teams integration
 
-Needs the Bot Teams plugin. Requests run in each bot's DM thread with the
+Needs the Studio Teams plugin. Requests run in each bot's DM thread with the
 bot's configured model and reasoning level.
 
 - **@mention a bot in the page.** Write what you need and mention the bot in
@@ -126,11 +126,11 @@ working, done, or failed, and opens its thread in a card on the page. It
 also lists the page's chats and its Keep updated schedule. Pages remembers which mentions and comments it
 has already sent, so bots are never asked twice.
 
-Without Bot Teams, pages, comments, agent tools, and **Work with this page**
-work as usual. **Keep updated…** is disabled and says Bot Teams isn't
+Without Studio Teams, pages, comments, agent tools, and **Work with this page**
+work as usual. **Keep updated…** is disabled and says Studio Teams isn't
 installed or enabled. A mention or comment for a
-bot made while Bot Teams is unavailable, for example while it reloads, waits
-and is sent once Bot Teams is back, as long as the BB server hasn't restarted
+bot made while Studio Teams is unavailable, for example while it reloads, waits
+and is sent once Studio Teams is back, as long as the BB server hasn't restarted
 in between.
 
 ## For agents

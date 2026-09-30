@@ -59,9 +59,10 @@ export function SidebarPortal({ id, title, order = 100, children }: { id: string
   useRevision();
   const anchor = anchorFor(key);
   if (!anchor) return null;
-  // BB scopes each plugin's CSS to its own root; the anchor sits in the host's.
+  // The anchor sits in the host's tree. Mark the section as this plugin's
+  // portal, as BB marks its own, so the plugin's CSS and route links apply.
   return createPortal(
-    <div data-bb-plugin={pluginId}>
+    <div data-bb-portaled-overlay="" data-bb-plugin-root="" data-bb-plugin={pluginId}>
       <SectionKeyContext.Provider value={key}>{children}</SectionKeyContext.Provider>
     </div>,
     anchor,
@@ -73,6 +74,15 @@ export function SidebarPortal({ id, title, order = 100, children }: { id: string
 export function useSidebarHosted(): boolean {
   useRevision();
   return host() !== null;
+}
+
+/** Expands one of this plugin's sections, e.g. when its search opens. */
+export function useExpandSidebarSection(id: string): () => void {
+  const pluginId = experimental_usePluginId();
+  return () => {
+    const key = sectionKey(pluginId, id);
+    if (isCollapsed(key)) setCollapsed(key, false);
+  };
 }
 
 /** Call after a sidebar row navigates: closes the sidebar on phones. */
@@ -104,6 +114,7 @@ export function SidebarSection({
   actions = [],
   trailing,
   menu,
+  menuLabel = `${title} list options`,
   children,
 }: {
   title: string;
@@ -113,6 +124,8 @@ export function SidebarSection({
   /** Controls after the action buttons, e.g. a menu button of the section's own. */
   trailing?: ReactNode;
   menu?: ReactNode;
+  /** The ⋯ button's label, "<title> list options" by default. */
+  menuLabel?: string;
   children: ReactNode;
 }) {
   const key = useContext(SectionKeyContext) ?? title;
@@ -164,11 +177,11 @@ export function SidebarSection({
           {trailing}
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
             <DropdownMenuTrigger asChild>
-              <button type="button" aria-label={`${title} list options`} className={CONTROL}>
+              <button type="button" aria-label={menuLabel} className={CONTROL}>
                 <Icon name="MoreHorizontal" className="size-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" aria-label={`${title} list options`}>
+            <DropdownMenuContent align="end" aria-label={menuLabel}>
               {menu}
               {menu ? <DropdownMenuSeparator /> : null}
               <SectionPlacementItems sectionKey={key} title={title} />

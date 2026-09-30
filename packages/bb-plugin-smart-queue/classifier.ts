@@ -212,7 +212,7 @@ export function parseModelVerdict(text: string | null): Verdict {
 }
 
 /**
- * Runs the prompt in a hidden, temporary thread, the same way Bot Teams runs
+ * Runs the prompt in a hidden, temporary thread, the same way Studio Teams runs
  * its provider classifier. In `thread` mode it uses the thread's own provider
  * and default model, so it works with whatever the user has installed.
  */

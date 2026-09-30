@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-/** A channel is a BB thread on this provider. Bot Teams creates these threads; the model picker never lists it. */
+/** A channel is a BB thread on this provider. Studio Teams creates these threads; the model picker never lists it. */
 export const channelProviderId = "bot-teams-channel";
 export const channelPostTool = "bots_channel_thread_post";
 
-/** Hidden thread input: Bot Teams hands the bridge a stored channel message to show. */
+/** Hidden thread input: Studio Teams hands the bridge a stored channel message to show. */
 export const channelDeliverPrefix = "[bot-teams:channel-deliver]";
 /** Hidden thread input: wakes a new channel thread without a visible message. */
 export const channelStartPrefix = "[bot-teams:channel-start]";
@@ -62,7 +62,7 @@ export const channelDeliverySchema = z.object({
   /** The bot's work thread for this reply; its name links there. */
   workThreadId: z.string().nullable().default(null),
   text: z.string(),
-  /** Bot Teams' own download URL: stored attachment paths are not links. */
+  /** Studio Teams' own download URL: stored attachment paths are not links. */
   attachments: z
     .array(z.object({ name: z.string(), url: z.string(), image: z.boolean() }))
     .default([]),

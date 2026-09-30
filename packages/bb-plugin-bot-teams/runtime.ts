@@ -1906,9 +1906,9 @@ export class Runtime {
         "Please inspect the attached files.",
       ...(job.coordinatorId === job.botId
         ? [
-            "You are the coordinator for this request. Only your completed synthesis is the owner-facing final answer. If you delegate, return a concise handoff now; Bot Teams will bring the settled results back to you.",
+            "You are the coordinator for this request. Only your completed synthesis is the owner-facing final answer. If you delegate, return a concise handoff now; Studio Teams will bring the settled results back to you.",
             ...(routingPlan?.executionMode === "parallel"
-              ? [`These collaborators started in parallel: ${routingPlan.collaboratorIds.map((id) => this.store.get(id).name).join(", ")}. Return your initial findings now; Bot Teams will hold them and give you the settled collaborator results for one final synthesis.`]
+              ? [`These collaborators started in parallel: ${routingPlan.collaboratorIds.map((id) => this.store.get(id).name).join(", ")}. Return your initial findings now; Studio Teams will hold them and give you the settled collaborator results for one final synthesis.`]
               : routingPlan?.collaboratorIds.length
                 ? [`These collaborators are available for delegation, but have not started: ${routingPlan.collaboratorIds.map((id) => this.store.get(id).name).join(", ")}.`]
                 : []),

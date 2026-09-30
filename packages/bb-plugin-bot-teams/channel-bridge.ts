@@ -33,7 +33,7 @@ import {
 
 /**
  * The channel provider's bridge. It runs no model: a user's message becomes a
- * `bots_channel_thread_post` call that Bot Teams routes to the channel's bots,
+ * `bots_channel_thread_post` call that Studio Teams routes to the channel's bots,
  * and bot replies come back later as hidden deliveries it shows as assistant
  * messages.
  */
@@ -64,7 +64,7 @@ function promptText(input: readonly PromptInput[]) {
     .join("");
 }
 
-/** Markdown for a pill Bot Teams offered: bots, channels, and direct messages. */
+/** Markdown for a pill Studio Teams offered: bots, channels, and direct messages. */
 export function pillText(itemId: string, label: string) {
   const split = itemId.indexOf(":");
   const provider = itemId.slice(0, split), id = itemId.slice(split + 1);
@@ -148,7 +148,7 @@ const postPresentation = {
   suppress: true,
 };
 
-/** A user's message: hand it to Bot Teams, which routes it like any channel message. */
+/** A user's message: hand it to Studio Teams, which routes it like any channel message. */
 /** The composer's picker: its model is the chat mode, its reasoning level the bot permissions. */
 interface Selection {
   model?: string;
@@ -251,7 +251,7 @@ const handlers: Record<string, (id: JsonRpcId, params: unknown) => void> = {
       models: channelModels.map((model) => ({ ...model, model: model.id })),
       selectedOnlyModels: [],
     }),
-  // "Not installed" keeps the provider out of the model picker; Bot Teams creates channel threads by ID.
+  // "Not installed" keeps the provider out of the model picker; Studio Teams creates channel threads by ID.
   [BRIDGE_REQUEST_METHODS.providerHealth]: (id) =>
     io.sendResult(id, {
       supported: true,

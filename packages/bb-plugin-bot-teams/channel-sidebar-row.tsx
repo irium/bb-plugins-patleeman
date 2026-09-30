@@ -188,7 +188,7 @@ export function ChannelSidebarRow({
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem disabled={pending} onSelect={onArchive}>
-          <Icon name={room.archived ? "ArchiveRestore" : "Archive"} />
+          <Icon name={room.archived ? "RotateCcw" : "Archive"} />
           {room.archived ? "Restore" : "Archive"}
         </ContextMenuItem>
         <ContextMenuItem

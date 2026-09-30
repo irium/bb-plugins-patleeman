@@ -67,7 +67,7 @@ function acceptedRequestsInTurn(
     .reverse();
 }
 
-/** Accepted owner messages in the current turn, excluding Bot Teams job prompts. */
+/** Accepted owner messages in the current turn, excluding Studio Teams job prompts. */
 export function directMessagesInTurn(
   events: readonly ThreadEvent[],
   phase: "active" | "completed",

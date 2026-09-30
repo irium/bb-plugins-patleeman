@@ -18,18 +18,16 @@ import type {
 } from "./contract";
 import { Button } from "./components/ui/button";
 import {
-  BackButton,
   TabBar,
   ProfileForm,
   DocumentEditor,
   WorkList,
   ErrorMessage,
-  StatusBadge,
   message,
 } from "./bot-ui";
 import {
   ChannelsPage,
-  ChannelsNavigation,
+  TeamsSidebar,
   ChannelRedirect,
   ChannelLinkNavigation,
 } from "./channels";
@@ -37,6 +35,22 @@ import { Modal } from "./channel-controls";
 import { setThreadDraft } from "./channel-drafts";
 import { BotCollection } from "./bot-collection";
 import { BotCreationThread } from "./bot-creation-thread";
+import { NEW_BOT_EVENT } from "./studio-provider";
+import {
+  Badge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  FLOATING_BUTTON,
+  ICON_BUTTON,
+  Icon as KitIcon,
+  ItemHeader,
+  ItemTile,
+  openAppPath,
+  studioPath,
+  useStudioPresent,
+} from "@bb-studio/kit/app";
 import {
   ChannelHandoffController,
   requestChannelHandoff,
@@ -49,10 +63,17 @@ import {
   ChannelThreadHeader,
 } from "./channel-thread-surfaces";
 const tabs = ["profile", "mission", "memory", "activity", "usage"] as const;
+const STATUS_TONES = {
+  ready: "success",
+  working: "live",
+  paused: "neutral",
+  error: "danger",
+} as const;
 
 function BotDetail({ id, tab }: { id: string; tab: string }) {
   const rpc = useRpc<typeof rpcContract>(),
-    navigate = useBbNavigate();
+    navigate = useBbNavigate(),
+    studio = useStudioPresent();
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [data, setData] = useState<{
       bot: Bot;
@@ -120,26 +141,75 @@ function BotDetail({ id, tab }: { id: string; tab: string }) {
       : botStatus === "working"
           ? "Working"
           : "Ready";
+  const startThread = async () => {
+    try {
+      const conversation = await rpc.call("newConversation", { id });
+      navigate.toThread(conversation.threadId);
+    } catch (cause) {
+      setError(message(cause));
+    }
+  };
   return (
-    <div className="bot-detail">
-      <header className="bot-thread-bar">
-        <BackButton />
-        <span className="bot-inline-avatar" aria-hidden>
-          {bot.avatar}
-        </span>
-        <h1>{bot.name}</h1>
-        <TabBar
-          items={tabs}
-          selected={tab}
-          label="Bot sections"
-          onSelect={(t) =>
-            navigate.toPluginPanel("bots", { subPath: `${id}/${t}` })
-          }
-        />
-        <div className="bot-bar-actions">
-          <StatusBadge status={botStatus} label={statusLabel} />
+    <div className="bot-detail relative">
+      <ItemHeader
+        backLabel={studio ? "Studio" : "Bots"}
+        onBack={() =>
+          studio ? openAppPath(studioPath("bot")) : navigate.toPluginPanel("bots")
+        }
+        leading={<Badge label={statusLabel} tone={STATUS_TONES[botStatus]} />}
+        trailing={
+          <>
+            {bot.retired ? null : (
+              <button type="button" className={FLOATING_BUTTON} disabled={pending} onClick={() => void startThread()}>
+                <KitIcon name="MessageSquarePlus" /> Message
+              </button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" aria-label="Bot options" className={ICON_BUTTON}>
+                  <KitIcon name="MoreHorizontal" className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem
+                  disabled={pending || !!bot.retired}
+                  onSelect={() => void action(() => rpc.call("wake", { id }))}
+                >
+                  <KitIcon name="Zap" className="size-4" /> Wake now
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    bot.retired
+                      ? void action(() => rpc.call("retire", { id, retired: false }))
+                      : setArchiveOpen(true)
+                  }
+                >
+                  <KitIcon name={bot.retired ? "RotateCcw" : "Archive"} className="size-4" />
+                  {bot.retired ? "Restore bot" : "Archive bot"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
+      <div className="bot-hero">
+        <ItemTile icon={bot.avatar || null} kindIcon="Bot" size="xl" />
+        <div className="min-w-0">
+          <h1>{bot.name}</h1>
+          <p>
+            @{bot.handle}
+            {bot.description ? ` · ${bot.description}` : ""}
+          </p>
         </div>
-      </header>
+      </div>
+      <TabBar
+        items={tabs}
+        selected={tab}
+        label="Bot sections"
+        onSelect={(t) =>
+          navigate.toPluginPanel("bots", { subPath: `${id}/${t}` })
+        }
+      />
       <Modal
         title={`Archive ${bot.name}?`}
         open={archiveOpen}
@@ -291,6 +361,16 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
     />
   );
 }
+/** Studio's New ▾ → Bot opens the bot setup chat. */
+function NewBotListener() {
+  const navigate = useBbNavigate();
+  useEffect(() => {
+    const open = () => navigate.toPluginPanel("bots", { subPath: "new" });
+    window.addEventListener(NEW_BOT_EVENT, open);
+    return () => window.removeEventListener(NEW_BOT_EVENT, open);
+  }, [navigate]);
+  return null;
+}
 export default definePluginApp((app) => {
   for (const icon of botTeamsIcons) app.experimental_icons.register(icon);
   app.contentScripts.register(threadChannelMenu);
@@ -340,7 +420,7 @@ export default definePluginApp((app) => {
   });
   app.slots.navPanel({
     id: "bots",
-    title: "Bot Teams",
+    title: "Studio Teams",
     icon: "Bot",
     path: "bots",
     component: BotsPage,
@@ -352,9 +432,7 @@ export default definePluginApp((app) => {
     path: "channels",
     component: ChannelsPage,
   });
-  app.slots.experimental_sidebarNavigation({
-    id: "channels",
-    title: "Channels navigation",
-    component: ChannelsNavigation,
-  });
+  // Channels and Direct messages, as sections of the Studio Sidebar.
+  app.slots.experimental_appOverlay({ id: "sidebar-sections", component: TeamsSidebar });
+  app.slots.experimental_appOverlay({ id: "studio-new-bot", component: NewBotListener });
 });

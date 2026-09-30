@@ -348,7 +348,7 @@ the hourly/daily budgets. Limits do not block reconciliation of existing work.
 ## Classifier setup
 
 Jev is the default classifier for recipient selection, busy-session actions, and
-implicit delegation returns. Set the OpenCode Zen API key in Bot Teams settings; it is
+implicit delegation returns. Set the OpenCode Zen API key in Studio Teams settings; it is
 stored as a secret. The server's `OPENCODE_API_KEY` is also supported. Never print
 or paste a credential into chat.
 

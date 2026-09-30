@@ -1,5 +1,6 @@
 // Live sidebar regression: empty threads only; never sends messages or wakes bots.
-// BB_SIDEBAR_QA_SESSION=<session> [BB_SIDEBAR_QA_BOT_ID=<idle fixture>] node scripts/qa-bot-teams-sidebar.mjs
+// BB_SIDEBAR_QA_SESSION=<session> [BB_SIDEBAR_QA_BOT_ID=<idle fixture>] [BB_SIDEBAR_QA_ORIGIN=<bb url>] node scripts/qa-bot-teams-sidebar.mjs
+// Needs the browser-automation plugin. The sections render through the Studio Sidebar (thread-list-plus).
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
@@ -142,7 +143,7 @@ async function exercise(p, f, group) {
   const waitChannel = (name) => p.waitForSelector(channelRow(name),{visible:true});
   const waitDirect = () => p.waitForSelector(directRow,{visible:true});
   // Establish the BB origin before browser-side RPCs, including a fresh about:blank tab.
-  await p.goto(`${f.origin}/`); await p.waitForSelector('.channels-sidebar');
+  await p.goto(`${f.origin}/`); await p.waitForSelector('section[aria-label="Channels"]');
   if (group !== 'mobile') {
     await rpc('updateRoom', { id:f.alpha.id, name:f.alpha.name });
     await rpc('channelState', { id:f.alpha.id, archived:false, pinned:false });
@@ -270,12 +271,12 @@ async function exercise(p, f, group) {
   }
   if (group === 'display') {
     await p.click('button[aria-label="Collapse Channels section"]');
-    check(await p.evaluate(() => document.querySelector('.channels-sidebar > div[id]')?.hidden), 'Collapse channels');
+    check(await p.evaluate(() => getComputedStyle(document.querySelector('section[aria-label="Channels"] > div[id]')).display === 'none'), 'Collapse channels');
     await p.click('button[aria-label="Search channels"]'); await fill('input[aria-label="Search channels"]', `  SIDEBAR QA ALPHA ${f.suffix}  `);
     await waitChannel(f.alpha.name);
     check(await p.evaluate((selector) => !document.querySelector(selector), channelRow(f.zulu.name)), 'Search trims whitespace and ignores case');
     await fill('input[aria-label="Search channels"]', 'no-sidebar-qa-match');
-    check(await p.evaluate(() => document.querySelector('.channels-sidebar').textContent.includes('No matching channels')), 'Empty channel search');
+    check(await p.evaluate(() => document.querySelector('section[aria-label="Channels"]').textContent.includes('No matching channels')), 'Empty channel search');
     await fill('input[aria-label="Search channels"]', `Sidebar QA`);
     await p.click('button[aria-label="Channel list options"]'); await submenu('Organize by'); await menuItem('No grouping'); await closeMenus();
     await p.click('button[aria-label="Channel list options"]'); await submenu('Sort by'); await menuItem('Alphabetical'); await closeMenus();
@@ -297,13 +298,13 @@ async function exercise(p, f, group) {
     check(true,'Pinned-first grouping puts pinned channels first');
     await rpc('channelState',{id:f.alpha.id,pinned:false});
     await p.click('button[aria-label="Channel list options"]'); await submenu('Organize by'); await menuItem('By activity'); await closeMenus();
-    check(await p.evaluate(() => !!document.querySelector('.channels-sidebar-group-heading')), 'Activity grouping');
+    check(await p.evaluate(() => !!document.querySelector('section[aria-label="Channels"] .channels-sidebar-group > p')), 'Activity grouping');
     await p.click('button[aria-label="Search channels"]');
     await p.click('button[aria-label="Collapse Direct messages section"]');
     await p.click('button[aria-label="Search direct messages"]'); await fill('input[aria-label="Search direct messages"]', f.bot.name.toUpperCase()); await waitDirect();
     await fill('input[aria-label="Search direct messages"]', `@${f.bot.handle}`); await waitDirect(); check(true,'DM search matches bot handles');
     await fill('input[aria-label="Search direct messages"]', 'no-sidebar-qa-match');
-    check(await p.evaluate(() => document.querySelector('.direct-messages-sidebar').textContent.includes('No matching direct messages')), 'Empty DM search');
+    check(await p.evaluate(() => document.querySelector('section[aria-label="Direct messages"]').textContent.includes('No matching direct messages')), 'Empty DM search');
     await p.click('button[aria-label="Search direct messages"]'); await waitDirect(); check(true, 'Closing DM search clears its filter');
   }
   if (group === 'direct') {
@@ -348,7 +349,7 @@ async function exercise(p, f, group) {
     stage = 'hide archived bots'; await p.click('button[aria-label="Direct message list options"]'); await menuItem('Hide archived bots');
     await absent(directRow);check(true,'Hide archived bots removes their direct threads');
     await rpc('retire', { id: f.bot.id, retired: false });
-    } catch(error) { throw new Error(`${stage}: ${error.message}; ${JSON.stringify(await p.evaluate(()=>({url:location.href,menus:[...document.querySelectorAll('[role="menu"]')].map(e=>e.textContent),sidebar:document.querySelector('.direct-messages-sidebar')?.textContent})))}`); }
+    } catch(error) { throw new Error(`${stage}: ${error.message}; ${JSON.stringify(await p.evaluate(()=>({url:location.href,menus:[...document.querySelectorAll('[role="menu"]')].map(e=>e.textContent),sidebar:document.querySelector('section[aria-label="Direct messages"]')?.textContent})))}`); }
   }
   if (group === 'errors') {
     await p.evaluate(()=>Object.defineProperty(navigator.clipboard,'writeText',{configurable:true,value:async()=>{throw new Error('Clipboard blocked for QA');}}));
@@ -356,7 +357,7 @@ async function exercise(p, f, group) {
     await p.waitForFunction(()=>[...document.querySelectorAll('[role="alert"]')].some(e=>e.textContent.includes('Clipboard blocked for QA')));
     check(true, 'DM clipboard failure is shown in the sidebar');
     await channelMenu(); await menuItem('Copy channel link');
-    await p.waitForFunction(()=>document.querySelector('.channels-sidebar').textContent.includes('Could not copy channel link'));
+    await p.waitForFunction(()=>document.querySelector('section[aria-label="Channels"]').textContent.includes('Could not copy channel link'));
     check(true, 'Channel clipboard failure is shown in the sidebar');
     await channelMenu(); await menuItem('Rename'); await fill('input[aria-label="Channel name"]', f.zulu.name); await p.keyboard.press('Enter');
     try { await p.waitForSelector('.sidebar-inline-rename-error'); }
@@ -399,7 +400,7 @@ async function exercise(p, f, group) {
   }
   if (group === 'creation') {
     const before = (await rpc('list', null)).rooms.map(r=>r.id);
-    await p.click('.channels-sidebar[aria-label="Channels"] button[aria-label="New channel"]');
+    await p.click('section[aria-label="Channels"] button[aria-label="New channel"]');
     await p.waitForFunction(()=>location.pathname.startsWith('/threads/'),{timeout:20000});
     const createdThread=await p.evaluate(()=>location.pathname.split('/').at(-1));
     const createdRoom=await rpc('channelForThread',{threadId:createdThread});

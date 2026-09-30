@@ -26,4 +26,4 @@ latest assistant output, and the new message to the Jev provider you configured,
 or to the fallback model's provider. That provider bills the usage.
 
 Smart Queue acts only on messages you type. It leaves agent messages, plugin
-messages, retries, scheduled sends, and Bot Teams threads alone.
+messages, retries, scheduled sends, and Studio Teams threads alone.

@@ -472,9 +472,6 @@
 .bot-tabs button[aria-current]:hover {
   background: transparent;
 }
-.bot-bar-actions .bot-status-badge {
-  margin-inline-end: 2px;
-}
 /* Activity: a read-only log. One dense row per call; the row opens its thread. */
 .activity-list {
   display: flex;
@@ -760,54 +757,53 @@
   outline-offset: 3px;
 }
 
-/* Use BB's typography, sidebar row size, interaction colors and scaffold controls. */
-.bot-thread-bar {
+/* The Studio item layout: a floating back bar over the page, then the bot's
+   avatar tile and name, then its sections as tabs. */
+.bot-hero,
+.bot-detail > .bot-tabs {
+  width: 100%;
+  max-width: 1024px;
+  margin: 0 auto;
+  padding-inline: 20px;
+  box-sizing: border-box;
+}
+.bot-hero {
   display: flex;
   align-items: center;
-  gap: 4px;
-  min-height: calc(var(--bb-sidebar-row-height, 28px) + 8px);
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
+  gap: 16px;
+  padding-top: 64px;
+  padding-bottom: 16px;
   flex-shrink: 0;
-  min-width: 0;
 }
-.bot-thread-bar h1 {
-  font-size: var(--text-sm);
+.bot-detail .bot-hero h1 {
+  font-size: 28px;
+  line-height: 1.2;
   font-weight: 600;
-  margin: 0 8px 0 0;
-  white-space: nowrap;
+  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  white-space: nowrap;
 }
-.bot-inline-avatar {
-  font-size: 16px;
-  line-height: 1;
+.bot-hero p {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.bot-thread-bar .bot-tabs {
-  padding: 0;
-  gap: 0;
-  border: 0;
-  align-self: stretch;
-  align-items: center;
-  min-width: 0;
+.bot-detail > .bot-tabs {
+  gap: 4px;
 }
-.bot-thread-bar .bot-tabs button {
+.bot-detail > .bot-tabs button {
   height: var(--bb-sidebar-row-height, 28px);
   padding: 0 8px;
-  font-size: var(--text-xs);
   font-weight: 500;
 }
 .bot-tabs button[aria-current]:after {
   left: 8px;
   right: 8px;
-  bottom: -4px;
-}
-.bot-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
+  bottom: -1px;
 }
 
 .bot-presence-dot {
@@ -852,48 +848,28 @@
 }
 /* BB's thread timeline: a 760px column of rows 8px apart, padded as a thread pane. */
 
-@media (max-width: 900px) {
-  .bot-thread-bar {
-    flex-wrap: wrap;
+@media (max-width: 767px) {
+  .bot-hero {
+    padding-top: 56px;
+    padding-inline: 12px;
   }
-
-}
-@media (max-width: 700px) {
-  .bot-thread-bar h1 {
-    max-width: 140px;
-    margin-right: 0;
+  .bot-detail > .bot-tabs {
+    padding-inline: 12px;
+    overflow-x: auto;
   }
-  .bot-detail .bot-tabs {
-    order: 3;
-    flex-basis: 100%;
+  .bot-detail .bot-hero h1 {
+    font-size: 24px;
   }
-  .bot-thread-bar .bot-tabs button {
-    padding: 0 6px;
-  }
-
 }
 
 @media (max-width: 767px) and (pointer: coarse) {
-  .bot-thread-bar .bot-tabs button {
+  .bot-detail > .bot-tabs button {
     height: 36px;
   }
 }
 
 /* Channel navigation follows the host's sidebar row geometry and tokens. */
 
-.channels-navigation-list {
-  max-height: min(55vh, 520px);
-  overflow-y: auto;
-  border-bottom: 1px solid var(--border);
-}
-.channels-sidebar-inline {
-  flex: none;
-  padding-top: 4px;
-}
-.channels-sidebar {
-  padding: 4px 8px;
-  font-size: var(--text-sm);
-}
 /* Matches BB's native sidebar thread row (text-sm, regular weight, sidebar
    foreground), so channels, direct messages, and threads read as one list. */
 .channel-nav-row {
@@ -1075,94 +1051,43 @@
     animation: none;
   }
 }
-.channels-sidebar {
-  margin: 4px 0 12px;
+.channels-sidebar-body {
+  font-size: var(--text-sm);
 }
-.channels-sidebar > header {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 24px;
-  margin-bottom: 4px;
-  padding: 0 4px 0 8px;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 20px;
-}
-.channels-sidebar-title {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-}
-.channels-sidebar-heading {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 400;
-}
-.channels-sidebar > header .channels-sidebar-collapse {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 24px;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border-radius: calc(var(--radius, 8px) - 2px);
-  color: var(--subtle-foreground, var(--muted-foreground));
-  opacity: 0;
-  cursor: pointer;
-}
-.channels-sidebar-collapse [data-icon-root] {
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-  transition: transform 150ms;
-}
-.channels-sidebar-collapse[aria-expanded="true"] [data-icon-root] {
-  transform: rotate(90deg);
-}
-.channels-sidebar > header .channels-sidebar-collapse[aria-expanded="false"],
-.channels-sidebar > header:hover .channels-sidebar-collapse,
-.channels-sidebar > header:focus-within .channels-sidebar-collapse {
-  opacity: 1;
-}
-.channels-sidebar-collapse:hover {
-  background: var(--sidebar-accent);
-  color: var(--sidebar-accent-foreground);
-}
-@media (hover: none), (pointer: coarse) {
-  .channels-sidebar > header .channels-sidebar-collapse {
-    opacity: 1;
-  }
-}
-.channels-sidebar-collapse:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-.channels-sidebar > header button {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-}
-.channels-sidebar > header button[aria-pressed="true"] {
-  background: var(--sidebar-accent);
-  color: var(--sidebar-accent-foreground);
-}
-
-.channels-sidebar input {
+.channels-sidebar-body input {
   margin: 4px 0;
   height: 28px;
 }
-.channels-sidebar-group-heading {
-  margin: 8px 8px 4px;
+/* The New direct message button, as the section's own header buttons. */
+.teams-sidebar-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: calc(var(--radius, 8px) - 2px);
+  color: var(--subtle-foreground, var(--muted-foreground));
+  cursor: pointer;
+  outline: none;
+}
+.teams-sidebar-control:hover,
+.teams-sidebar-control[data-state="open"] {
+  background: var(--state-hover, var(--sidebar-accent));
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  font-weight: 400;
-  line-height: 20px;
+}
+.teams-sidebar-control:focus-visible {
+  box-shadow: 0 0 0 2px var(--sidebar-ring, var(--ring));
+}
+.teams-sidebar-control [data-icon-root] {
+  width: 16px;
+  height: 16px;
+}
+@media (max-width: 767px) and (pointer: coarse) {
+  .teams-sidebar-control {
+    width: 36px;
+    height: 36px;
+  }
 }
 .channel-header {
   display: flex;

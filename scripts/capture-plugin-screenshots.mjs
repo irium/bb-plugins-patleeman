@@ -498,8 +498,8 @@ async function pluginRpc(pluginId, method, input) {
 }
 
 /** Run the bb CLI as the owner, not as the thread this script may run inside. */
-// Bot Teams captures read the seeded "Launch room" channel: Atlas and Scribe
-// with fixed replies from their demo missions (see the Bot Teams README).
+// Studio Teams captures read the seeded "Launch room" channel: Atlas and Scribe
+// with fixed replies from their demo missions (see the Studio Teams README).
 const launchRoomReplies = [
   "Ready. I'll keep the decision log for ORBIT-42 and post next steps after each check.",
   "Release check passed: the brief, owner, and Friday window all line up.",
@@ -1048,7 +1048,7 @@ const captures = [
       });
       const setupPath = `/plugins/bot-teams/bots/new/${room.id}`;
       const checkComposer = async (channel = false) => {
-        await client.waitForText("Help me create a persistent bot in BB Bot Teams");
+        await client.waitForText("Help me create a persistent bot in BB Studio Teams");
         if (channel) await client.waitForText(room.id);
         await client.evaluate(`(() => {
           const editor = document.querySelector('[data-bot-creation-thread] [contenteditable="true"]');
@@ -1131,14 +1131,22 @@ const captures = [
       await client.waitForInputValue("Bot role", "Research and verify the facts");
       await client.waitForText("Mission schedule");
       await client.evaluate(`(() => {
+        const hero = document.querySelector('.bot-detail .bot-hero');
+        if (hero?.querySelector('h1')?.textContent !== 'Atlas' || !hero.textContent.includes('@atlas'))
+          throw new Error('The bot page must open with its avatar, name and handle');
+        const header = Array.from(document.querySelectorAll('.bot-detail button')).map((button) => button.getAttribute('aria-label') || button.textContent.trim());
+        for (const label of ['Studio', 'Message', 'Bot options'])
+          if (!header.some((text) => text.includes(label))) throw new Error('The bot header is missing ' + label);
         const form = document.querySelector('form[aria-label="Bot profile"]');
-        if (!form || form.querySelectorAll('.bot-config-row').length !== 6 || !form.querySelector('button[aria-label="Mission schedule"]')) {
-          throw new Error('Expected native bot settings rows and schedule picker');
+        const rows = Array.from(form?.querySelectorAll('.bot-form-row > :first-child') ?? []).map((label) => label.textContent.trim());
+        const expected = ['Name', 'Avatar', 'Role', 'Primary model', 'Fallback model', 'Permissions', 'Mission schedule'];
+        if (rows.join('|') !== expected.join('|') || !form.querySelector('button[aria-label="Mission schedule"]')) {
+          throw new Error('Expected native bot settings rows and schedule picker, got ' + rows.join(', '));
         }
         const width = form.closest('.bot-config-content').getBoundingClientRect().width;
         if (width > 1024 || width < 900) throw new Error('Bot configuration must use BB collection width');
         const save = Array.from(form.querySelectorAll('button')).find((button) => button.textContent === 'Save profile');
-        if (!save?.disabled) throw new Error('Unchanged profiles must disable Save');
+        if ((save && !save.disabled) || document.body.innerText.includes('Unsaved changes')) throw new Error('Unchanged profiles must not offer Save');
       })()`);
     },
   },
@@ -1152,16 +1160,18 @@ const captures = [
       await client.waitForText("MEMORY.md");
       // Wait for the real file, not just the empty editor shell.
       const started = Date.now();
-      while (!(await client.evaluate(`document.querySelector('textarea[aria-label="MEMORY.md"]')?.value.includes('ORBIT-42')`))) {
+      while (!(await client.evaluate(`document.querySelector('[aria-label="MEMORY.md"]')?.textContent.includes('ORBIT-42')`))) {
         if (Date.now() - started > 10000) throw new Error('Atlas memory must contain the staged launch brief');
         await sleep(100);
       }
       await client.evaluate(`(() => {
-        const editor = document.querySelector('textarea[aria-label="MEMORY.md"]');
-        const height = editor.getBoundingClientRect().height;
-        if (height < 208 || height > 400 || editor.disabled) throw new Error('Memory editor must be bounded and editable');
+        const editor = document.querySelector('[aria-label="MEMORY.md"]');
+        const source = document.querySelector('.bot-markdown-source').getBoundingClientRect();
+        const frame = document.querySelector('.bot-markdown-editor').getBoundingClientRect();
+        if (source.height < 208 || frame.bottom > innerHeight || editor.getAttribute('contenteditable') !== 'true')
+          throw new Error('Memory editor must fit the page and be editable');
         const save = Array.from(document.querySelectorAll('.bot-document button')).find((button) => button.textContent === 'Save memory');
-        if (!save?.disabled || !document.querySelector('.bot-document [data-icon="RotateCcw"]')) throw new Error('Expected native reload and unchanged-save controls');
+        if ((save && !save.disabled) || !document.querySelector('.bot-document [data-icon="RotateCcw"]')) throw new Error('Expected native reload and no save for unchanged memory');
       })()`);
     },
   },
@@ -1171,11 +1181,11 @@ const captures = [
     fileName: "bots-collection.png",
     setup: async (client) => {
       await client.navigate("/");
-      await client.waitForText("Bot Teams");
+      await client.waitForText("Studio Teams");
       await client.evaluate(`(() => {
-        const button = Array.from(document.querySelectorAll('.channels-navigation button'))
-          .find((candidate) => candidate.textContent.trim() === 'Bot Teams');
-        if (!button) throw new Error('Bots navigation is missing');
+        const button = Array.from(document.querySelectorAll('[data-sidebar="sidebar"] button'))
+          .find((candidate) => candidate.textContent.trim() === 'Studio Teams');
+        if (!button) throw new Error('Studio Teams navigation is missing');
         button.click();
       })()`);
       await client.waitForAriaButton("Filter bots");
@@ -1196,6 +1206,47 @@ const captures = [
         if (width > 1024 || width < 900) throw new Error('Bots collection must use BB collection content width');
       })()`);
     },
+  },
+  {
+    id: "bots-sidebar",
+    packageDir: "bb-plugin-bot-teams",
+    fileName: "studio-sidebar.png",
+    showSidebar: true,
+    setup: async (client) => {
+      // Channels and Direct messages are Studio Sidebar sections: between
+      // Studio and Threads, in the sidebar's one scroll area.
+      await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+      await client.waitForSelector('section[aria-label="Channels"] .channel-sidebar-row');
+      await client.waitForSelector('section[aria-label="Direct messages"] .direct-thread-nav-row');
+      const layout = JSON.parse(await client.evaluate(`JSON.stringify((() => {
+        const sidebar = document.querySelector('[data-sidebar="sidebar"]');
+        const sections = Array.from(sidebar.querySelectorAll('[data-studio-sidebar-sections] > section, [data-studio-sidebar-sections] section[aria-label]'))
+          .map((el) => el.getAttribute('aria-label'));
+        const root = sidebar.querySelector('[data-studio-sidebar-sections]');
+        const threads = Array.from(sidebar.querySelectorAll('button, p, span')).find((el) => el.textContent?.trim() === 'Threads');
+        const scrollers = Array.from(root.querySelectorAll('*')).filter((el) => /(auto|scroll)/.test(getComputedStyle(el).overflowY));
+        return {
+          sections,
+          channels: Array.from(sidebar.querySelectorAll('.channel-sidebar-row .channel-nav-name')).map((el) => el.textContent),
+          direct: Array.from(sidebar.querySelectorAll('.direct-thread-nav-row')).map((el) => el.textContent),
+          above: Boolean(threads && (root.compareDocumentPosition(threads) & Node.DOCUMENT_POSITION_FOLLOWING)),
+          scrollers: scrollers.length,
+        };
+      })())`));
+      const order = ["Channels", "Direct messages"].map((name) => layout.sections.indexOf(name));
+      if (order.includes(-1) || order[0] > order[1]) throw new Error(`Expected Channels then Direct messages, got ${layout.sections.join(", ")}`);
+      for (const name of ["Launch room", "Design review"])
+        if (!layout.channels.includes(name)) throw new Error(`The Channels section is missing ${name}`);
+      if (!layout.direct.some((row) => row.includes("Atlas"))) throw new Error("Direct messages is missing the Atlas thread");
+      if (!layout.above) throw new Error("The Studio Teams sections are not above Threads");
+      if (layout.scrollers) throw new Error("A Studio Teams section has its own scroll area");
+    },
+    // From the Studio sections down, so the rows and the Threads heading below show.
+    clip: async (client) => client.evaluate(`(() => {
+      const sidebar = document.querySelector('[data-sidebar="sidebar"]').getBoundingClientRect();
+      const top = document.querySelector('[data-studio-sidebar-sections]').getBoundingClientRect().top - 12;
+      return { x: sidebar.x, y: top, width: sidebar.width, height: Math.min(sidebar.bottom - top, 460) };
+    })()`),
   },
   {
     id: "agent-checklists",

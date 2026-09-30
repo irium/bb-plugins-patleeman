@@ -1,6 +1,6 @@
 # Studio Draw
 
-> **Studio Draw** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, and keeping what your agents make: [Studio](../bb-plugin-studio), [Studio Pages](../bb-plugin-pages), [Studio Talk](../bb-plugin-talk), Studio Draw, [Studio Artifacts](../bb-plugin-artifacts), and [Studio Tasks](../bb-plugin-studio-tasks).
+> **Studio Draw** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-plugin-studio), [Studio Pages](../bb-plugin-pages), [Studio Talk](../bb-plugin-talk), Studio Draw, [Studio Artifacts](../bb-plugin-artifacts), [Studio Tasks](../bb-plugin-studio-tasks), and [Studio Teams](../bb-plugin-bot-teams).
 
 Create and edit [Excalidraw](https://excalidraw.com) drawings inside BB,
 sketch alongside your agents, and attach drawings to conversations. The

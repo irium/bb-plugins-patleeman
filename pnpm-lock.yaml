@@ -213,6 +213,9 @@ importers:
 
   packages/bb-plugin-bot-teams:
     dependencies:
+      '@bb-studio/kit':
+        specifier: file:../studio-kit
+        version: link:../studio-kit
       '@codemirror/commands':
         specifier: ^6.11.1
         version: 6.11.1

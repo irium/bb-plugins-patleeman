@@ -170,7 +170,7 @@ export function DirectSidebarThread({
       </Sub>
       <Separator />
       <Item onSelect={archive}>
-        <Icon name={archived ? "ArchiveRestore" : "Archive"} />
+        <Icon name={archived ? "RotateCcw" : "Archive"} />
         {archived ? "Unarchive" : "Archive"}
       </Item>
       <Item className="text-destructive focus:text-destructive"
@@ -224,7 +224,7 @@ export function DirectSidebarThread({
           <button type="button" className="direct-thread-options direct-thread-archive"
             aria-label={`${archived ? "Unarchive" : "Archive"} ${title}`}
             onClick={archive}>
-            <Icon name={archived ? "ArchiveRestore" : "Archive"} />
+            <Icon name={archived ? "RotateCcw" : "Archive"} />
           </button>
           <DropdownMenu onOpenChange={(open) => { if (open) loadSections(); }}>
             <DropdownMenuTrigger asChild>

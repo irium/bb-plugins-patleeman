@@ -8,7 +8,7 @@
   },
   "bb": {
     "name": "Studio Pages",
-    "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Bot Teams bot to hand it work, or let one keep a page up to date.",
+    "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Studio Teams bot to hand it work, or let one keep a page up to date.",
     "branding": {
       "icon": "./icons/pages.svg",
       "experimental_icons": {

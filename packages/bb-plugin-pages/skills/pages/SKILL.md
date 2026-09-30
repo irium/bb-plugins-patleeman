@@ -1,12 +1,12 @@
 ---
 name: pages
-description: Use when the user refers to a BB Page — a /plugins/pages/pages/<id> link, a page mention, "the launch page", a doc they want written or kept up to date — or asks you to read, write, comment on, or restructure a page, or how Pages and its Bot Teams integration work.
+description: Use when the user refers to a BB Page — a /plugins/pages/pages/<id> link, a page mention, "the launch page", a doc they want written or kept up to date — or asks you to read, write, comment on, or restructure a page, or how Pages and its Studio Teams integration work.
 ---
 
 # Pages
 
 Pages are collaborative documents inside BB. The user edits them live in the
-Pages panel while agents and Bot Teams bots edit the same document through
+Pages panel while agents and Studio Teams bots edit the same document through
 tools. Every change merges in real time (Yjs), so nobody's typing is
 overwritten.
 
@@ -78,11 +78,11 @@ in a card on the page. The thread also appears in the sidebar, and its header
 links back to the page. That thread's first message carries the page id and
 its Markdown with block ids as hidden context. The copy can go stale as the
 user types, so read the page again right before you edit it with
-`pages_edit`. This works without Bot Teams.
+`pages_edit`. This works without Studio Teams.
 
-## Bot Teams integration
+## Studio Teams integration
 
-These need the Bot Teams plugin. Each request runs in the bot's own DM thread
+These need the Studio Teams plugin. Each request runs in the bot's own DM thread
 with its configured model and reasoning level.
 
 - **@mention a bot in a page.** Typing `@` and picking a bot in the page

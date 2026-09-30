@@ -57,7 +57,7 @@ export async function askJev(
   const key = config.zenApiKey?.trim() || process.env.OPENCODE_API_KEY?.trim();
   if (!key)
     throw new Error(
-      "Set the OpenCode Zen API key in Bot Teams settings to use Jev.",
+      "Set the OpenCode Zen API key in Studio Teams settings to use Jev.",
     );
   // Node 20's AbortSignal.any() holds its sources weakly, so a bare
   // AbortSignal.timeout() there can be collected before it fires. Own the timer.
@@ -87,7 +87,7 @@ export async function askJev(
     if (!response.ok) {
       await response.body?.cancel();
       throw new Error(
-        `Jev classification failed (HTTP ${response.status}). Check the Zen key, credits, and model in Bot Teams settings.`,
+        `Jev classification failed (HTTP ${response.status}). Check the Zen key, credits, and model in Studio Teams settings.`,
       );
     }
     body = await response.json();

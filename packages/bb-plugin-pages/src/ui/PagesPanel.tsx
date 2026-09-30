@@ -28,7 +28,7 @@ function usePagesData(rpc: Rpc) {
   useEffect(() => {
     refetch();
   }, [refetch]);
-  // Polls so the panel notices Bot Teams being installed, enabled or edited;
+  // Polls so the panel notices Studio Teams being installed, enabled or edited;
   // a hidden tab waits until it's shown again.
   useEffect(() => {
     const poll = () => {

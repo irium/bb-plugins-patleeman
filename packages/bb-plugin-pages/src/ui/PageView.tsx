@@ -523,7 +523,7 @@ export function PageView({
                   <Icon name="Repeat" className="size-4" />
                   <span className="flex min-w-0 flex-col">
                     Keep updated…
-                    {!bots.available ? <span className="text-xs text-muted-foreground">{bots.reason ?? "Bot Teams is not available."}</span> : null}
+                    {!bots.available ? <span className="text-xs text-muted-foreground">{bots.reason ?? "Studio Teams is not available."}</span> : null}
                   </span>
                 </DropdownMenuItem>
                 <DropdownMenuItem className="md:hidden" onSelect={() => setDialog("history")}>

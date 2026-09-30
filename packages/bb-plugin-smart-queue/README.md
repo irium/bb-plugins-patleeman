@@ -5,7 +5,7 @@ still working. A correction or urgent change **steers** the running turn now.
 A separate or later task waits as a **follow-up** until the turn ends. You no
 longer need to pick steer or queue yourself.
 
-Bot Teams makes the same choice for busy bots in channels. Smart Queue does it
+Studio Teams makes the same choice for busy bots in channels. Smart Queue does it
 for ordinary threads.
 
 ## How it decides
@@ -64,7 +64,7 @@ less.
 
 Smart Queue acts only on messages you send yourself to a busy thread. It
 ignores messages from agents and other threads, plugin submissions, retries,
-scheduled messages, hidden threads, and Bot Teams threads (Bot Teams routes
+scheduled messages, hidden threads, and Studio Teams threads (Studio Teams routes
 those itself).
 
 Both composer settings work:

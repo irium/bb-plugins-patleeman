@@ -10,7 +10,7 @@ describe("page watcher", () => {
   it("keeps requests pending until they're marked sent", () => {
     const seen = emptySeen();
     const found = { mentions: [mention], comments: [human] };
-    // Bot Teams was unavailable: the scan looked but sent nothing.
+    // Studio Teams was unavailable: the scan looked but sent nothing.
     expect(unseen(seen, found)).toEqual(found);
     expect(unseen(seen, found)).toEqual(found);
     markSeen(seen, found);

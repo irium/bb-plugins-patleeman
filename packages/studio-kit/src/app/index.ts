@@ -45,6 +45,7 @@ export {
   SidebarSection,
   showSidebarSection,
   useHiddenSidebarSections,
+  useExpandSidebarSection,
   useSidebarDisplay,
   useSidebarHosted,
   useSidebarNavigated,

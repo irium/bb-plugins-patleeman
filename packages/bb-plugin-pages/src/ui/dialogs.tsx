@@ -14,7 +14,7 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 
 function BotPicker({ bots, value, onChange }: { bots: BotView[]; value: string; onChange(id: string): void }) {
   if (!bots.length) {
-    return <p className="text-sm text-muted-foreground">No bots yet. Create one in Bot Teams first.</p>;
+    return <p className="text-sm text-muted-foreground">No bots yet. Create one in Studio Teams first.</p>;
   }
   return (
     <div className="grid max-h-56 grid-cols-2 gap-1.5 overflow-auto">
@@ -93,7 +93,7 @@ export function KeepUpdatedDialog({
           <DialogTitle>Keep this page updated</DialogTitle>
           <DialogDescription>A bot updates the page on a schedule.</DialogDescription>
         </DialogHeader>
-        {!bots.available ? <p className="text-sm text-muted-foreground">{bots.reason ?? "Bot Teams is not available."}</p> : null}
+        {!bots.available ? <p className="text-sm text-muted-foreground">{bots.reason ?? "Studio Teams is not available."}</p> : null}
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium text-muted-foreground">Owner</span>
           <BotPicker bots={bots.bots} value={botId} onChange={setBotId} />

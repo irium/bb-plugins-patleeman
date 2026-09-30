@@ -1,6 +1,6 @@
 # Channel attention notifications
 
-Bot Teams keeps decision, blocker, and important update requests on their channel messages. Creating one adds a durable attention marker and queues a push event. The notification resolver returns a standard `turn-finished` event with a channel message path, so tapping the alert opens the request in the channel. It does not create a pending interaction, open a question form, or reveal the bot's DM.
+Studio Teams keeps decision, blocker, and important update requests on their channel messages. Creating one adds a durable attention marker and queues a push event. The notification resolver returns a standard `turn-finished` event with a channel message path, so tapping the alert opens the request in the channel. It does not create a pending interaction, open a question form, or reveal the bot's DM.
 
 The owner replies in the channel composer. **Acknowledge** and **Snooze 1 hour** remain available on the request. Reading a channel does not clear it. Reopening a snoozed or acknowledged request queues a fresh push event. **Attention push notifications** controls these alerts; delivery also respects **Settings → Push notifications**. The installed BB build does not expose the shared `notifications.enqueue` RPC, so queued events cannot reach the phone until BB provides it. The channel request remains visible and usable.
 

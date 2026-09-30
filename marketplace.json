@@ -95,15 +95,16 @@
     },
     {
       "id": "bot-teams",
-      "displayName": "Bot Teams",
-      "description": "Persistent bots that collaborate in channels, delegate work, and keep their own workspaces and memory.",
+      "displayName": "Studio Teams",
+      "description": "Part of BB Studio. Persistent bots that collaborate in channels, delegate work, and keep their own workspaces and memory.",
       "icon": "Bot",
       "tags": [
         "agents",
         "collaboration",
         "channels",
         "automation",
-        "notifications"
+        "notifications",
+        "studio"
       ],
       "author": {
         "name": "Patrick Lee",
@@ -297,7 +298,7 @@
     {
       "id": "pages",
       "displayName": "Studio Pages",
-      "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Bot Teams bot to hand it work, or let one keep a page up to date.",
+      "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Studio Teams bot to hand it work, or let one keep a page up to date.",
       "icon": {
         "url": "./packages/bb-plugin-pages/icons/pages.svg"
       },
@@ -386,7 +387,7 @@
     {
       "id": "studio",
       "displayName": "Studio",
-      "description": "The home of BB Studio. One collection for your pages, Talk recordings and drawings: search, group with tags, filter by project, and hand anything to an agent. Add-ons plug in.",
+      "description": "The home of BB Studio. One collection for your pages, recordings, drawings, tasks and bots: search, group with tags, filter by project, and hand anything to an agent. Add-ons plug in.",
       "icon": {
         "url": "./packages/bb-plugin-studio/icons/studio.svg"
       },

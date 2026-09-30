@@ -1,8 +1,8 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
-// Reads bots from the Bot Teams plugin over its published RPC. Pages works
-// without Bot Teams; bot features then report that it isn't installed.
+// Reads bots from the Studio Teams plugin over its published RPC. Pages works
+// without Studio Teams; bot features then report that it isn't installed.
 
 export const BOT_TEAMS_ID = "bot-teams";
 const CACHE_MS = 15_000;
@@ -107,7 +107,7 @@ export class BotDirectory {
     );
   }
 
-  /** The bot's owner conversation thread, created by Bot Teams on first use. */
+  /** The bot's owner conversation thread, created by Studio Teams on first use. */
   async conversationThread(botId: string): Promise<string> {
     const conversation = await this.bb.sdk.plugins.callRpc({
       pluginId: BOT_TEAMS_ID,
@@ -161,8 +161,8 @@ export class BotDirectory {
       return this.cache;
     } catch (error) {
       const reason = /not found|not installed|disabled|404/i.test(message(error))
-        ? "Bot Teams isn't installed or enabled."
-        : `Bot Teams is unavailable: ${message(error)}`;
+        ? "Studio Teams isn't installed or enabled."
+        : `Studio Teams is unavailable: ${message(error)}`;
       this.failure = { reason, at: Date.now() };
       throw new Error(reason);
     }

@@ -205,7 +205,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (refresh) {
         const problem = validateCron(refresh.cron);
         if (problem) throw new Error(`Invalid schedule: ${problem}`);
-        if (!(await bots.get(refresh.botId))) throw new Error("That bot isn't available in Bot Teams.");
+        if (!(await bots.get(refresh.botId))) throw new Error("That bot isn't available in Studio Teams.");
       }
       store.setRefresh(id, refresh);
       // A new schedule counts from now rather than firing for past slots.
@@ -225,7 +225,7 @@ export default async function plugin(bb: BbPluginApi) {
         .join("\n")
         .trim();
       // An @mentioned bot takes the work in its own thread; otherwise a plain
-      // agent does, so the composer works without Bot Teams.
+      // agent does, so the composer works without Studio Teams.
       const [bot] = message ? await bots.mentionedIn(message).catch(() => []) : [];
       if (bot) {
         const row = await service.dispatch(id, bot, "mention", {
