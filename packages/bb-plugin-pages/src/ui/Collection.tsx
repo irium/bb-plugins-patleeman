@@ -261,7 +261,7 @@ export function Collection({
                   role="row"
                   tabIndex={0}
                   aria-label={page.title || "Untitled"}
-                  className="group/row grid cursor-pointer grid-cols-[minmax(0,1fr)_minmax(0,180px)_170px] items-center gap-4 rounded-lg px-2 py-2 hover:bg-state-hover max-md:grid-cols-[minmax(0,1fr)_auto] max-md:py-2.5"
+                  className="group/row grid cursor-pointer grid-cols-[minmax(0,1fr)_minmax(0,180px)_170px] items-center gap-4 rounded-md px-2 py-2 hover:bg-state-hover max-md:grid-cols-[minmax(0,1fr)_auto] max-md:py-2.5"
                   onClick={() => onOpen(page.id)}
                   onKeyDown={(event) => event.key === "Enter" && onOpen(page.id)}
                 >

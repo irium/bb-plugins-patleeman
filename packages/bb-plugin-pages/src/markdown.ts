@@ -40,6 +40,7 @@ export type InlineContent = StyledText | LinkContent | MentionContent;
 
 export interface TableContent {
   type: "tableContent";
+  headerRows?: number;
   rows: { cells: (InlineContent[] | { type: "tableCell"; content: InlineContent[] })[] }[];
 }
 
@@ -182,6 +183,8 @@ function convertTable(table: Table): PageBlock {
     type: "table",
     content: {
       type: "tableContent",
+      // A Markdown table's first row is always its header.
+      headerRows: 1,
       rows: table.children.map((row) => ({
         cells: row.children.map((cell) => inline(cell.children)),
       })),

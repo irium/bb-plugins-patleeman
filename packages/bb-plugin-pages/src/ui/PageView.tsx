@@ -403,7 +403,7 @@ export function PageView({
           <div className="group/title px-[54px] max-md:px-4">
             {page.icon ? (
               <IconPicker page={page} rpc={rpc}>
-                <button type="button" aria-label="Change icon" className="mb-3 rounded-lg text-[44px] leading-none hover:bg-state-hover">
+                <button type="button" aria-label="Change icon" className="mb-3 rounded-md text-[44px] leading-none hover:bg-state-hover">
                   {page.icon}
                 </button>
               </IconPicker>
@@ -423,6 +423,8 @@ export function PageView({
               ) : null}
               <TitleField
                 value={title}
+                // A new page starts with its title, like a new document.
+                autoFocus={!page.title && !page.archived}
                 onFocus={() => (editingTitle.current = true)}
                 onBlur={() => (editingTitle.current = false)}
                 onChange={(event) => saveTitle(event.target.value)}

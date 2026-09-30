@@ -1,9 +1,114 @@
-/* BlockNote sits inside the page column; the column owns padding and
-   background so the editor blends with the host theme. */
-.pages-editor .bn-container,
-.pages-editor.bn-container {
+/* BlockNote ships its own greys and font. Point them at BB's theme so pages
+   follow whichever theme is active. Comment composers are nested editors
+   with their own color scheme, hence the second selector. */
+.pages-editor.bn-root[data-color-scheme],
+.pages-editor .bn-root[data-color-scheme] {
+  --bn-font-family: var(--font-sans);
+  --bn-border-radius: var(--radius);
+  --bn-colors-editor-text: var(--foreground);
   --bn-colors-editor-background: transparent;
+  --bn-colors-menu-text: var(--popover-foreground);
+  --bn-colors-menu-background: var(--popover);
+  --bn-colors-tooltip-text: var(--popover-foreground);
+  --bn-colors-tooltip-background: var(--popover);
+  --bn-colors-hovered-text: var(--accent-foreground);
+  --bn-colors-hovered-background: var(--accent);
+  --bn-colors-selected-text: var(--accent-foreground);
+  --bn-colors-selected-background: var(--accent);
+  --bn-colors-disabled-text: var(--muted-foreground);
+  --bn-colors-disabled-background: var(--muted);
+  --bn-colors-border: var(--border);
+  --bn-colors-side-menu: var(--muted-foreground);
   background: transparent;
+}
+.pages-editor .bn-editor {
+  accent-color: var(--primary);
+}
+
+/* Headings step down from the 32px page title. */
+.pages-editor [data-content-type="heading"] {
+  --level: 1.75em;
+  padding-top: 20px;
+}
+.pages-editor [data-content-type="heading"][data-level="2"] {
+  --level: 1.4em;
+  padding-top: 16px;
+}
+.pages-editor [data-content-type="heading"][data-level="3"] {
+  --level: 1.2em;
+  padding-top: 12px;
+}
+.pages-editor .bn-block-content[data-content-type="heading"] {
+  font-weight: 600;
+}
+.pages-editor .bn-inline-content a {
+  color: var(--primary);
+  text-underline-offset: 2px;
+}
+.pages-editor [data-content-type="quote"] blockquote {
+  color: inherit;
+  border-left: 3px solid var(--border);
+}
+.pages-editor [data-content-type="divider"] hr {
+  border-top-color: var(--border);
+}
+.pages-editor .bn-block-group .bn-block-group .bn-block-outer::before {
+  border-left-color: var(--border) !important;
+}
+.pages-editor .bn-inline-content code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+  background: var(--muted);
+}
+.pages-editor .bn-block-content[data-content-type="codeBlock"] {
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--foreground) 5%, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.pages-editor .bn-block-content[data-content-type="codeBlock"] > pre {
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.pages-editor .bn-block-content[data-content-type="codeBlock"] > pre code {
+  font-family: inherit;
+}
+.pages-editor .bn-block-content[data-content-type="codeBlock"] > div > select {
+  color: var(--muted-foreground);
+  top: 4px;
+  left: auto;
+  right: 10px;
+}
+.pages-editor .bn-block-content[data-content-type="codeBlock"] > div > select > option {
+  color: var(--popover-foreground);
+  background: var(--popover);
+}
+.pages-editor [data-content-type="table"] th,
+.pages-editor [data-content-type="table"] td {
+  border-color: var(--border);
+  padding: 6px 10px;
+}
+.pages-editor [data-content-type="table"] th {
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+  font-weight: 600;
+}
+.pages-editor .ProseMirror .column-resize-handle {
+  background-color: var(--primary);
+}
+.pages-editor .bn-thread-mark:not([data-orphan="true"]) {
+  background: color-mix(in oklch, #facc15 22%, transparent);
+}
+.pages-editor .bn-thread-mark .bn-thread-mark-selected {
+  background: color-mix(in oklch, #facc15 38%, transparent);
+}
+/* Empty-block hints read like BB's input placeholders. */
+.pages-editor .bn-block-content:has(.ProseMirror-trailingBreak:only-child)::after {
+  font-style: normal;
+  color: var(--muted-foreground);
 }
 /* Only the page body: comment composers are nested BlockNote editors. */
 .pages-main > .bn-editor {
@@ -57,8 +162,8 @@
   width: 16px;
   height: 16px;
 }
-/* BlockNote's shadcn cards rely on arbitrary Tailwind values that the plugin
-   build does not emit, so give comment threads their spacing directly. */
+/* Comment threads: a compact card that matches BB's popovers rather than
+   BlockNote's roomier default. */
 .pages-editor .bn-thread {
   display: flex;
   flex-direction: column;
@@ -71,6 +176,26 @@
 }
 .pages-editor .bn-thread > * {
   padding-inline: 0;
+}
+/* The quoted text the thread is anchored to. */
+.pages-editor .bn-thread > :first-child:not(.bn-thread-comments) {
+  padding: 0;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--muted-foreground);
+}
+.pages-editor .bn-thread-comments {
+  padding-block: 0;
+  gap: 14px;
+}
+.pages-editor .bn-thread-comments:last-child {
+  border-bottom: 0;
+}
+.pages-editor .bn-thread-comments:not(:last-child) {
+  padding-bottom: 12px;
+}
+.pages-editor .bn-comment-editor .bn-editor {
+  font-size: 14px;
 }
 .pages-comments .bn-thread {
   box-shadow: none;
