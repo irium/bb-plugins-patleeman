@@ -31,8 +31,7 @@ const tagId = z.string().min(1).max(100);
 const tagName = z.string().min(1).max(100);
 const itemRef = z.object({ pluginId, id: z.string().min(1).max(200) });
 
-/** Realtime channel for the sidebar's tabs; payload `{}`. */
-export const TABS_CHANNEL = "studio-tabs";
+export { TABS_CHANNEL } from "./ids";
 
 const tab = z.object({
   pluginId: z.string(),

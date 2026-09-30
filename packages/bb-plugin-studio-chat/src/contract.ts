@@ -4,8 +4,7 @@ import { z } from "zod";
 
 export const schemas = studioSchemas(z);
 
-/** The mention provider whose pills name a Studio item; item ids are `<plugin>:<id>`. */
-export const MENTION_PROVIDER_ID = "item";
+export { MENTION_PROVIDER_ID } from "./ids";
 
 const ref = z.object({ pluginId: z.string().min(1).max(100), id: z.string().min(1).max(200) });
 export type ItemRef = z.infer<typeof ref>;

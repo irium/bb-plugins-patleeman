@@ -23,7 +23,8 @@ import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { TABS_CHANNEL, type rpcContract, type TabView } from "../contract";
+import type { rpcContract, TabView } from "../contract";
+import { TABS_CHANNEL } from "../ids";
 import { itemAtPath } from "../tabs";
 
 const REFETCH_DEBOUNCE_MS = 300;
