@@ -8,7 +8,7 @@
   },
   "bb": {
     "name": "Studio Draw",
-    "description": "Part of BB Studio. Sketch Excalidraw drawings with your agents, then attach them to conversations.",
+    "description": "Part of BB Studio. Sketch Excalidraw drawings with your agents, keep them in Studio's collection, and attach them to conversations.",
     "branding": {
       "icon": "./assets/icon.svg",
       "experimental_icons": {
