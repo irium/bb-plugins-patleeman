@@ -590,6 +590,9 @@ importers:
 
   packages/bb-plugin-pages:
     dependencies:
+      '@bb-studio/kit':
+        specifier: file:../studio-kit
+        version: link:../studio-kit
       '@blocknote/core':
         specifier: 0.55.0
         version: 0.55.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@types/hast@3.0.5)(y-prosemirror@1.3.7(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.6)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
@@ -874,6 +877,49 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  packages/bb-plugin-studio:
+    dependencies:
+      '@bb-studio/kit':
+        specifier: file:../studio-kit
+        version: link:../studio-kit
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
+    devDependencies:
+      '@get-bb/plugin-sdk':
+        specifier: 0.5.29
+        version: 0.5.29(@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.4))(react@19.2.4))(@types/better-sqlite3@7.6.13)(@types/react@19.2.18)(better-sqlite3@12.11.1)(cron-parser@5.10.1)(hono@4.13.9)(react-dom@19.2.8(react@19.2.4))(react@19.2.4)
+      '@radix-ui/react-dropdown-menu':
+        specifier: ^2.1.20
+        version: 2.1.24(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.4))(react@19.2.4)
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.4(@types/react@19.2.18)
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      react:
+        specifier: 19.2.4
+        version: 19.2.4
+      sonner:
+        specifier: ^1.7.4
+        version: 1.7.4(react-dom@19.2.8(react@19.2.4))(react@19.2.4)
+      tailwind-merge:
+        specifier: ^3.4.0
+        version: 3.6.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.1
+        version: 4.1.1(@types/node@22.20.1)(jsdom@29.0.1)(vite@8.2.0(@types/node@22.20.1)(esbuild@0.28.2)(tsx@4.23.11))
+
   packages/bb-plugin-talk:
     dependencies:
       '@radix-ui/react-checkbox':
@@ -1068,6 +1114,45 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+
+  packages/studio-kit:
+    devDependencies:
+      '@get-bb/plugin-sdk':
+        specifier: 0.5.29
+        version: 0.5.29(@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.4))(react@19.2.4))(@types/better-sqlite3@7.6.13)(@types/react@19.2.18)(better-sqlite3@12.11.1)(cron-parser@5.10.1)(hono@4.13.9)(react-dom@19.2.8(react@19.2.4))(react@19.2.4)
+      '@radix-ui/react-dropdown-menu':
+        specifier: ^2.1.20
+        version: 2.1.24(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.4))(react@19.2.4)
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.4(@types/react@19.2.18)
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      react:
+        specifier: 19.2.4
+        version: 19.2.4
+      sonner:
+        specifier: ^1.7.4
+        version: 1.7.4(react-dom@19.2.8(react@19.2.4))(react@19.2.4)
+      tailwind-merge:
+        specifier: ^3.4.0
+        version: 3.6.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.1
+        version: 4.1.1(@types/node@22.20.1)(jsdom@29.0.1)(vite@8.2.0(@types/node@22.20.1)(esbuild@0.28.2)(tsx@4.23.11))
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
 
 packages:
 
