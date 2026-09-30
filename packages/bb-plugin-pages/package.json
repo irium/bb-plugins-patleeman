@@ -70,6 +70,7 @@
   "scripts": {
     "test": "vitest run --config vitest.config.mts",
     "typecheck": "tsc --noEmit",
-    "build": "bb plugin build ."
+    "build": "bb plugin build .",
+    "tailwind:blocknote": "node scripts/blocknote-tailwind.mjs"
   }
 }

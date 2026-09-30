@@ -1,4 +1,4 @@
-import { defineRpcContract } from "@get-bb/plugin-sdk";
+import { defineRpcContract, type NewThreadRequest } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
 export * from "./constants";
@@ -67,9 +67,34 @@ export const snapshotSchema = z.object({
 });
 export type SnapshotView = z.infer<typeof snapshotSchema>;
 
+// What BB's new-thread composer submits, whitelisted like Bot Teams does. Core
+// threads.spawn validates the host-owned environment and prompt input.
+export const chatRequestSchema = z.object({
+  projectId: z.string().min(1),
+  providerId: z.string().min(1),
+  model: z.string(),
+  reasoningLevel: z.enum(["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"]),
+  permissionMode: z.enum(["accept-edits", "auto", "full"]),
+  serviceTier: z.enum(["default", "fast"]).optional(),
+  executionInputSources: z.object({
+    model: z.enum(["client-preference", "explicit"]).optional(),
+    permissionMode: z.enum(["client-preference", "explicit"]).optional(),
+    providerId: z.enum(["client-preference", "explicit"]).optional(),
+    reasoningLevel: z.enum(["client-preference", "explicit"]).optional(),
+    serviceTier: z.enum(["client-preference", "explicit"]).optional(),
+  }),
+  environment: z.record(z.string(), z.json()).transform((value) => value as NewThreadRequest["environment"]),
+  input: z
+    .array(z.record(z.string(), z.json()))
+    .min(1)
+    .transform((value) => value as NewThreadRequest["input"]),
+  sendAt: z.number().int().positive().optional(),
+});
+
 export const rpcContract = defineRpcContract({
   tree: {
-    input: z.object({ projectId }),
+    /** Omit `projectId` for every page; otherwise a project's pages plus global ones. */
+    input: z.object({ projectId: projectId.optional() }),
     output: z.object({ pages: z.array(pageMetaSchema) }),
   },
   create: {
@@ -129,9 +154,19 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: pageId }),
     output: z.object({ request: requestSchema }),
   },
-  askBot: {
-    input: z.object({ id: pageId, botId: z.string(), message: z.string().min(1).max(4000) }),
-    output: z.object({ request: requestSchema }),
+  /** Starts an agent thread about the page, or hands it to a bot the message @mentions. */
+  work: {
+    input: z.object({ id: pageId, request: chatRequestSchema }),
+    output: z.object({ threadId: z.string(), botName: z.string().nullable() }),
+  },
+  chats: {
+    input: z.object({ pageId }),
+    output: z.object({ chats: z.array(z.object({ threadId: z.string(), createdAt: z.number() })) }),
+  },
+  /** The page a "Work with this page" thread was started from. */
+  chatPage: {
+    input: z.object({ threadId: z.string().min(1).max(200) }),
+    output: z.object({ page: pageMetaSchema.nullable() }),
   },
   snapshots: {
     input: z.object({ id: pageId }),

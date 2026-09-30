@@ -8,20 +8,35 @@ work, or give a page an owner bot that keeps it up to date on a schedule.
 
 ## Staged preview
 
-![Pages panel showing a launch page with stats, a chart, and a checklist](assets/staged-preview.png)
+![A Pages document with stats, a chart, and a checklist](assets/staged-preview.png)
 
 This is the real BB **Pages** panel, opened from the nav panel. The capture
-script seeds a project page called "Offline mode launch" with a nested
-"Rollout risks" sub-page, using the plugin's own `create` RPC. The page holds:
+script uses the plugin's own `create` RPC to seed three project pages:
+- "Offline mode launch"
+- a nested "Rollout risks" sub-page
+- "Release notes: October"
+
+The launch page is open. It holds:
 - a tip callout
 - a stats block with three key numbers and their deltas
 - a stacked bar chart of weekly active teams
 - a launch checklist with two items done
 
-The sidebar shows the project's page tree, expanded to the sub-page, and an
-empty Global section. The header shows the breadcrumb, the last edit, and the
-**Ask a bot**, **Dictate**, and **Comments** buttons. **Dictate** appears
-because Talk is installed in the staged app. The script deletes both pages
+At the top left are the **Pages** back pill and the breadcrumb. At the top
+right are the **Dictate**, **Version history**, **Comments** and page menu
+buttons. **Dictate** appears because Talk is installed in the staged app.
+The **Work with this page…** composer floats at the bottom right.
+
+![The Pages collection listing the seeded pages](assets/collection.png)
+
+The collection is what the **Pages** nav item opens. It shows:
+- the search box
+- the filter pills and the project pill
+- the list/grid toggle and **New page**
+- every page in the staged app, with its project and last activity
+
+"Rollout risks" shows the page it sits in. The **Untitled** row is a page
+that already existed in the staged app. The script deletes its three pages
 afterwards.
 
 ## What you get
@@ -39,12 +54,21 @@ afterwards.
   write.
 - **Mentions.** Type `@` to mention a bot, another page, a BB thread, or a
   date. Page and thread mentions open where they point.
-- **Comments.** Select text to comment on it. Threads show in a sidebar where
-  you can reply, react, edit, and resolve. Agents can read, start, reply to,
-  and resolve threads.
-- **A page tree.** Pages belong to a project or are global, and nest to any
-  depth. Rename, give pages an emoji icon, move them, archive them, or
-  delete them from the sidebar.
+- **Comments.** Select text to comment on it. Threads show in a floating
+  card where you can reply, react, edit, and resolve. Agents can read, start,
+  reply to, and resolve threads.
+- **A collection of pages.** The **Pages** nav item lists every page, with
+  search over titles and content, filters, a project filter, and a list or
+  grid view. **New page** opens a blank full-page document.
+- **Projects and nesting.** Pages belong to a project or are global, and
+  nest to any depth, with a breadcrumb back up. Give a page an emoji icon,
+  move it, archive it, or delete it from its ⋯ menu.
+- **Work with this page.** The box at the bottom of every page is BB's
+  new-thread composer. Sending starts an agent thread in the page's project
+  that gets the page as context. The thread opens in a card on the page,
+  and you can minimize it or open it as a full thread. The full thread's
+  header shows the page's name, which takes you back to the page with the
+  chat open. This works without Bot Teams.
 - **Version history.** Pages saves a version before an agent's or bot's first
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.
@@ -54,7 +78,7 @@ afterwards.
 With the [Talk](../bb-plugin-talk) plugin installed, you can dictate into a
 page:
 
-- **Dictate** in the header, or **Dictate** in the `/` menu, starts Talk. Press
+- The **Dictate** button at the top right, or **Dictate** in the `/` menu, starts Talk. Press
   **Stop dictation** or ✓ in Talk's pill to finish, and the transcript goes in
   at your cursor. Blank lines in the transcript start new paragraphs. If you
   haven't clicked into the page yet, the text goes at the end.
@@ -79,18 +103,21 @@ bot's configured model and reasoning level.
 - **@mention a bot in a comment.** The bot answers in the thread and makes
   any change you asked for. Once a bot has replied in a thread, your later
   replies there go to it too.
-- **Ask a bot.** The header button sends a request about the whole page.
+- **@mention a bot in "Work with this page…".** The message goes to that
+  bot as a request about the whole page, in its own thread.
 - **Keep updated.** Pick an owner bot, a schedule (hourly, every morning,
   weekday mornings, Monday mornings, or a custom cron), and what to keep
   current. The bot revisits the page on that schedule. **Refresh now** runs it
   immediately.
 
-The strip under the title shows each request as queued, working, done, or
-failed, with the bot's reply. Pages remembers which mentions and comments it
+The **Activity** menu at the top right shows each request as queued,
+working, done, or failed, and opens its thread in a card on the page. It
+also lists the page's chats and its Keep updated schedule. Pages remembers which mentions and comments it
 has already sent, so bots are never asked twice.
 
-Without Bot Teams, pages, comments, and agent tools work as usual. The bot
-buttons say Bot Teams isn't installed or enabled. A mention or comment for a
+Without Bot Teams, pages, comments, agent tools, and **Work with this page**
+work as usual. **Keep updated…** is disabled and says Bot Teams isn't
+installed or enabled. A mention or comment for a
 bot made while Bot Teams is unavailable, for example while it reloads, waits
 and is sent once Bot Teams is back, as long as the BB server hasn't restarted
 in between.
@@ -132,3 +159,8 @@ pnpm test
 bb plugin build .
 bb plugin install . --yes
 ```
+
+BlockNote's menus and toolbars are styled with Tailwind classes that live in
+`node_modules`, which `bb plugin build` doesn't scan. `blocknote-tailwind.txt`
+lists them so the build generates them. After upgrading `@blocknote/shadcn`,
+run `pnpm tailwind:blocknote` to regenerate it.

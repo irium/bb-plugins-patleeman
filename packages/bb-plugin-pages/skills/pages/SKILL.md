@@ -60,6 +60,16 @@ Pages reads and writes GitHub-flavoured Markdown plus:
 Tables, checklists (`- [ ]`), headings, quotes, code, and images work as in
 GFM.
 
+## Working from a page
+
+The "Work with this page…" box at the bottom of a page is BB's new-thread
+composer. Sending starts a normal agent thread in the page's project, shown
+in a card on the page. The thread also appears in the sidebar, and its header
+links back to the page. That thread's first message carries the page id and
+its Markdown with block ids as hidden context. The copy can go stale as the
+user types, so read the page again right before you edit it with
+`pages_edit`. This works without Bot Teams.
+
 ## Bot Teams integration
 
 These need the Bot Teams plugin. Each request runs in the bot's own DM thread
@@ -70,13 +80,15 @@ with its configured model and reasoning level.
   the page and usually leaves a comment on that block saying what it did.
 - **@mention a bot in a comment.** The bot answers in the same thread. Bots
   that have already replied in a thread see every new human reply there.
-- **Ask a bot.** The header button sends a freeform request about the page.
+- **Hand off from the page composer.** Mentioning a bot in the page's
+  "Work with this page…" box sends it that message as a request about the
+  page.
 - **Keep updated.** A page can have an owner bot, a cron schedule, and
   instructions. On each run the bot brings the page up to date. **Refresh
   now** runs it immediately.
 
-Requests show in the page's activity strip as queued, working, done, or
-failed, with the bot's final reply.
+Requests show in the page's **Activity** menu as queued, working, done, or
+failed. Picking one opens its thread in a card on the page.
 
 When you are a bot handling one of these requests, follow its instructions:
 edit with `pages_edit`, then reply in the named comment thread with

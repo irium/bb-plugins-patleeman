@@ -61,6 +61,13 @@ export const MIGRATIONS = [
    )`,
   `CREATE INDEX IF NOT EXISTS requests_page ON requests (page_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS requests_thread ON requests (thread_id, status)`,
+  // Agent threads started from a page's composer.
+  `CREATE TABLE IF NOT EXISTS chats (
+     thread_id TEXT PRIMARY KEY,
+     page_id TEXT NOT NULL,
+     created_at INTEGER NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS chats_page ON chats (page_id, created_at)`,
 ];
 
 export const newId = (prefix: string) => `${prefix}_${randomBytes(6).toString("hex")}`;
@@ -213,6 +220,7 @@ export class PageStore {
         this.db.prepare("DELETE FROM snapshots WHERE page_id = ?").run(id);
         this.db.prepare("DELETE FROM files WHERE page_id = ?").run(id);
         this.db.prepare("DELETE FROM requests WHERE page_id = ?").run(id);
+        this.db.prepare("DELETE FROM chats WHERE page_id = ?").run(id);
       }
     });
     tx(ids);
@@ -329,6 +337,21 @@ export class PageStore {
     return this.db
       .prepare("SELECT * FROM requests WHERE page_id = ? ORDER BY created_at DESC LIMIT ?")
       .all(pageId, limit) as RequestRow[];
+  }
+
+  addChat(pageId: string, threadId: string): void {
+    this.db.prepare("INSERT OR IGNORE INTO chats VALUES (?,?,?)").run(threadId, pageId, Date.now());
+  }
+
+  chats(pageId: string, limit = 10): { thread_id: string; created_at: number }[] {
+    return this.db
+      .prepare("SELECT thread_id, created_at FROM chats WHERE page_id = ? ORDER BY created_at DESC LIMIT ?")
+      .all(pageId, limit) as { thread_id: string; created_at: number }[];
+  }
+
+  chatPageId(threadId: string): string | null {
+    const row = this.db.prepare("SELECT page_id FROM chats WHERE thread_id = ?").get(threadId) as { page_id: string } | undefined;
+    return row?.page_id ?? null;
   }
 
   openRequestsForThread(threadId: string): RequestRow[] {

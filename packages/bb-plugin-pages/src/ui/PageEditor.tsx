@@ -374,28 +374,31 @@ export function PageEditor({
         <BlockNoteViewEditor />
       </div>
       {sidePanel === "comments" ? (
-        // Beside the page on wide screens, a sheet over it on narrow ones.
+        // A card floating over the page's right edge; a bottom sheet on phones.
+        // Positioned against the page view, so no ancestor up to it may be positioned.
         <aside
           aria-label="Comments"
-          className="pages-comments w-80 shrink-0 border-l border-border pl-3 max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-40 max-lg:w-full max-lg:max-w-sm max-md:max-w-none max-md:border-l-0 max-lg:overflow-auto max-lg:bg-background max-lg:p-3 max-lg:shadow-2xl"
+          className="pages-comments absolute top-14 right-3 bottom-3 z-30 flex w-80 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl max-md:inset-x-0 max-md:top-auto max-md:bottom-0 max-md:h-[75%] max-md:w-auto max-md:rounded-b-none"
         >
-          <div className="mb-2 flex items-center justify-between lg:hidden">
+          <header className="flex h-11 shrink-0 items-center justify-between border-b border-border pr-2 pl-4">
             <span className="text-sm font-medium">Comments</span>
             <button
               type="button"
               aria-label="Close comments"
-              className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground"
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground"
               onClick={onCloseSidePanel}
             >
               <Icon name="X" className="size-4" />
             </button>
+          </header>
+          <div className="min-h-0 flex-1 overflow-auto p-3">
+            {openThreads ? null : (
+              <p className="px-1 py-2 text-sm text-muted-foreground">
+                No open comments. Select text in the page and choose <span className="text-foreground">Comment</span> to start one.
+              </p>
+            )}
+            <ThreadsSidebar filter="open" sort="position" />
           </div>
-          {openThreads ? null : (
-            <p className="px-1 py-2 text-sm text-muted-foreground">
-              No open comments. Select text in the page and choose <span className="text-foreground">Comment</span> to start one.
-            </p>
-          )}
-          <ThreadsSidebar filter="open" sort="position" />
         </aside>
       ) : null}
       <SuggestionMenuController triggerCharacter="/" getItems={slashMenuItems} />

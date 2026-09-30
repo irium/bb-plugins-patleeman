@@ -179,16 +179,59 @@ export default async function plugin(bb: BbPluginApi) {
       if (!request) throw new Error("A refresh is already queued.");
       return { request: requestView(request) };
     },
-    askBot: async ({ id, botId, message }) => {
+    work: async ({ id, request }) => {
       const meta = requireMeta(id);
-      const bot = await bots.get(botId);
-      if (!bot) throw new Error("That bot isn't available in Bot Teams.");
-      const request = await service.dispatch(id, bot, "mention", {
-        dedupeKey: `ask:${id}:${botId}:${Date.now()}`,
-        summary: truncate(message, 140),
-        prompt: service.requestPrompt(meta, ["The user asked you about a page:", message, "", "Make any page changes with pages_edit."]),
+      const message = request.input
+        .map((item) => (item.type === "text" && item.visibility !== "agent-only" ? item.text : ""))
+        .join("\n")
+        .trim();
+      // An @mentioned bot takes the work in its own thread; otherwise a plain
+      // agent does, so the composer works without Bot Teams.
+      const [bot] = message ? await bots.mentionedIn(message).catch(() => []) : [];
+      if (bot) {
+        const row = await service.dispatch(id, bot, "mention", {
+          dedupeKey: `work:${id}:${bot.id}:${Date.now()}`,
+          summary: truncate(message, 140),
+          prompt: service.requestPrompt(meta, ["The user asked you about a page:", message, "", "Make any page changes with pages_edit."]),
+        });
+        if (!row?.thread_id || row.status === "failed") throw new Error(row?.error ?? `Couldn't reach ${bot.name}.`);
+        return { threadId: row.thread_id, botName: bot.name };
+      }
+      const markdown = readMarkdown(service.hub.open(id).doc, { ids: true });
+      const thread = await bb.sdk.threads.spawn({
+        ...request,
+        input: [
+          ...request.input,
+          {
+            type: "text",
+            visibility: "agent-only",
+            mentions: [],
+            text: service.requestPrompt(meta, [
+              "The user is working with you from a page. Their message is about this page.",
+              "Current page with block ids:",
+              truncate(markdown, 40_000),
+            ]),
+          },
+        ],
       });
-      return { request: requestView(request!) };
+      store.addChat(id, thread.id);
+      return { threadId: thread.id, botName: null };
+    },
+    chats: async ({ pageId }) => {
+      // Skips chats whose thread was deleted; the row stays in case the lookup failed for another reason.
+      const rows = await Promise.all(
+        store.chats(pageId).map(async (row) =>
+          (await bb.sdk.threads.get({ threadId: row.thread_id }).then(() => true, () => false))
+            ? { threadId: row.thread_id, createdAt: row.created_at }
+            : null,
+        ),
+      );
+      return { chats: rows.filter((chat) => chat !== null) };
+    },
+    chatPage: ({ threadId }) => {
+      const id = store.chatPageId(threadId);
+      const meta = id ? store.meta(id) : null;
+      return { page: meta ? toView(meta) : null };
     },
     snapshots: ({ id }) => ({
       snapshots: store.snapshots(id).map((row) => ({ id: row.id, label: row.label, actor: row.actor, createdAt: row.created_at })),
