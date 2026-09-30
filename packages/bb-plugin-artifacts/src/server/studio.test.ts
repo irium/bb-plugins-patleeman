@@ -49,6 +49,7 @@ describe("the Artifacts Studio provider", () => {
     });
     expect(byId[image.id]).toMatchObject({
       title: "chart.png",
+      facts: expect.arrayContaining([{ id: "type", value: "Image", sort: null }]),
       thumbnailUrl: `/api/v1/plugins/artifacts/http/content?artifact=${image.id}&version=${image.version.id}`,
     });
   });
