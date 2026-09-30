@@ -1,6 +1,6 @@
 // The floating chat. Over a Studio item it offers "Work with this…" and
 // brings back the item's last chat; anywhere else it only shows a thread the
-// user floated. It steps aside while the thread's own view is on screen.
+// user floated, even while that thread's own view is on screen.
 import {
   experimental_NewThreadComposer as NewThreadComposer,
   ThreadChat,
@@ -23,7 +23,6 @@ import { ThreadMenu } from "./ThreadMenu";
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
 const CARD = "pointer-events-auto flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl";
-const THREAD_IN_PATH = /\/(thr_[a-z0-9]+)(?:\/|$)/i;
 
 /** The Studio item on screen, or null; each path is asked once. */
 function useViewing(rpc: Rpc, path: string): Viewed | null {
@@ -131,9 +130,7 @@ export function ChatOverlay() {
     rpc.call("link", { pluginId: viewed.pluginId, id: viewed.id, threadId }).catch(() => {});
   }, [rpc, viewed, threadId, mode]);
 
-  const routeThread = path.startsWith("/plugins/") ? null : (THREAD_IN_PATH.exec(path)?.[1] ?? null);
-  const hasThread = Boolean(threadId) && routeThread !== threadId;
-  const showThread = hasThread && (mode === "thread" || mode === "minimized");
+  const showThread = Boolean(threadId) && (mode === "thread" || mode === "minimized");
   const showBar = Boolean(viewed) && mode !== "thread" && mode !== "compose";
   if (!showThread && !showBar && mode !== "compose") return null;
 

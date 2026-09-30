@@ -30,7 +30,7 @@ export function ThreadMenu({ threadId, onNewChat }: { threadId: string; onNewCha
 
   const open = (split: boolean) => {
     // BB's view takes over; the card would only repeat it.
-    setChat({ mode: "minimized" });
+    setChat({ mode: "closed" });
     actions.open(threadId, { split });
   };
 

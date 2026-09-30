@@ -27,8 +27,8 @@ has no provider credentials, so the thread shows its connection error.
   Studio Chat** in a sidebar thread's menu (with
   [Studio Sidebar](../bb-plugin-thread-list-plus)), or the palette's "Studio
   Chat: float this thread" puts that thread in the card.
-  The card stays with you across Studio items, and steps aside while the
-  thread's own view is on screen.
+  The card shows straight away, even over the thread's own view, and stays
+  with you across Studio items.
 - **Switch threads** from the card's ⋯ menu, which lists your sidebar threads
   with a filter. It also starts a new chat or opens the current one in full
   or in a split.
