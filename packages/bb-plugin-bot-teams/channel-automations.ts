@@ -16,12 +16,20 @@ import {
 } from "./automation-contract";
 
 // Task text is data in the automation record, never interpolated into shell code.
+// BB runs scripts with a minimal PATH that has neither `bb` nor `node`, so the
+// script runs BB's CLI with the runtime Bot Teams itself runs on. That may be
+// BB's Electron binary, which acts as Node only with ELECTRON_RUN_AS_NODE.
 export const dispatchScript = `#!/bin/sh
 set -eu
 unset BB_THREAD_ID BB_ENVIRONMENT_ID
-exec bb bots automation-dispatch --project "$BB_PROJECT_ID" --automation "$BB_AUTOMATION_ID" --run "$BB_AUTOMATION_RUN_ID" --json
+set -- bots automation-dispatch --project "$BB_PROJECT_ID" --automation "$BB_AUTOMATION_ID" --run "$BB_AUTOMATION_RUN_ID" --json
+if [ -n "\${BB_CLI:-}" ] && [ -x "\${BB_BOTS_NODE:-}" ]; then
+  exec env ELECTRON_RUN_AS_NODE=1 "$BB_BOTS_NODE" "$BB_CLI" "$@"
+fi
+exec bb "$@"
 `;
 const metadataKey = "BB_BOTS_CHANNEL_AUTOMATION";
+const nodeKey = "BB_BOTS_NODE";
 const metadataSchema = z.object({
   version: z.literal(1),
   channelId: z.string().uuid(),
@@ -211,8 +219,40 @@ export class ChannelAutomations {
       interpreter: "sh",
       script: dispatchScript,
       timeoutMs: 60_000,
-      env: { [metadataKey]: JSON.stringify(m) },
+      env: { [metadataKey]: JSON.stringify(m), [nodeKey]: process.execPath },
     };
+  }
+  /**
+   * Bring existing schedules onto the current dispatcher script and runtime
+   * path, which can change when BB updates. Runs at startup; failures only log.
+   */
+  async refreshDispatchers() {
+    const projectId = this.store.all()[0]?.projectId;
+    if (!projectId) return;
+    for (const listed of await this.all(projectId)) {
+      // Listing leaves out script sources; read each record to compare.
+      const automation = await this.rpc(
+        "get",
+        { projectId, automationId: listed.id },
+        automationSchema,
+      );
+      if (
+        automation.execution.script === dispatchScript &&
+        automation.execution.env?.[nodeKey] === process.execPath
+      )
+        continue;
+      await this.runtime.locked(`automation:${automation.id}`, () =>
+        this.rpc(
+          "update",
+          {
+            projectId,
+            automationId: automation.id,
+            execution: this.execution(metadata(automation)!),
+          },
+          automationSchema,
+        ),
+      );
+    }
   }
   private async target(
     channelId: string | undefined,

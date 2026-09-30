@@ -752,6 +752,11 @@ export default async function plugin(bb: BbPluginApi) {
           kind === "bot" ? id : undefined,
         );
       }),
+    automationCreate: (input) => automations.create(input),
+    automationList: (input) => automations.list(input),
+    automationUpdate: (input) => automations.update(input),
+    automationAction: (input) => automations.action(input),
+    automationRuns: (input) => automations.runs(input),
     list: async () => {
       const activity = store.botActivitySummary();
       const bots = store.all();
@@ -1686,6 +1691,20 @@ export default async function plugin(bb: BbPluginApi) {
         } catch {
           break;
         }
+      }
+    },
+  });
+  // Once per start: the Automations plugin may not be answering yet, so retry.
+  bb.background.service("automation-dispatchers", {
+    async start(signal) {
+      while (!signal.aborted) {
+        try {
+          await automations.refreshDispatchers();
+          return;
+        } catch (cause) {
+          bb.log.warn(`Channel automation refresh failed: ${String(cause)}`);
+        }
+        try { await delay(60_000, undefined, { signal }); } catch { break; }
       }
     },
   });

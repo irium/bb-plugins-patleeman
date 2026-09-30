@@ -999,6 +999,21 @@ const captures = [
     },
   },
   {
+    id: "bots-automations",
+    packageDir: "bb-plugin-bot-teams",
+    fileName: "channel-automations.png",
+    setup: async (client) => {
+      const threadId = await launchRoomThread();
+      const { automations } = await pluginRpc("bot-teams", "automationList", { channelId: launchRoomId, limit: 50, offset: 0 });
+      if (!automations.some((a) => a.name === "Weekday launch status" && !a.enabled))
+        throw new Error("Seed the paused Weekday launch status automation in Launch room before capturing.");
+      await client.navigate(`/threads/${threadId}`);
+      await client.waitForText(launchRoomReplies[0]);
+      await client.evaluate(`document.querySelector('button[aria-label="Channel automations"]').click()`);
+      await client.waitForText("Weekday launch status");
+    },
+  },
+  {
     id: "bots-creation",
     packageDir: "bb-plugin-bot-teams",
     fileName: "bot-creation-thread.png",

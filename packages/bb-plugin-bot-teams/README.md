@@ -75,7 +75,7 @@ Each channel is a hidden BB thread on the **Bot Teams** provider, so it looks an
 - **Messages from elsewhere**, such as `bb bots channel send` or automations, also appear in the thread, marked as sent outside it.
 - Renaming a channel renames its thread. Deleting a channel deletes its thread. If the thread is deleted on its own, opening the channel creates a new one.
 
-The composer's model picker holds the chat mode and bot permissions. The thread header holds the member list and **Search channel**; live work and requests that need you sit above the composer. Old channel and message links (`/plugins/bot-teams/channels/…`, including those in notifications) open the channel's thread; a message link opens the channel rather than scrolling to that message. Past messages cannot be edited in a channel thread; send a correction instead.
+The composer's model picker holds the chat mode and bot permissions. The thread header holds the member list, **Search channel**, and **Channel automations** (the clock); live work and requests that need you sit above the composer. Old channel and message links (`/plugins/bot-teams/channels/…`, including those in notifications) open the channel's thread; a message link opens the channel rather than scrolling to that message. Past messages cannot be edited in a channel thread; send a correction instead.
 
 ## Mentions everywhere
 
@@ -167,13 +167,16 @@ this channel.” The bot can create a recurring schedule or a one-time reminder
 for itself. Each run reads the latest channel context, mission, and memory, and
 posts its answer in the same channel using its current model and permissions.
 
-Ask a bot, or use the `bb bots channel automation` commands, to create or edit a task with weekday, daily,
+Click the clock in the channel thread's header to open **Channel automations**, or use the `bb bots channel automation` commands, to create or edit a task with weekday, daily,
 hourly, one-time, or custom schedules. New schedules start paused unless enabled.
 Review tasks, pause/resume schedules, run them now, view run history, or delete them. Native tools infer the active bot and channel; top-level agents supply
 both IDs. Bots can manage only their own schedules in channels they belong to.
 
 The existing **Automations** plugin must be enabled. It stores these schedules
-in the Personal project and runs a fixed dispatcher script. Automation history
+in the Personal project and runs a fixed dispatcher script. BB gives scripts a
+minimal `PATH` without `bb` or `node`, so the script runs `$BB_CLI` with the
+runtime Bot Teams runs on; Bot Teams updates existing schedules to the current
+script and runtime path when it starts. Automation history
 shows dispatch status alongside the actual response status, errors, and links to
 the channel answer and bot work thread. Retries are reflected in the response status. Pausing or deleting a schedule affects
 future runs. Stop an existing response with its **Stop** button above the composer.

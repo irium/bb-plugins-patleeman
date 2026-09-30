@@ -8,6 +8,15 @@ import { botSetupThreadRequest } from "./bot-creation-contract";
 import { z } from "zod";
 import { sendModes } from "./send-mode";
 export const sendModeSchema = z.enum(sendModes);
+import {
+  channelAutomationCreate,
+  channelAutomationList,
+  channelAutomationUpdate,
+  channelAutomationAction,
+  channelAutomationView,
+  channelAutomationRuns,
+  channelAutomationRunPage,
+} from "./automation-contract";
 export const idSchema = z.string().regex(/^bot_[a-f0-9]{16}$/);
 export const permissionModeSchema = z.enum(["accept-edits", "auto", "full"]);
 export type PermissionMode = z.infer<typeof permissionModeSchema>;
@@ -464,6 +473,29 @@ export const rpcContract = {
     output: usageSummary,
   },
 
+  automationRuns: {
+    input: channelAutomationRuns,
+    output: channelAutomationRunPage,
+  },
+  automationCreate: {
+    input: channelAutomationCreate,
+    output: channelAutomationView,
+  },
+  automationList: {
+    input: channelAutomationList,
+    output: z.object({
+      automations: z.array(channelAutomationView),
+      nextOffset: z.number().nullable(),
+    }),
+  },
+  automationUpdate: {
+    input: channelAutomationUpdate,
+    output: channelAutomationView,
+  },
+  automationAction: {
+    input: channelAutomationAction,
+    output: z.object({ ok: z.literal(true), result: z.unknown() }),
+  },
   list: {
     input: z.null(),
     output: z.object({

@@ -215,9 +215,12 @@ test("run history stays in its channel, preserves failures, and bounds output", 
       channelId: x.room.id,
       automationId: a.id,
     });
-    const page = await x.service.runs(input);
+    const page = (await x.harness.behavior.callRpc(
+      "automationRuns",
+      input,
+    )) as { runs: { status: string; output: string }[]; nextCursor: null };
     assert.equal(page.runs[0]!.status, "failed");
-    assert.equal(page.runs[0]!.output?.length, 2000);
+    assert.equal(page.runs[0]!.output.length, 2000);
     assert.equal(page.nextCursor, null);
     const other = x.active(x.b.id);
     await assert.rejects(
@@ -697,6 +700,32 @@ test("CLI edits a paused schedule without enabling it", async () => {
     assert.equal(updated.prompt, "New task");
     assert.equal(updated.enabled, false);
     assert.equal(updated.trigger.cron, "0 9 * * 1-5");
+  } finally {
+    await x.harness.lifecycle.dispose();
+  }
+});
+
+test("startup moves older schedules onto the current dispatcher and runtime", async () => {
+  const x = await setup();
+  try {
+    const current = await x.service.create(x.input());
+    const stale = await x.service.create(x.input({ name: "Older" }));
+    const old = x.records.get(stale.id)!;
+    const metadata = old.execution.env.BB_BOTS_CHANNEL_AUTOMATION;
+    old.enabled = false;
+    old.execution = {
+      ...old.execution,
+      script: "#!/bin/sh\nexec bb bots automation-dispatch\n",
+      env: { BB_BOTS_CHANNEL_AUTOMATION: metadata },
+    };
+    const untouched = x.records.get(current.id)!.execution;
+    await x.service.refreshDispatchers();
+    const refreshed = x.records.get(stale.id)!;
+    assert.equal(refreshed.execution.script, dispatchScript);
+    assert.equal(refreshed.execution.env.BB_BOTS_NODE, process.execPath);
+    assert.equal(refreshed.execution.env.BB_BOTS_CHANNEL_AUTOMATION, metadata);
+    assert.equal(refreshed.enabled, false);
+    assert.equal(x.records.get(current.id)!.execution, untouched);
   } finally {
     await x.harness.lifecycle.dispose();
   }

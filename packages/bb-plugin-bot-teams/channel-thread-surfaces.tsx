@@ -16,6 +16,7 @@ import { railLive, railRoutingCount } from "./channel-rail";
 import { message } from "./bot-ui";
 import { attentionReasons } from "./attention-view";
 import { ChannelSearch } from "./channel-search";
+import { ChannelAutomationsView } from "./channel-automations-view";
 import { channelHandoffText, takeChannelThreadHandoff } from "./handoff-draft";
 
 /**
@@ -47,10 +48,11 @@ function useChannelSurface(threadId: string | null) {
   return { surface, load };
 }
 
-/** Header: who is in the channel, and search across its history. */
+/** Header: who is in the channel, search across its history, and its schedules. */
 export function ChannelThreadHeader({ threadId }: PluginThreadHeaderActionProps) {
   const { surface, load } = useChannelSurface(threadId);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [automationsOpen, setAutomationsOpen] = useState(false);
   if (!surface) return null;
   return (
     <div className="channel-thread-header">
@@ -59,6 +61,15 @@ export function ChannelThreadHeader({ threadId }: PluginThreadHeaderActionProps)
         <Icon name="Search" />
       </Button>
       <ChannelSearch id={surface.room.id} open={searchOpen} onOpenChange={setSearchOpen} />
+      <Button variant="ghost" size="icon" aria-label="Channel automations" onClick={() => setAutomationsOpen(true)}>
+        <Icon name="Clock" />
+      </Button>
+      <ChannelAutomationsView
+        id={surface.room.id}
+        bots={surface.bots.filter((b) => surface.room.memberIds.includes(b.id))}
+        open={automationsOpen}
+        onOpenChange={setAutomationsOpen}
+      />
     </div>
   );
 }
