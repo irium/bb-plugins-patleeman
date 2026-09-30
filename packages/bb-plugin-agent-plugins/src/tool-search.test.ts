@@ -18,11 +18,9 @@ function tool(serverId: string, name: string, description: string, extra: Partia
 }
 
 const catalog: CatalogTool[] = [
-  tool("datadog", "search_datadog_logs", "Search logs in Datadog. Supports facets and time ranges."),
-  tool("datadog", "search_datadog_monitors", "Search monitors by name, tag, or status."),
-  tool("datadog", "get_datadog_metric", "Query a metric timeseries."),
-  tool("slack", "slack_search_public_and_private", "Search messages in public and private Slack channels."),
+  tool("slack", "slack_search_public_and_private", "Search messages in public and private Slack channels. Supports filters."),
   tool("slack", "slack_send_message", "Send a message to a Slack channel."),
+  tool("slack", "slack_list_channels", "List Slack channels by name."),
   tool("gmail", "search_messages", "Search Gmail messages using Gmail search syntax."),
 ];
 
@@ -41,7 +39,7 @@ describe("summarizeDescription", () => {
 
 describe("queryTerms", () => {
   it("splits on separators, lowercases, and dedupes", () => {
-    expect(queryTerms("Search_Datadog logs, logs")).toEqual(["search", "datadog", "logs"]);
+    expect(queryTerms("Search_Slack messages, messages")).toEqual(["search", "slack", "messages"]);
     expect(queryTerms("   ")).toEqual([]);
   });
 });
@@ -51,18 +49,17 @@ describe("searchTools", () => {
     const result = searchTools(catalog);
     expect(result.total).toBe(catalog.length);
     expect(result.tools[0]).toEqual({
-      opaqueId: "plugin__datadog__search_datadog_logs",
+      opaqueId: "plugin__slack__slack_search_public_and_private",
       pluginName: "example",
-      serverId: "datadog",
-      name: "search_datadog_logs",
-      summary: "Search logs in Datadog.",
+      serverId: "slack",
+      name: "slack_search_public_and_private",
+      summary: "Search messages in public and private Slack channels.",
       status: "ready",
     });
     expect(result.tools[0]).not.toHaveProperty("inputSchema");
     expect(result.servers).toEqual([
-      { pluginName: "example", serverId: "datadog", tools: 3 },
       { pluginName: "example", serverId: "gmail", tools: 1 },
-      { pluginName: "example", serverId: "slack", tools: 2 },
+      { pluginName: "example", serverId: "slack", tools: 3 },
     ]);
   });
 
@@ -78,9 +75,9 @@ describe("searchTools", () => {
   });
 
   it("falls back to any-term matches when nothing matches every term", () => {
-    const result = searchTools(catalog, { query: "monitors kubernetes" });
+    const result = searchTools(catalog, { query: "list kubernetes" });
     expect(result.partialMatch).toBe(true);
-    expect(result.tools.map((t) => t.name)).toEqual(["search_datadog_monitors"]);
+    expect(result.tools.map((t) => t.name)).toEqual(["slack_list_channels"]);
   });
 
   it("returns nothing when no term matches", () => {
@@ -90,10 +87,10 @@ describe("searchTools", () => {
   });
 
   it("filters by server and pages with limit and offset", () => {
-    const page = searchTools(catalog, { serverId: "datadog", limit: 2, offset: 1 });
+    const page = searchTools(catalog, { serverId: "slack", limit: 2, offset: 1 });
     expect(page.total).toBe(3);
-    expect(page.tools.map((t) => t.name)).toEqual(["search_datadog_monitors", "get_datadog_metric"]);
-    expect(page.servers).toHaveLength(3);
+    expect(page.tools.map((t) => t.name)).toEqual(["slack_send_message", "slack_list_channels"]);
+    expect(page.servers).toHaveLength(2);
   });
 
   it("defaults and clamps the limit", () => {
@@ -113,7 +110,7 @@ describe("describeTools", () => {
   it("returns full definitions in request order and reports unknown ids", () => {
     const result = describeTools(catalog, ["plugin__slack__slack_send_message", "missing", "plugin__gmail__search_messages", "missing"]);
     expect(result.tools.map((t) => t.name)).toEqual(["slack_send_message", "search_messages"]);
-    expect(result.tools[0]!.inputSchema).toEqual(catalog[4]!.inputSchema);
+    expect(result.tools[0]!.inputSchema).toEqual(catalog[1]!.inputSchema);
     expect(result.notFound).toEqual(["missing"]);
   });
 });
