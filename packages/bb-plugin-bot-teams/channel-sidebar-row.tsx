@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
 import type { Room, RoomWork, ThreadStatusView } from "./contract";
+import { isThreadSplitClick, useOpenThreadInSplit } from "./thread-split-navigation";
 import { ChannelStatusIcon, useChannelStatus } from "./channel-status-view";
 import { IconActionTooltip } from "./channel-controls";
 import { useSidebarInlineRename } from "./sidebar-inline-rename";
@@ -34,6 +35,7 @@ export function ChannelSidebarRow({
   approvalCount = 0,
   pending,
   onOpen,
+  onNavigate,
   onMarkRead,
   onPin,
   onRename,
@@ -52,6 +54,7 @@ export function ChannelSidebarRow({
   approvalCount?: number;
   pending: boolean;
   onOpen: () => void;
+  onNavigate: () => void;
   onMarkRead: () => void;
   onPin: () => void;
   onRename: (name: string) => Promise<unknown>;
@@ -67,19 +70,16 @@ export function ChannelSidebarRow({
     onSave: onRename,
   });
   const rowLink = useRef<HTMLAnchorElement>(null);
+  const openThreadInSplit = useOpenThreadInSplit(room.threadId ?? "");
   const menuId = useId();
   const hasUnread = room.updatedAt > (room.lastReadAt ?? 0);
   const unread = hasUnread && !selected;
   const status = useChannelStatus({ roomId: room.id, threadId: room.threadId, threads, work, active, unread,
     needsAttention: attentionCount + approvalCount > 0 });
   const openInSplit = () => {
-    // BB's route anchor delegate handles modified plugin links with its split placement rules.
-    rowLink.current?.dispatchEvent(new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-      metaKey: true,
-      view: window,
-    }));
+    if (!room.threadId) return;
+    openThreadInSplit(rowLink.current);
+    onNavigate();
   };
   const waitingLabel = [
     attentionCount > 0 &&
@@ -115,7 +115,13 @@ export function ChannelSidebarRow({
             className="channel-nav-row"
             aria-current={selected ? "page" : undefined}
             onClick={(event) => {
-              if (event.metaKey || event.ctrlKey) return;
+              if (isThreadSplitClick(event.nativeEvent)) return;
+              if (event.shiftKey || event.altKey) return;
+              if (event.metaKey || event.ctrlKey) {
+                event.preventDefault();
+                openInSplit();
+                return;
+              }
               event.preventDefault();
               onOpen();
             }}
@@ -156,7 +162,7 @@ export function ChannelSidebarRow({
       </ContextMenuTrigger>
       <ContextMenuContent id={menuId} aria-label={`${room.name} options`}
         onCloseAutoFocus={rename.onCloseAutoFocus}>
-        <ContextMenuItem onSelect={openInSplit}>
+        <ContextMenuItem disabled={!room.threadId} onSelect={openInSplit}>
           <Icon name="PanelRight" />
           Open in split
         </ContextMenuItem>

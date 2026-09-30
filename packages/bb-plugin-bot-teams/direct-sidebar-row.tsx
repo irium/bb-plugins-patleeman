@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   experimental_Icon as Icon,
   useBbNavigate,
@@ -7,6 +7,7 @@ import {
 import type { Bot, Conversation, DirectThreadInfo, DirectThreadView } from "./contract";
 import { DirectMessageStatus } from "./bot-direct-chat";
 import { message } from "./bot-ui";
+import { isThreadSplitClick, threadLinkPath, useOpenThreadInSplit } from "./thread-split-navigation";
 import { useSidebarInlineRename } from "./sidebar-inline-rename";
 import {
   ContextMenu,
@@ -58,6 +59,8 @@ export function DirectSidebarThread({
 }) {
   const sdk = useSdk();
   const navigate = useBbNavigate();
+  const rowLink = useRef<HTMLAnchorElement>(null);
+  const openThreadInSplit = useOpenThreadInSplit(conversation.threadId);
   const [error, setError] = useState<string | null>(null);
   const [sections, setSections] = useState<{ id: string; name: string }[]>([]);
   const title = info.title || conversation.title || "Direct message";
@@ -73,7 +76,7 @@ export function DirectSidebarThread({
     },
   });
   const archived = info.archivedAt !== null;
-  const href = `/projects/${info.projectId}/threads/${conversation.threadId}`;
+  const href = threadLinkPath(info.projectId, conversation.threadId);
   const run = async (action: () => Promise<unknown>) => {
     try {
       await action();
@@ -117,15 +120,16 @@ export function DirectSidebarThread({
         <Item onSelect={onNewThread}><Icon name="Plus" /> New thread with {bot.name}</Item>
         <Separator />
       </>}
-      <Item onSelect={() => void run(() => sdk.threads.open({
-        threadId: conversation.threadId, file: null, split: "right",
-      }))}>
+      <Item onSelect={() => {
+        openThreadInSplit(rowLink.current);
+        onNavigate();
+      }}>
         <Icon name="Columns2" /> Open in split
       </Item>
       <Separator />
-      <Item onSelect={() => void navigator.clipboard.writeText(
+      <Item onSelect={() => void run(() => navigator.clipboard.writeText(
         new URL(href, window.location.origin).href,
-      )}>
+      ))}>
         <Icon name="Copy" /> Copy thread link
       </Item>
       <Item onSelect={() => void run(() => info.unread
@@ -190,15 +194,22 @@ export function DirectSidebarThread({
   return <>
     <ContextMenu onOpenChange={(open) => { if (open) loadSections(); }}>
       <ContextMenuTrigger asChild>
-        <div className="direct-thread-nav-row">
+        <div className="direct-thread-nav-row" data-sidebar-thread-id={conversation.threadId}>
           {rename.editing ? <span className="channel-nav-row direct-thread-nav-link">
             {rename.editor}
-          </span> : <a href={href} className="channel-nav-row direct-thread-nav-link"
+          </span> : <a ref={rowLink} href={href} className="channel-nav-row direct-thread-nav-link"
             data-sidebar-thread-id={conversation.threadId}
             aria-current={selected ? "page" : undefined}
             title={untitled ? bot.name : `${title} · ${bot.name}`}
             onClick={(event) => {
-              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              if (isThreadSplitClick(event.nativeEvent)) return;
+              if (event.shiftKey || event.altKey) return;
+              if (event.metaKey || event.ctrlKey) {
+                event.preventDefault();
+                openThreadInSplit(rowLink.current);
+                onNavigate();
+                return;
+              }
               event.preventDefault();
               open();
             }}>
@@ -207,6 +218,8 @@ export function DirectSidebarThread({
             {!untitled && <span className="direct-thread-bot">{bot.name}</span>}
             {archived && <span className="channel-nav-archived">Archived</span>}
             {status && !archived && <DirectMessageStatus thread={status} />}
+            {!status && !archived && info.unread && !selected &&
+              <span className="channel-unread-dot" role="img" aria-label="Unread direct message" />}
           </a>}
           <button type="button" className="direct-thread-options direct-thread-archive"
             aria-label={`${archived ? "Unarchive" : "Archive"} ${title}`}

@@ -9,10 +9,12 @@ import {
 import { createPortal } from "react-dom";
 import {
   useBbNavigate,
+  useBbContext,
   useRealtime,
   useRealtimeConnectionState,
   useRpc,
   experimental_Icon as Icon,
+  experimental_usePluginId,
   type PluginNavPanelProps,
   type PluginThreadListProps,
   type ExperimentalSidebarNavigationProps,
@@ -220,7 +222,10 @@ export function ChannelRedirect({ subPath }: { subPath?: string }) {
 }
 export function ChannelsNavigation({
   experimental_Original: Original,
+  isCompactViewport,
 }: ExperimentalSidebarNavigationProps) {
+  const pluginId = experimental_usePluginId();
+  const { threadId } = useBbContext();
   const anchor = useRef<HTMLSpanElement>(null);
   const [inlineTarget, setInlineTarget] = useState<HTMLElement | null>(null);
 
@@ -231,12 +236,24 @@ export function ChannelsNavigation({
 
     const target = document.createElement("div");
     target.className = "channels-sidebar-inline";
+    // The sidebar sections are portaled outside PluginSlotMount. Keep their
+    // route links in the host delegate's scope, just like portaled menus.
+    target.setAttribute("data-bb-portaled-overlay", "");
+    target.setAttribute("data-bb-plugin", pluginId);
     content.prepend(target);
     setInlineTarget(target);
     return () => target.remove();
-  }, []);
+  }, [pluginId]);
 
-  const sections = <ChannelsSidebar activeThreadId={null} onNavigate={() => {}} />;
+  const closeMobileSidebar = () => {
+    if (!isCompactViewport) return;
+    // The navigation slot does not expose the drawer controller in the stable
+    // SDK. Use the host's toggle, which owns focus restoration and dismissal.
+    document.querySelector<HTMLButtonElement>(
+      'button[aria-label^="Toggle sidebar"][aria-expanded="true"]',
+    )?.click();
+  };
+  const sections = <ChannelsSidebar activeThreadId={threadId} onNavigate={closeMobileSidebar} />;
   return (
     <>
       <Original />
@@ -300,8 +317,7 @@ export function ChannelsSidebar({
       useRoster(true),
     rpc = useRpc<typeof rpcContract>(),
     navigate = useBbNavigate();
-  const [selected, setSelected] = useState<string | null>(null),
-    [channelSearch, setChannelSearch] = useState(""),
+  const [channelSearch, setChannelSearch] = useState(""),
     [directSearch, setDirectSearch] = useState(""),
     [channelSearching, setChannelSearching] = useState(false),
     [directSearching, setDirectSearching] = useState(false),
@@ -317,7 +333,6 @@ export function ChannelsSidebar({
     [pending, setPending] = useState(false);
   const channelListId = useId();
   const directListId = useId();
-  const channelPanel = useRef<string | null>(null);
   const updateDisplay = (next: ChannelDisplay) => {
     setDisplay(next);
     try {
@@ -368,28 +383,7 @@ export function ChannelsSidebar({
       setFailure(`Could not copy channel link: ${message(e)}`);
     }
   };
-  useEffect(() => {
-    const listener = (e: Event) => {
-      channelPanel.current = (e as CustomEvent<string | null>).detail;
-      setSelected(channelPanel.current);
-    };
-    window.addEventListener("bots:channel-selection", listener);
-    return () => window.removeEventListener("bots:channel-selection", listener);
-  }, []);
-  useEffect(() => {
-    if (!activeThreadId) {
-      if (!channelPanel.current) setSelected(null);
-      return;
-    }
-    let current = true;
-    void rpc.call("channelForThread", { threadId: activeThreadId }).then(
-      (roomId) => { if (current) setSelected(roomId); },
-      () => { if (current) setSelected(null); },
-    );
-    return () => { current = false; };
-  }, [activeThreadId, rpc]);
   const open = (id: string) => {
-    setSelected(id);
     setFailure(null);
     void rpc.call("openChannelThread", { id }).then(
       ({ threadId }) => {
@@ -607,7 +601,7 @@ export function ChannelsSidebar({
               <ChannelSidebarRow
                 key={r.id}
                 room={r}
-                selected={selected === r.id}
+                selected={!!activeThreadId && r.threadId === activeThreadId}
                 active={activeRoomIds.includes(r.id)}
                 threads={roomThreads[r.id] ?? []}
                 work={roomWork[r.id]}
@@ -615,6 +609,7 @@ export function ChannelsSidebar({
                 approvalCount={approvalCounts[r.id] ?? 0}
                 pending={pending}
                 onOpen={() => open(r.id)}
+                onNavigate={onNavigate}
                 onMarkRead={() => void changeChannelState(r.id,
                   r.updatedAt > (r.lastReadAt ?? 0)
                     ? { lastReadAt: r.updatedAt }
@@ -685,7 +680,10 @@ export function ChannelsSidebar({
             <DropdownMenuContent align="end" aria-label="Direct message list options">
               <DropdownMenuItem
                 aria-label={showArchivedDirectThreads ? "Hide archived threads" : "Show archived threads"}
-                onSelect={() => setShowArchivedDirectThreads(!showArchivedDirectThreads)}>
+                onSelect={() => {
+                  setShowArchivedDirectThreads(!showArchivedDirectThreads);
+                  setDirectCollapsed(false);
+                }}>
                 <Icon name="Archive" />
                 {showArchivedDirectThreads ? "Hide archived threads" : "Show archived threads"}
               </DropdownMenuItem>
@@ -900,7 +898,12 @@ export function ChannelsPage({ subPath }: PluginNavPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const id = channelId(subPath);
   const botId = directMessageBotId(subPath);
+  const threadId = /^thread\/(thr_[a-z0-9]+)$/.exec(subPath)?.[1] ?? null;
   useEffect(() => {
+    if (threadId) {
+      navigate.toThread(threadId);
+      return;
+    }
     if (!id && !botId) return;
     let active = true;
     const target = botId
@@ -913,8 +916,11 @@ export function ChannelsPage({ subPath }: PluginNavPanelProps) {
     return () => {
       active = false;
     };
-  }, [id, botId, rpc, navigate]);
-  if (!id && !botId) return <CreateChannel />;
+  }, [id, botId, threadId, rpc, navigate]);
+  if (!id && !botId && !threadId) {
+    if (!subPath || subPath === "new") return <CreateChannel />;
+    return <div className="bot-page"><ErrorMessage error="Invalid channel link." /></div>;
+  }
   return (
     <div className="bot-page">
       {error ? <ErrorMessage error={error} /> : <p role="status">Opening…</p>}

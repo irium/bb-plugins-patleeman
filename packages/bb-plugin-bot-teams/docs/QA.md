@@ -660,3 +660,61 @@ bb bots channel schedule "Launch room" --name "Weekday launch status" \
   --text "Post the day's ORBIT-42 launch status and open decisions." \
   --bot scribe --cron "0 9 * * 1-5" --timezone America/New_York --paused
 ```
+
+
+## Open in split stays in the current window
+
+Channel and direct-message menus use a shared thread route bridge. The bridge
+opens a plugin route in a pane, then resolves the exact thread with BB navigation.
+This supports hidden threads and personal threads, which the sidebar action
+lookup and project-qualified route links do not handle. The portaled sidebar
+declares its plugin scope so BB handles its route links. An already-open thread
+uses normal navigation to focus its existing pane.
+
+Live verification in a fresh 1440 × 1000 browser session:
+
+- Opened a channel from its three-dot menu: two panes, with the channel chat rendered.
+- Opened an empty temporary direct thread from its three-dot menu: three panes, with the exact direct thread rendered.
+- Reopened both threads: the pane count stayed at three and the selected thread received focus.
+- Checked browser popup calls: zero. No message was sent; the temporary direct thread was deleted afterward.
+- Package typecheck/build, stable SDK compatibility, marketplace schema/index/assets checks, and `git diff --check` passed.
+
+## Channel and direct-message sidebar audit
+
+Run the live regression against a headless BB browser session:
+
+```sh
+BB_SIDEBAR_QA_SESSION=<session-id> node scripts/qa-bot-teams-sidebar.mjs
+```
+
+The script creates an idle bot, empty channels, direct threads, and a temporary
+section. It sends no messages and cleans up its threads, channels, and section;
+the fixture bot is left archived. An existing dedicated `Sidebar QA` bot with
+its mission schedule disabled can be supplied through `BB_SIDEBAR_QA_BOT_ID`.
+Use `BB_SIDEBAR_QA_GROUPS` to select comma-separated groups.
+
+All ten groups passed in the staged app: navigation, channels, display, direct,
+bot-pages, errors, integration, creation, deletion, and mobile. They cover
+selection, copied links, modifier clicks, split reuse, search, collapse,
+sorting/grouping, pin/read state, rename validation, sections, archive/restore,
+bot-page links, clipboard failures, invalid routes, empty-thread creation,
+channel handoff drafts, deletion confirmation, and mobile drawer dismissal.
+The bot-pages group was rerun after fixing the harness's menu-transition wait.
+The package's 291 tests, typecheck/build, stable compatibility, marketplace
+validation, staged-preview checks, and diff whitespace validation also passed.
+
+The audit fixed stale selected-row state, invalid personal DM links, modifier
+clicks escaping the app, missing mobile drawer dismissal, collapsed archived-DM
+results, unread indicators on older direct threads, missing DM menu-extension
+thread context, and invalid plugin routes accidentally creating channels.
+The built plugin was reloaded in the running app.
+
+### Leaving a channel clears its highlight
+
+Channel rows derive selection directly from `activeThreadId` and the room's
+linked thread ID. They no longer store a last-clicked channel or resolve
+selection through an asynchronous lookup. The `selection` regression group
+opens a channel, then an empty fixture in the native pinned list, then another
+channel and a DM. It asserts that no channel remains selected after either
+transition. Both transitions and the navigation group passed live after the
+plugin was rebuilt and reloaded.
