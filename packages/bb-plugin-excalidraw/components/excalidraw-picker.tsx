@@ -1,4 +1,4 @@
-// Composer picker shown while "Excalidraw drawing" is selected from the
+// Composer picker shown while "Drawing" is selected from the
 // composer's `+` menu. Rendered by the host in place of the composer
 // (pendingInteraction); picking a drawing submits its id to the waiting
 // backend call, which then uploads the rendered image for the thread.
@@ -40,7 +40,7 @@ export function ExcalidrawPicker({
           {drawings.length === 0 ? (
             <Card className="border-dashed bg-muted/20">
               <CardContent className="flex items-center gap-3 px-3 py-3 text-xs text-muted-foreground">
-                No drawings yet — create one in the Excalidraw panel.
+                No drawings yet — create one in Drawings.
               </CardContent>
             </Card>
           ) : (

@@ -9,7 +9,7 @@ export function createExcalidrawComposerCustomization(
     plusMenu: [
       {
         id: "excalidraw",
-        label: "Excalidraw drawing",
+        label: "Drawing",
         icon: "PenTool",
         description: "Attach a drawing to this conversation as an image",
         disabled: (view) => view.scope.kind !== "thread",

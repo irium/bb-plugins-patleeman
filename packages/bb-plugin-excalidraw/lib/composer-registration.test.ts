@@ -7,7 +7,7 @@ describe("Excalidraw composer registration", () => {
     expect(customization.scopes).toEqual(["thread", "new-thread"]);
 
     const item = customization.plusMenu?.[0];
-    expect(item?.label).toBe("Excalidraw drawing");
+    expect(item?.label).toBe("Drawing");
     expect(typeof item?.disabled).toBe("function");
     if (typeof item?.disabled !== "function") return;
 

@@ -1,6 +1,6 @@
 // Drawing gallery: image-first card grid with lazy SVG previews. The title
 // is just a small caption — the preview is the identity of each card.
-// Optionally bound to a thread (thread right-panel "Excalidraw" action) so
+// Optionally bound to a thread (thread right-panel "Drawings" action) so
 // drawings can be uploaded for that conversation as rendered images.
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";

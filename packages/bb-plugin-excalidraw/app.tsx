@@ -1,11 +1,11 @@
 // bb-plugin-excalidraw — frontend entry.
 //
 // Surfaces:
-//   - navPanel "Excalidraw": full drawing gallery + editor (create/edit).
-//   - threadPanelAction "Excalidraw": the same gallery/editor inside a
+//   - navPanel "Drawings": full drawing gallery + editor (create/edit).
+//   - threadPanelAction "Drawings": the same gallery/editor inside a
 //     thread's right panel, where "Attach image" attaches the rendered
 //     drawing to that conversation.
-//   - composer `+` menu → "Excalidraw drawing": pick a drawing (host picker)
+//   - composer `+` menu → "Drawing": pick a drawing (host picker)
 //     and upload it as a rendered image attachment for the current conversation.
 //   - mention provider (server): `@drawing` works in every composer.
 import { useState } from "react";
@@ -61,7 +61,7 @@ async function attachFromComposer(scope: PluginComposerScope) {
 export default definePluginApp((app) => {
   app.slots.navPanel({
     id: "drawings",
-    title: "Excalidraw",
+    title: "Drawings",
     icon: "PenTool",
     path: "drawings",
     component: () => <DrawingsSurface />,
@@ -69,10 +69,10 @@ export default definePluginApp((app) => {
 
   app.slots.threadPanelAction({
     id: "excalidraw",
-    title: "Excalidraw",
+    title: "Drawings",
     icon: "PenTool",
     layout: "flush",
-    run: async ({ openPanel }) => openPanel({ title: "Excalidraw" }),
+    run: async ({ openPanel }) => openPanel({ title: "Drawings" }),
     component: ({ threadId }) => <DrawingsSurface threadId={threadId} />,
   });
 

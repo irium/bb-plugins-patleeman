@@ -12,8 +12,8 @@
     "build": "bb plugin build ."
   },
   "bb": {
-    "name": "Talk",
-    "description": "Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable.",
+    "name": "Studio Talk",
+    "description": "Part of BB Studio. Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable.",
     "branding": {
       "icon": "./icons/talk.svg",
       "experimental_icons": {

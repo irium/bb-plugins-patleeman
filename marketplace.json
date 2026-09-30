@@ -203,14 +203,15 @@
     },
     {
       "id": "excalidraw",
-      "displayName": "Excalidraw",
-      "description": "Create and edit Excalidraw drawings, then attach them to conversations.",
+      "displayName": "Studio Draw",
+      "description": "Part of BB Studio. Sketch Excalidraw drawings with your agents, then attach them to conversations.",
       "icon": {
         "url": "./packages/bb-plugin-excalidraw/assets/icon.svg"
       },
       "tags": [
         "drawing",
-        "collaboration"
+        "collaboration",
+        "bb-studio"
       ],
       "author": {
         "name": "Patrick Lee",
@@ -271,8 +272,8 @@
     },
     {
       "id": "pages",
-      "displayName": "Pages",
-      "description": "Collaborative pages you write with your agents. Mention a Bot Teams bot to hand it work, or let one keep a page up to date.",
+      "displayName": "Studio Pages",
+      "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Bot Teams bot to hand it work, or let one keep a page up to date.",
       "icon": {
         "url": "./packages/bb-plugin-pages/icons/pages.svg"
       },
@@ -280,7 +281,8 @@
         "productivity",
         "documents",
         "collaboration",
-        "bots"
+        "bots",
+        "bb-studio"
       ],
       "author": {
         "name": "Patrick Lee",
@@ -380,15 +382,16 @@
     },
     {
       "id": "talk",
-      "displayName": "Talk",
-      "description": "Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable.",
+      "displayName": "Studio Talk",
+      "description": "Part of BB Studio. Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable.",
       "icon": {
         "url": "./packages/bb-plugin-talk/icons/talk.svg"
       },
       "tags": [
         "productivity",
         "voice",
-        "dictation"
+        "dictation",
+        "bb-studio"
       ],
       "author": {
         "name": "Patrick Lee",

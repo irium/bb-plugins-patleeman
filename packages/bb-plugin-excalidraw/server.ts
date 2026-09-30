@@ -260,7 +260,7 @@ export default async function plugin(bb: BbPluginApi) {
       const result = await bb.ui.requestInput({
         threadId,
         rendererId: "excalidraw-picker",
-        title: "Attach an Excalidraw drawing",
+        title: "Attach a drawing",
         payload: { drawings: rows.map(toMeta) },
         timeoutMs: 300_000,
       });
@@ -353,7 +353,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "excalidraw_create_drawing",
     description:
-      "Create a new empty Excalidraw drawing and return its id and name. The user can open it from the Excalidraw panel.",
+      "Create a new empty Excalidraw drawing and return its id and name. The user can open it from Drawings.",
     parameters: z.object({ name: z.string().min(1).max(200) }),
     execute({ name }) {
       const id = randomUUID();
@@ -432,7 +432,7 @@ export default async function plugin(bb: BbPluginApi) {
   // time the agent receives its scene data as context.
   bb.ui.registerMentionProvider({
     id: "drawing",
-    label: "Excalidraw",
+    label: "Drawings",
     search({ query }) {
       const rows = db
         .prepare("SELECT * FROM drawings ORDER BY updated_at DESC LIMIT 50")
@@ -442,7 +442,7 @@ export default async function plugin(bb: BbPluginApi) {
         .filter((r) => !q || r.name.toLowerCase().includes(q))
         .map((r) => ({
           id: r.id,
-          title: "Excalidraw drawing",
+          title: "Drawing",
           subtitle: `${toMeta(r).elementCount} elements`,
         }));
     },

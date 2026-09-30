@@ -1,5 +1,7 @@
 # bb-plugin-excalidraw
 
+> **Studio Draw** is part of **BB Studio**, a suite of plugins for writing, talking, and drawing with your agents: [Studio Pages](../bb-plugin-pages), [Studio Talk](../bb-plugin-talk), and [Studio Draw](../bb-plugin-excalidraw).
+
 Create and edit [Excalidraw](https://excalidraw.com) drawings inside bb, then
 attach them to conversations.
 
@@ -11,17 +13,17 @@ Captured from the running BB application with a real drawn rectangle.
 
 ## What you get
 
-- **Drawings panel** (sidebar → Excalidraw): a pure image-first card gallery —
+- **Drawings panel** (sidebar → Drawings): a pure image-first card gallery —
   no titles anywhere, each drawing is its live SVG thumbnail (lazy-rendered
   and cached). Click **+ New drawing** to start immediately. The editor
   autosaves as you work; its toolbar is icon-only: attach to the
   conversation, copy the image to the clipboard, download the PNG, or
   delete.
 - **Attach as an image via the composer `+` menu**: in any conversation,
-  open the `+` menu → **Excalidraw drawing**, pick a drawing, and the
+  open the `+` menu → **Drawing**, pick a drawing, and the
   rendered PNG is uploaded as an image attachment without sending a message.
 - **Attach from the thread panel**: open the thread right panel → Actions →
-  **Excalidraw**, then **Attach image** on a drawing — the PNG is uploaded
+  **Drawings**, then **Attach image** on a drawing — the PNG is uploaded
   without sending a message.
 - **`@drawing` mentions** (composer-native): type `@` and pick a drawing to
   add a mention pill; when you send, the agent receives the drawing's scene
