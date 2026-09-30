@@ -33,7 +33,8 @@ export {
   useProjects,
   type Project,
 } from "./pieces";
-export { useStudioPresent } from "./presence";
+export { usePluginPresent, useStudioChatPresent, useStudioPresent } from "./presence";
+export { usePathname } from "./route";
 export {
   SIDEBAR_ROW,
   SIDEBAR_ROW_SELECTED,

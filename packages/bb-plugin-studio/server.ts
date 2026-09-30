@@ -153,6 +153,17 @@ export default async function plugin(bb: BbPluginApi) {
       }
       return readSidebar();
     },
+    itemAt: async (input) => {
+      if ("path" in input && input.path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`)) return { item: null, kind: null };
+      const { providers, items } = await hub.overview();
+      const item =
+        "path" in input
+          ? itemAtPath(items, input.path)
+          : (items.find((each) => each.pluginId === input.pluginId && each.id === input.id) ?? null);
+      if (!item) return { item: null, kind: null };
+      const kind = providers.find((provider) => provider.pluginId === item.pluginId)?.kinds.find((each) => each.id === item.kind) ?? null;
+      return { item, kind };
+    },
   });
 
   // Agents --------------------------------------------------------------------

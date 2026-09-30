@@ -18,6 +18,7 @@ export const PAGE_KIND: StudioKind = {
   create: { mode: "rpc" },
   canArchive: true,
   blurb: "Documents you write with agents.",
+  agentHint: "Read it with pages_read and change it with pages_edit; comments are in pages_comments.",
 };
 
 const PREVIEW_CHARS = 140;

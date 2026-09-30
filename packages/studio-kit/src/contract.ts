@@ -13,6 +13,15 @@ export const STUDIO_PANEL_PATH = "studio";
 export const STUDIO_CHANGED_METHOD = "studio_changed";
 /** Studio's realtime channel; payload `{ pluginId }`. */
 export const STUDIO_REALTIME_CHANNEL = "studio-changed";
+/** Studio's RPC that finds the item a path opens, or an item by id. */
+export const STUDIO_ITEM_AT_METHOD = "itemAt";
+
+/** Studio Chat, the floating chat over Studio items. */
+export const STUDIO_CHAT_PLUGIN_ID = "studio-chat";
+/** Window event that floats a thread in Studio Chat; detail `{ threadId }`. */
+export const STUDIO_CHAT_FLOAT_EVENT = "bb-studio:chat:float";
+/** CSS variable on the root element that moves the chat card left, e.g. past a comments card. */
+export const STUDIO_CHAT_RIGHT_VAR = "--studio-chat-right";
 
 export type StudioTone = "neutral" | "live" | "progress" | "warning" | "danger" | "success";
 
@@ -92,6 +101,12 @@ export interface StudioKind {
   canArchive: boolean;
   /** Empty-state copy for this kind. */
   blurb: string;
+  /**
+   * How an agent reads and edits one, e.g. "Read it with pages_read and edit
+   * it with pages_edit." Studio Chat tells the agent this when the item is on
+   * screen.
+   */
+  agentHint?: string;
 }
 
 export interface StudioProviderInfo {
@@ -146,6 +161,7 @@ export function studioSchemas(z: typeof Zod) {
       .nullable(),
     canArchive: z.boolean(),
     blurb: z.string(),
+    agentHint: z.string().max(500).optional(),
   });
   const info = z.object({ pluginId: z.string(), version: z.literal(1), panel: z.string().nullable(), kinds: z.array(kind) });
   const ids = z.array(z.string().min(1).max(200)).min(1).max(500);
@@ -180,6 +196,11 @@ export function studioSchemas(z: typeof Zod) {
         output: z.object({ message: z.string().nullable(), text: z.string().nullable() }),
       },
     },
+    /** Studio's method that finds an item and its kind, by the path that opens it or by id. */
+    itemAt: {
+      input: z.union([z.object({ path: z.string().min(1).max(2000) }), z.object({ pluginId: z.string().min(1).max(100), id: z.string().min(1).max(200) })]),
+      output: z.object({ item: item.extend({ pluginId: z.string() }).nullable(), kind: kind.nullable() }),
+    },
     /** Studio's own method add-ons call when their items change. */
     changed: {
       input: z.object({ pluginId: z.string().min(1).max(100) }),
@@ -206,6 +227,18 @@ export async function eachId(
     }
   }
   return { done, failed };
+}
+
+/** The item whose view is at `path`: the longest `href` that is the path or a parent of it. */
+export function itemAtPath<T extends { href: string }>(items: readonly T[], path: string): T | null {
+  const clean = path.split(/[?#]/)[0]!.replace(/\/+$/, "");
+  let best: T | null = null;
+  for (const item of items) {
+    const href = item.href.split(/[?#]/)[0]!.replace(/\/+$/, "");
+    if (!href.startsWith("/")) continue;
+    if ((clean === href || clean.startsWith(`${href}/`)) && href.length > (best?.href.length ?? 0)) best = item;
+  }
+  return best;
 }
 
 /** A composer prompt that links each item, so the agent can read them. */

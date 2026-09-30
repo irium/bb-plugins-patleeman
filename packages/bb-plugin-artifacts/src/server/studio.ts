@@ -21,6 +21,7 @@ export const ARTIFACT_KIND: StudioKind = {
   create: null,
   canArchive: true,
   blurb: "Files your agents made.",
+  agentHint: "Read it with artifacts_read.",
 };
 
 const PREVIEW_CHARS = 140;

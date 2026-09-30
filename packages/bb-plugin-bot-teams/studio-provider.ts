@@ -19,6 +19,7 @@ export const BOT_KIND: StudioKind = {
   create: { mode: "event", event: NEW_BOT_EVENT },
   canArchive: true,
   blurb: "Persistent teammates with their own workspace and memory.",
+  agentHint: "It's a bot: @mention it by name to hand it work; `bb bots show <id>` and `bb bots memory <id>` describe it.",
 };
 
 export const botHref = (id: string) => `/plugins/${PLUGIN_ID}/bots/${id}`;

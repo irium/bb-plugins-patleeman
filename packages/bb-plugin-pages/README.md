@@ -1,6 +1,6 @@
 # bb-plugin-pages
 
-> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-plugin-studio), Studio Pages, [Studio Talk](../bb-plugin-talk), [Studio Draw](../bb-plugin-excalidraw), [Studio Artifacts](../bb-plugin-artifacts), [Studio Tasks](../bb-plugin-studio-tasks), and [Studio Teams](../bb-plugin-bot-teams).
+> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-plugin-studio), Studio Pages, [Studio Talk](../bb-plugin-talk), [Studio Draw](../bb-plugin-excalidraw), [Studio Artifacts](../bb-plugin-artifacts), [Studio Tasks](../bb-plugin-studio-tasks), [Studio Chat](../bb-plugin-studio-chat), and [Studio Teams](../bb-plugin-bot-teams).
 
 Collaborative documents for BB that you write together with your agents.
 Pages gives you a Notion-style block editor with live multiplayer editing,
@@ -79,7 +79,10 @@ afterwards.
   that gets the page as context. The thread opens in a card on the page,
   and you can minimize it or open it as a full thread. The full thread's
   header shows the page's name, which takes you back to the page with the
-  chat open. This works without Studio Teams.
+  chat open. This works without Studio Teams. With
+  [Studio Chat](../bb-plugin-studio-chat) installed, its floating chat takes
+  over the box and card: same composer, same page chats, and it follows you
+  to other Studio items.
 - **Version history.** Pages saves a version before an agent's or bot's first
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.

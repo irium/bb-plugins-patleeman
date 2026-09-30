@@ -17,6 +17,7 @@ export const DRAWING_KIND: StudioKind = {
   create: { mode: "rpc" },
   canArchive: true,
   blurb: "Diagrams and sketches.",
+  agentHint: "Read it with excalidraw_get_drawing and change it with excalidraw_update_drawing.",
 };
 
 const PREVIEW_CHARS = 140;

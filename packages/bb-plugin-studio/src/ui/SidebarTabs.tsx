@@ -17,6 +17,7 @@ import {
   useSidebarDisplay,
   useSidebarHosted,
   useSidebarNavigated,
+  usePathname,
 } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
@@ -25,7 +26,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TABS_CHANNEL, type rpcContract, type TabView } from "../contract";
 import { itemAtPath } from "../tabs";
 
-const ROUTE_POLL_MS = 400;
 const REFETCH_DEBOUNCE_MS = 300;
 const APP_NAMES: Record<string, string> = {
   pages: "Pages",
@@ -35,21 +35,6 @@ const APP_NAMES: Record<string, string> = {
   "studio-tasks": "Tasks",
   "bot-teams": "Bots",
 };
-
-/** The app's path, as BB's router changes it without an event plugins can hear. */
-function usePathname(): string {
-  const [path, setPath] = useState(() => window.location.pathname);
-  useEffect(() => {
-    const check = () => setPath(window.location.pathname);
-    const timer = setInterval(check, ROUTE_POLL_MS);
-    window.addEventListener("popstate", check);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("popstate", check);
-    };
-  }, []);
-  return path;
-}
 
 function useTabs(enabled: boolean) {
   const rpc = useRpc<typeof rpcContract>();

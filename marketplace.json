@@ -410,6 +410,31 @@
       }
     },
     {
+      "id": "studio-chat",
+      "displayName": "Studio Chat",
+      "description": "Part of BB Studio. A chat that floats over your pages, drawings and other Studio items, knows which one you're looking at, and can hold any thread.",
+      "icon": {
+        "url": "./packages/bb-plugin-studio-chat/assets/icon.svg"
+      },
+      "tags": [
+        "productivity",
+        "collaboration",
+        "agents",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-plugins.git",
+          "subdir": "packages/bb-plugin-studio-chat",
+          "ref": "main"
+        }
+      }
+    },
+    {
       "id": "talk",
       "displayName": "Studio Talk",
       "description": "Part of BB Studio. Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable.",

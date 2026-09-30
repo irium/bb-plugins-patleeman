@@ -24,6 +24,7 @@ export const RECORDING_KINDS: StudioKind[] = [
     create: { mode: "event", event: NEW_RECORDING_EVENT },
     canArchive: true,
     blurb: "Long voice notes, transcribed.",
+    agentHint: "Read the transcript with `bb talk transcript <id>`; `bb talk show <id>` has the details.",
   },
   {
     id: "dictation",
@@ -36,6 +37,7 @@ export const RECORDING_KINDS: StudioKind[] = [
     create: null,
     canArchive: true,
     blurb: "Your dictations, with audio.",
+    agentHint: "Read the transcript with `bb talk transcript <id>`; `bb talk show <id>` has the details.",
   },
 ];
 

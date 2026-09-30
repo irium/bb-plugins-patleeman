@@ -71,17 +71,5 @@ export class TabStore {
   }
 }
 
-/**
- * The item whose view is at `path`: its link, or a path below it. The longest
- * link wins, so a page's link beats its parent's.
- */
-export function itemAtPath<T extends { href: string }>(items: readonly T[], path: string): T | null {
-  const clean = path.split(/[?#]/)[0]!.replace(/\/+$/, "");
-  let best: T | null = null;
-  for (const item of items) {
-    const href = item.href.split(/[?#]/)[0]!.replace(/\/+$/, "");
-    if (!href.startsWith("/")) continue;
-    if ((clean === href || clean.startsWith(`${href}/`)) && href.length > (best?.href.length ?? 0)) best = item;
-  }
-  return best;
-}
+/** Kept here for the tab code; the kit owns it so Studio Chat matches paths the same way. */
+export { itemAtPath } from "@bb-studio/kit/contract";

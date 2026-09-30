@@ -90,4 +90,6 @@ export const rpcContract = defineRpcContract({
   visitTab: { input: z.object({ path: z.string().min(1).max(2000) }), output: z.object({ tab: tab.nullable() }) },
   closeTabs: { input: z.object({ items: z.array(itemRef).min(1).max(100) }), output: z.object({ ok: z.boolean() }) },
   setSidebar: { input: z.object({ visible: z.boolean() }), output: sidebar },
+  /** The item a path opens, or an item by id, with its kind. Studio Chat calls it. */
+  itemAt: schemas.itemAt,
 });

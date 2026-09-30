@@ -36,6 +36,7 @@ export const TASK_KIND: StudioKind = {
   create: { mode: "rpc" },
   canArchive: true,
   blurb: "Things to do, for you or an agent.",
+  agentHint: "Read it with tasks_get and change it with tasks_update.",
 };
 
 const STATUS_TONES: Record<TaskStatus, StudioBadge["tone"]> = {

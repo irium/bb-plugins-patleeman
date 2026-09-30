@@ -1,5 +1,6 @@
 import { ThreadTitle, useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { ItemHeader } from "@bb-studio/kit/app";
+import { ItemHeader, useStudioChatPresent } from "@bb-studio/kit/app";
+import { STUDIO_CHAT_FLOAT_EVENT, STUDIO_CHAT_RIGHT_VAR } from "@bb-studio/kit/contract";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   DropdownMenu,
@@ -388,13 +389,29 @@ export function PageView({
     if (titleTimer.current) clearTimeout(titleTimer.current);
     titleTimer.current = setTimeout(() => void rpc.call("update", { id: page.id, title: next.trim() }), 400);
   };
+  // Studio Chat, when installed, holds the page's chats; Pages' own card
+  // steps aside for it.
+  const studioChat = useStudioChatPresent();
   const openThread = (threadId: string) => {
+    if (studioChat) {
+      window.dispatchEvent(new CustomEvent(STUDIO_CHAT_FLOAT_EVENT, { detail: { threadId } }));
+      return;
+    }
     setChatThread(threadId);
     setChatMode("thread");
   };
   useEffect(() => {
-    if (chatThreadId) openThread(chatThreadId);
-  }, [chatThreadId]);
+    if (chatThreadId && studioChat !== null) openThread(chatThreadId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatThreadId, studioChat]);
+  // Keeps Studio Chat clear of the comments card.
+  const besideComments = sidePanel === "comments";
+  useEffect(() => {
+    if (!studioChat || !besideComments || !window.matchMedia("(min-width: 768px)").matches) return;
+    const root = document.documentElement.style;
+    root.setProperty(STUDIO_CHAT_RIGHT_VAR, "344px");
+    return () => void root.removeProperty(STUDIO_CHAT_RIGHT_VAR);
+  }, [studioChat, besideComments]);
 
   const refreshBot = page.refresh ? bots.bots.find((bot) => bot.id === page.refresh!.botId) : undefined;
   const shown = { ...page, title };
@@ -542,18 +559,20 @@ export function PageView({
         }
       />
 
-      <PageChat
-        page={page}
-        rpc={rpc}
-        threadId={chatThread}
-        mode={chatMode}
-        onMode={setChatMode}
-        besideComments={sidePanel === "comments"}
-        onStarted={(threadId) => {
-          openThread(threadId);
-          loadChats();
-        }}
-      />
+      {studioChat === false ? (
+        <PageChat
+          page={page}
+          rpc={rpc}
+          threadId={chatThread}
+          mode={chatMode}
+          onMode={setChatMode}
+          besideComments={besideComments}
+          onStarted={(threadId) => {
+            openThread(threadId);
+            loadChats();
+          }}
+        />
+      ) : null}
       <KeepUpdatedDialog open={dialog === "refresh"} onClose={() => setDialog(null)} page={page} bots={bots} rpc={rpc} />
       <HistoryDialog open={dialog === "history"} onClose={() => setDialog(null)} page={page} bots={bots.bots} rpc={rpc} />
     </div>
