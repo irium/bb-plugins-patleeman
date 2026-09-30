@@ -1,6 +1,6 @@
 # Studio Artifacts
 
-> **Studio Artifacts** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, and keeping what your agents make: [Studio](../bb-plugin-studio), [Studio Pages](../bb-plugin-pages), [Studio Talk](../bb-plugin-talk), [Studio Draw](../bb-plugin-excalidraw), and Studio Artifacts.
+> **Studio Artifacts** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, and keeping what your agents make: [Studio](../bb-plugin-studio), [Studio Pages](../bb-plugin-pages), [Studio Talk](../bb-plugin-talk), [Studio Draw](../bb-plugin-excalidraw), Studio Artifacts, and [Studio Tasks](../bb-plugin-studio-tasks).
 
 Keep the images, reports, pages and files your agents make. Save a file from
 a thread and it becomes an artifact in Studio's collection. You can view it,

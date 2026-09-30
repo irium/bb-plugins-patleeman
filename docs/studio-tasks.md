@@ -5,7 +5,7 @@ to do, who's doing them, and where they stand. A task can be yours, or you
 can hand it to an agent. Handing it over starts a thread, and the task then
 moves across the board as that thread runs, stops for you, and finishes.
 
-Plugin id `tasks`, display name "Studio Tasks", kind `task`.
+Plugin id `studio-tasks` (see As built), display name "Studio Tasks", kind `task`.
 
 ## Where it fits
 
@@ -182,6 +182,25 @@ The existing Studio, Pages, Talk, Draw and Artifacts RPCs and hrefs don't
 change, which matters for the mobile thread (@thread:thr_6im388p6s7). The
 only change outside the new package is adding `tasks` to Studio's `SUITE`
 list.
+
+## As built
+
+- **Plugin id `studio-tasks`.** BB ships a builtin plugin with the id
+  `tasks`, and BB refuses to install another plugin with that id. So the
+  package is `bb-plugin-studio-tasks`, the CLI is `bb studio-tasks`, the
+  skill is `studio-tasks`, and a task lives at
+  `/plugins/studio-tasks/tasks/<id>`. The agent tools stay `tasks_list`,
+  `tasks_get`, `tasks_create` and `tasks_update`, and the directive stays
+  `::task{id="tsk_…"}`.
+- **Explicit handoff labels.** An idle thread still moves the task to Review,
+  but the card says what happened: "Agent says it's ready for review" when
+  the agent called `tasks_update`, "Agent replied, check its answer" when it
+  just stopped, and "Agent needs your input" for an open interaction.
+- **Archive on Done** is a setting (`archiveThreadsOnDone`, off by default).
+  Done also offers "Archive threads" in its toast and in the task's menu.
+- **Bots** aren't assignees yet.
+- The staged screenshot shows the board without a live handoff, because the
+  staged BB has no agent credentials.
 
 ## Open questions
 

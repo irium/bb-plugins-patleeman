@@ -1,8 +1,9 @@
 // An add-on's own collection page. Built from the same `studio_*` methods
 // Studio calls, so it shows exactly what Studio would for this add-on. When
-// Studio is installed, the page hands over to Studio's collection instead.
+// Studio is installed, the page hands over to Studio's collection instead,
+// unless the add-on keeps its own page (`handOver={false}`).
 import { useBbContext, useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { z as Zod } from "zod";
 import { mentionPrompt, type StudioCreateEventDetail, type StudioSchemas } from "../contract";
@@ -26,6 +27,8 @@ export function AddOnCollection({
   call,
   refreshKey,
   kind: initialKind = "all",
+  handOver = true,
+  headerActions,
 }: {
   pluginId: string;
   title: string;
@@ -34,8 +37,13 @@ export function AddOnCollection({
   refreshKey?: unknown;
   /** The kind Studio opens filtered to when this page hands over. */
   kind?: string;
+  /** Hand over to Studio's collection when Studio is installed. */
+  handOver?: boolean;
+  /** Extra buttons beside New. */
+  headerActions?: ReactNode;
 }) {
-  const studio = useStudioPresent();
+  const present = useStudioPresent();
+  const studio = handOver ? present : false;
   const navigate = useBbNavigate();
   const context = useBbContext();
   const projects = useProjects();
@@ -120,6 +128,7 @@ export function AddOnCollection({
       storageKey={`${pluginId}:collection`}
       kind={kind}
       onKindChange={setKind}
+      headerActions={headerActions}
       handlers={handlers}
     />
   );

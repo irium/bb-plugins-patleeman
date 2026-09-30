@@ -1,6 +1,6 @@
 ---
 name: studio
-description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings and artifacts — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (Studio Pages, Studio Talk, Studio Draw, Studio Artifacts) fit together.
+description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings, artifacts and tasks — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (Studio Pages, Studio Talk, Studio Draw, Studio Artifacts, Studio Tasks) fit together.
 ---
 
 # Studio
@@ -14,6 +14,7 @@ the core: one collection that lists every item from every installed add-on.
 | Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb talk` |
 | Studio Draw | `excalidraw` | Drawings | the `draw` skill and `excalidraw_*` tools |
 | Studio Artifacts | `artifacts` | Artifacts: saved images, HTML, reports, files | the `artifacts` skill and `artifacts_*` tools |
+| Studio Tasks | `studio-tasks` | Tasks on a board you can hand to agents | the `studio-tasks` skill and `tasks_*` tools |
 
 Items belong to a BB project or are global. Every item has a link
 (`/plugins/<plugin id>/<panel>/<item id>`); put it in replies as
@@ -23,7 +24,7 @@ Items belong to a BB project or are global. Every item has a link
 
 - Agent tool `studio_list_items`: this project's and global items, newest
   first, each with its kind and link. Pass `query` to match titles and
-  content, `kind` (`page`, `recording`, `dictation`, `drawing`, `artifact`) to narrow, and
+  content, `kind` (`page`, `recording`, `dictation`, `drawing`, `artifact`, `task`) to narrow, and
   `allProjects: true` to look everywhere. Archived items are left out.
 - CLI: `bb studio list [--all] [--kind <kind>] [--query <text>] [--json]`.
 - `bb studio providers` shows which add-ons are installed and whether each is

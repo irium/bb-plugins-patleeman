@@ -22,6 +22,7 @@
     { "name": "smart-queue", "source": "./packages/bb-plugin-smart-queue" },
     { "name": "studio", "source": "./packages/bb-plugin-studio" },
     { "name": "talk", "source": "./packages/bb-plugin-talk" },
+    { "name": "studio-tasks", "source": "./packages/bb-plugin-studio-tasks" },
     { "name": "tok-speed", "source": "./packages/bb-plugin-tok-speed" },
     { "name": "thread-list-plus", "source": "./packages/bb-plugin-thread-list-plus" },
     { "name": "traces", "source": "./packages/bb-plugin-traces" },

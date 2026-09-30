@@ -1,6 +1,6 @@
 # Studio
 
-> **Studio** is the core of **BB Studio**, a suite of plugins for writing, talking, drawing, and keeping what your agents make: Studio, [Studio Pages](../bb-plugin-pages), [Studio Talk](../bb-plugin-talk), [Studio Draw](../bb-plugin-excalidraw), and [Studio Artifacts](../bb-plugin-artifacts).
+> **Studio** is the core of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, and keeping what your agents make: Studio, [Studio Pages](../bb-plugin-pages), [Studio Talk](../bb-plugin-talk), [Studio Draw](../bb-plugin-excalidraw), [Studio Artifacts](../bb-plugin-artifacts), and [Studio Tasks](../bb-plugin-studio-tasks).
 
 One collection for everything the Studio add-ons make: pages, Talk
 recordings and dictations, drawings, and saved artifacts. Search across all of them, filter by
